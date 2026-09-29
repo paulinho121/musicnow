@@ -1,0 +1,21 @@
+{
+  "name": "ensaio-facil",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev -w @ensaio/api & npm run dev -w @ensaio/web",
+    "dev:api": "npm run dev -w @ensaio/api",
+    "dev:web": "npm run dev -w @ensaio/web",
+    "build": "npm run build -w @ensaio/api && npm run build -w @ensaio/web",
+    "test": "npm run test -w @ensaio/shared",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "db:generate": "npm run db:generate -w @ensaio/api",
+    "db:migrate": "npm run db:migrate -w @ensaio/api",
+    "db:seed": "npm run db:seed -w @ensaio/api",
+    "deploy": "powershell -ExecutionPolicy Bypass -File deploy/deploy.ps1"
+  }
+}

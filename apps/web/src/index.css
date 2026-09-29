@@ -1,0 +1,110 @@
+@import 'tailwindcss';
+
+/* Tema: escuro por padrão (palco, pouca luz), claro opcional (ensaio de dia). */
+:root,
+[data-theme='dark'] {
+  --bg: #0e0f13;
+  --surface: #16181e;
+  --surface-2: #1e2129;
+  --border: #2a2e38;
+  --text: #eceef3;
+  --muted: #9aa1b1;
+  --accent: #f5a524;
+  --accent-ink: #1a1204;
+  --chord: #f5b84a;
+  --danger: #f06a6a;
+  --ok: #4fd18b;
+  color-scheme: dark;
+}
+
+[data-theme='light'] {
+  --bg: #f6f5f2;
+  --surface: #ffffff;
+  --surface-2: #efede8;
+  --border: #dedad2;
+  --text: #17181c;
+  --muted: #5f6472;
+  --accent: #d97a06;
+  --accent-ink: #ffffff;
+  --chord: #b85f00;
+  --danger: #c93838;
+  --ok: #1c8f55;
+  color-scheme: light;
+}
+
+@theme {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-border: var(--border);
+  --color-text: var(--text);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --color-accent-ink: var(--accent-ink);
+  --color-chord: var(--chord);
+  --color-danger: var(--danger);
+  --color-ok: var(--ok);
+
+  --color-sec-intro: #7aa2ff;
+  --color-sec-verso: #9aa1b1;
+  --color-sec-pre: #b58cff;
+  --color-sec-refrao: #f5a524;
+  --color-sec-ponte: #ff7eb6;
+  --color-sec-solo: #4fd1c5;
+  --color-sec-final: #f06a6a;
+
+  --font-sans: 'Inter Variable', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono Variable', ui-monospace, monospace;
+}
+
+html,
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  min-height: 100dvh;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+@utility btn {
+  @apply inline-flex h-11 items-center justify-center gap-2 rounded-xl px-4 text-sm font-semibold transition active:scale-[.98] disabled:pointer-events-none disabled:opacity-50;
+}
+@utility btn-primary {
+  @apply btn bg-accent text-accent-ink hover:brightness-110;
+}
+@utility btn-ghost {
+  @apply btn border border-border bg-surface text-text hover:bg-surface-2;
+}
+@utility btn-icon {
+  @apply inline-flex size-11 items-center justify-center rounded-xl border border-border bg-surface text-text transition hover:bg-surface-2 active:scale-95 disabled:opacity-40;
+}
+@utility input {
+  @apply h-11 w-full rounded-xl border border-border bg-surface px-3 text-base text-text placeholder:text-muted/70 focus:border-accent focus:outline-none;
+}
+@utility label {
+  @apply mb-1.5 block text-sm font-medium text-muted;
+}
+@utility card {
+  @apply rounded-2xl border border-border bg-surface;
+}
+@utility chip {
+  @apply inline-flex h-9 items-center gap-1.5 rounded-full border border-border bg-surface px-3.5 text-sm font-medium text-muted transition hover:text-text;
+}
+@utility chip-on {
+  @apply border-accent bg-accent/15 text-accent;
+}
+
+/* Cifra: monoespaçada, para os acordes ficarem alinhados sobre a sílaba certa. */
+.sheet {
+  font-family: var(--font-mono);
+  white-space: pre;
+  font-variant-ligatures: none;
+}
