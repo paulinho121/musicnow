@@ -1,13 +1,14 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { ReportReason } from '@ensaio/shared'
 import { api } from './api'
-import type { Dashboard, ImportResult, ImportSongInput, Me, SongDetail, SongInput, SongListItem } from './types'
+import type { Dashboard, ImportResult, ImportSongInput, Me, SongDetail, SongInput, SongListItem, SongMark } from './types'
 
 export const keys = {
   me: ['me'] as const,
   dashboard: ['dashboard'] as const,
   songs: (params: Record<string, string | undefined>) => ['songs', params] as const,
-  song: (id: string) => ['song', id] as const,
+  /** Prefixo ['song', id] cobre a música vista solta e dentro de qualquer repertório. */
+  song: (id: string, setlistId?: string | null) => (setlistId ? ['song', id, setlistId] : ['song', id]),
   facets: ['songs', 'facets'] as const,
 }
 
@@ -32,11 +33,35 @@ export function useFacets() {
   return useQuery({ queryKey: keys.facets, queryFn: () => api<{ styles: string[] }>('/songs/facets'), staleTime: 5 * 60_000 })
 }
 
-export function useSong(id: string | undefined) {
+export function useSong(id: string | undefined, setlistId?: string | null) {
   return useQuery({
-    queryKey: keys.song(id ?? ''),
-    queryFn: () => api<SongDetail>(`/songs/${id}`),
+    queryKey: keys.song(id ?? '', setlistId),
+    queryFn: () => api<SongDetail>(`/songs/${id}${setlistId ? `?setlistId=${setlistId}` : ''}`),
     enabled: Boolean(id),
+  })
+}
+
+export interface MarkInput {
+  lineIndex: number
+  type: SongMark['type']
+  text: string | null
+  shared: boolean
+  setlistId: string | null
+}
+
+export function useAddMark(songId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (input: MarkInput) => api<SongMark>(`/songs/${songId}/marks`, { method: 'POST', json: input }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['song', songId] }),
+  })
+}
+
+export function useDeleteMark(songId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (markId: string) => api(`/songs/${songId}/marks/${markId}`, { method: 'DELETE' }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['song', songId] }),
   })
 }
 
@@ -73,7 +98,7 @@ export function useToggleFavorite() {
     mutationFn: ({ id, value }: { id: string; value: boolean }) =>
       api(`/songs/${id}/favorite`, { method: value ? 'POST' : 'DELETE' }),
     onMutate: async ({ id, value }) => {
-      qc.setQueryData<SongDetail>(keys.song(id), (s) => (s ? { ...s, isFavorite: value } : s))
+      qc.setQueriesData<SongDetail>({ queryKey: ['song', id] }, (s) => (s ? { ...s, isFavorite: value } : s))
       qc.setQueriesData<SongListItem[]>({ queryKey: ['songs'] }, (list) =>
         Array.isArray(list) ? list.map((s) => (s.id === id ? { ...s, isFavorite: value } : s)) : list,
       )
@@ -91,7 +116,7 @@ export function useSavePersonalKey(id: string) {
   return useMutation({
     mutationFn: (personalKey: string | null) =>
       api<{ personalKey: string | null }>(`/songs/${id}/state`, { method: 'PUT', json: { personalKey } }),
-    onSuccess: (res) => qc.setQueryData<SongDetail>(keys.song(id), (s) => (s ? { ...s, ...res } : s)),
+    onSuccess: (res) => qc.setQueriesData<SongDetail>({ queryKey: ['song', id] }, (s) => (s ? { ...s, ...res } : s)),
   })
 }
 

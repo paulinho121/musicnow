@@ -1,8 +1,11 @@
-import { normalizeOffset, parseChord, semitonesBetween, transposeKey } from '@ensaio/shared'
+import { atLeast, normalizeOffset, parseChord, semitonesBetween, transposeKey } from '@ensaio/shared'
 import clsx from 'clsx'
 import {
   ArrowLeft,
+  ChevronLeft,
+  ChevronRight,
   Expand,
+  ListMusic,
   Lock,
   Minus,
   Pause,
@@ -12,29 +15,53 @@ import {
   RotateCcw,
   Shrink,
   Star,
+  Tag,
   Type,
   Unlock,
 } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
+import { AddToSetlistButton } from '../components/AddToSetlist'
 import { ChordSheet, sectionsOf, useSheet } from '../components/ChordSheet'
 import { KeyPicker } from '../components/KeyPicker'
+import { MarkDialog } from '../components/MarkDialog'
 import { ReportButton } from '../components/ReportDialog'
 import { ErrorState, PageSpinner, useToast } from '../components/ui'
 import { useSession } from '../lib/auth'
-import { useSavePersonalKey, useSong, useToggleFavorite } from '../lib/queries'
+import { useDeleteMark, useSavePersonalKey, useSong, useToggleFavorite } from '../lib/queries'
 import { useLocalState } from '../lib/storage'
+import type { SongMark } from '../lib/types'
 
 const VIEWER_DEFAULTS = { fontSize: 17, lineHeight: 1.45, speed: 3, showChords: true }
 
+/** Contexto quando a música é tocada dentro de um repertório. */
+export interface SetlistContext {
+  id: string
+  name: string
+  position: number
+  total: number
+  /** Tom definido para esta música no repertório (null = tom original). */
+  itemKey: string | null
+  itemNotes: string | null
+  prev?: { title: string; go: () => void }
+  next?: { title: string; go: () => void }
+  onExit: () => void
+}
+
+/** Rota /musicas/:id — a música solta. */
 export function SongView() {
   const { id } = useParams()
+  return <SongViewer songId={id!} />
+}
+
+export function SongViewer({ songId, setlist }: { songId: string; setlist?: SetlistContext }) {
   const navigate = useNavigate()
   const toast = useToast()
   const { data: session } = useSession()
-  const { data: song, isLoading, error, refetch } = useSong(id)
+  const { data: song, isLoading, error, refetch } = useSong(songId, setlist?.id)
   const fav = useToggleFavorite()
-  const savePersonal = useSavePersonalKey(id ?? '')
+  const savePersonal = useSavePersonalKey(songId)
+  const deleteMark = useDeleteMark(songId)
 
   const [prefs, setPrefs] = useLocalState('ef-viewer', VIEWER_DEFAULTS)
   const [offset, setOffset] = useState(0)
@@ -43,14 +70,26 @@ export function SongView() {
   const [scrolling, setScrolling] = useState(false)
   const [locked, setLocked] = useState(false)
   const [fullscreen, setFullscreen] = useState(false)
+  const [markMode, setMarkMode] = useState(false)
+  const [markLine, setMarkLine] = useState<number | null>(null)
 
-  // Ao abrir, começa no tom pessoal do músico (se ele tiver um salvo).
+  // Tom inicial: o do repertório; fora dele, o tom pessoal do músico; senão, o original.
+  const baseKey = setlist?.itemKey ?? song?.personalKey ?? null
   const initialized = useRef<string | null>(null)
   useEffect(() => {
-    if (!song || initialized.current === song.id) return
-    initialized.current = song.id
-    setOffset(song.originalKey && song.personalKey ? normalizeOffset(semitonesBetween(song.originalKey, song.personalKey)) : 0)
-  }, [song])
+    if (!song) return
+    const marker = `${song.id}|${setlist?.id ?? ''}|${setlist?.itemKey ?? ''}`
+    if (initialized.current === marker) return
+    initialized.current = marker
+    setOffset(song.originalKey && baseKey ? normalizeOffset(semitonesBetween(song.originalKey, baseKey)) : 0)
+  }, [song, setlist?.id, setlist?.itemKey, baseKey])
+
+  // Trocou de música no repertório: volta ao topo e para a rolagem.
+  useEffect(() => {
+    window.scrollTo(0, 0)
+    setScrolling(false)
+    setMarkLine(null)
+  }, [songId])
 
   const original = song?.originalKey ?? null
   const currentKey = original ? transposeKey(original, offset) : null
@@ -59,6 +98,8 @@ export function SongView() {
   const sections = sectionsOf(lines)
 
   const shift = useCallback((d: number) => setOffset((o) => normalizeOffset(o + d)), [])
+  const next = setlist?.next
+  const prev = setlist?.prev
 
   useAutoScroll(scrolling, prefs.speed, () => setScrolling(false))
   useWakeLock(Boolean(song))
@@ -69,25 +110,30 @@ export function SongView() {
     return () => document.removeEventListener('fullscreenchange', onFs)
   }, [])
 
-  // Teclado e pedais Bluetooth (que enviam setas / PageDown).
+  // Teclado e pedais Bluetooth (que enviam setas / PageDown). No fim da página,
+  // "avançar" passa para a próxima música do repertório.
   useEffect(() => {
+    const atBottom = () => window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 4
+    const atTop = () => window.scrollY <= 4
     const onKey = (e: KeyboardEvent) => {
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement) return
       if (e.key === ' ') {
         e.preventDefault()
         setScrolling((s) => !s)
       } else if (e.key === 'PageDown' || e.key === 'ArrowRight') {
         e.preventDefault()
-        window.scrollBy({ top: window.innerHeight * 0.75, behavior: 'smooth' })
+        if (atBottom() && next) next.go()
+        else window.scrollBy({ top: window.innerHeight * 0.75, behavior: 'smooth' })
       } else if (e.key === 'PageUp' || e.key === 'ArrowLeft') {
         e.preventDefault()
-        window.scrollBy({ top: -window.innerHeight * 0.75, behavior: 'smooth' })
+        if (atTop() && prev) prev.go()
+        else window.scrollBy({ top: -window.innerHeight * 0.75, behavior: 'smooth' })
       } else if (!locked && (e.key === '+' || e.key === '=')) shift(1)
       else if (!locked && e.key === '-') shift(-1)
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [locked, shift])
+  }, [locked, shift, next, prev])
 
   if (isLoading) return <PageSpinner />
   if (error || !song)
@@ -98,7 +144,9 @@ export function SongView() {
     )
 
   const hideLyrics = song.lyricsHidden
-  const personalDiffers = currentKey !== (song.personalKey ?? original)
+  const uid = session?.user.id
+  // Fora de repertório, oferece salvar o tom pessoal; dentro dele, o tom é o da banda.
+  const personalDiffers = !setlist && currentKey !== (song.personalKey ?? original)
 
   const toggleFullscreen = () => {
     if (document.fullscreenElement) document.exitFullscreen()
@@ -113,15 +161,40 @@ export function SongView() {
     })
   }
 
+  const canDelete = (m: SongMark) => m.authorId === uid || (Boolean(m.setlistId) && atLeast(song.setlistRole, 'admin'))
+  const onMarkClick = (m: SongMark) => {
+    if (!canDelete(m)) return toast('Só quem criou esta marcação pode apagá-la.', 'error')
+    if (!confirm(`Apagar a marcação "${m.text ?? m.type}"?`)) return
+    deleteMark.mutate(m.id, { onSuccess: () => toast('Marcação apagada.'), onError: (e) => toast(e.message, 'error') })
+  }
+
+  const lineText = markLine !== null ? (song.content.split('\n')[markLine] ?? '') : ''
+  const resetLabel = setlist?.itemKey ? `Voltar ao tom do repertório (${setlist.itemKey})` : 'Voltar ao tom original'
+
   return (
-    <div className="min-h-dvh pb-32">
-      {/* Cabeçalho */}
+    <div className="min-h-dvh pb-36">
       <header className="sticky top-0 z-30 border-b border-border bg-bg/95 backdrop-blur">
-        <div className="mx-auto flex max-w-4xl items-center gap-2 px-3 py-2">
+        {setlist && (
+          <div className="flex items-center gap-1 border-b border-border bg-surface/60 px-2 py-1">
+            <button className="btn-icon size-9 shrink-0 border-transparent bg-transparent" onClick={setlist.onExit} aria-label="Voltar ao repertório">
+              <ListMusic className="size-4" />
+            </button>
+            <p className="min-w-0 flex-1 truncate text-xs text-muted">
+              <b className="text-text">{setlist.name}</b> · {setlist.position + 1} de {setlist.total}
+            </p>
+            <button className="btn-icon size-9 shrink-0" onClick={prev?.go} disabled={!prev} aria-label="Música anterior">
+              <ChevronLeft className="size-4" />
+            </button>
+            <button className="btn-icon size-9 shrink-0" onClick={next?.go} disabled={!next} aria-label="Próxima música">
+              <ChevronRight className="size-4" />
+            </button>
+          </div>
+        )}
+        <div className="mx-auto flex max-w-4xl items-center gap-1 px-2 py-2">
           <button
             className="btn-icon shrink-0 border-transparent bg-transparent"
             aria-label="Voltar"
-            onClick={() => (window.history.length > 1 ? navigate(-1) : navigate('/musicas'))}
+            onClick={() => (setlist ? setlist.onExit() : window.history.length > 1 ? navigate(-1) : navigate('/musicas'))}
           >
             <ArrowLeft className="size-5" />
           </button>
@@ -137,40 +210,59 @@ export function SongView() {
           >
             <Star className={clsx('size-5', song.isFavorite ? 'fill-accent text-accent' : '')} />
           </button>
-          {song.canEdit && (
+          <button
+            className={clsx('btn-icon shrink-0', markMode ? 'border-accent bg-accent/15 text-accent' : 'border-transparent bg-transparent')}
+            aria-label={markMode ? 'Sair do modo de marcar' : 'Marcar trechos'}
+            aria-pressed={markMode}
+            onClick={() => {
+              setMarkMode((m) => !m)
+              setScrolling(false)
+            }}
+          >
+            <Tag className="size-5" />
+          </button>
+          {!setlist && <AddToSetlistButton songId={song.id} songTitle={song.title} isPrivate={song.visibility === 'private'} />}
+          {song.canEdit && !setlist && (
             <Link to={`/musicas/${song.id}/editar`} className="btn-icon shrink-0 border-transparent bg-transparent" aria-label="Editar">
               <Pencil className="size-5" />
             </Link>
           )}
-          <button className="btn-icon shrink-0 border-transparent bg-transparent" aria-label="Tela cheia" onClick={toggleFullscreen}>
-            {fullscreen ? <Shrink className="size-5" /> : <Expand className="size-5" />}
-          </button>
         </div>
 
-        {sections.length > 1 && (
-          <nav aria-label="Seções" className="mx-auto flex max-w-4xl gap-2 overflow-x-auto px-3 pb-2 [scrollbar-width:none]">
-            {sections.map((s) => (
-              <button
-                key={s.index}
-                className="chip h-8 shrink-0 text-xs"
-                onClick={() => document.getElementById(`linha-${s.index}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
-              >
-                {s.label}
-              </button>
-            ))}
-          </nav>
+        {markMode ? (
+          <p className="bg-accent/10 px-4 py-2 text-center text-xs text-accent">
+            Toque numa linha para marcar · toque numa marcação para apagar
+          </p>
+        ) : (
+          sections.length > 1 && (
+            <nav aria-label="Seções" className="mx-auto flex max-w-4xl gap-2 overflow-x-auto px-3 pb-2 [scrollbar-width:none]">
+              {sections.map((s) => (
+                <button
+                  key={s.index}
+                  className="chip h-8 shrink-0 text-xs"
+                  onClick={() => document.getElementById(`linha-${s.index}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+                >
+                  {s.label}
+                </button>
+              ))}
+            </nav>
+          )
         )}
       </header>
 
       <div className="mx-auto max-w-4xl px-4 pt-4">
-        {/* Dados da música */}
         <div className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted">
+          {setlist?.itemKey && (
+            <span>
+              Tom do repertório <b className="font-mono text-accent">{setlist.itemKey}</b>
+            </span>
+          )}
           {original && (
             <span>
               Tom original <b className="font-mono text-text">{original}</b>
             </span>
           )}
-          {song.personalKey && (
+          {song.personalKey && !setlist && (
             <span>
               Meu tom <b className="font-mono text-accent">{song.personalKey}</b>
             </span>
@@ -179,9 +271,12 @@ export function SongView() {
           {song.timeSignature && <span>{song.timeSignature}</span>}
           {song.style && <span>{song.style}</span>}
         </div>
-        {song.notes && (
-          <p className="mb-4 rounded-xl border-l-4 border-accent bg-accent/10 px-3 py-2 text-sm">{song.notes}</p>
+        {setlist?.itemNotes && (
+          <p className="mb-3 rounded-xl border-l-4 border-sec-intro bg-sec-intro/10 px-3 py-2 text-sm">
+            <b>Neste repertório:</b> {setlist.itemNotes}
+          </p>
         )}
+        {song.notes && <p className="mb-4 rounded-xl border-l-4 border-accent bg-accent/10 px-3 py-2 text-sm">{song.notes}</p>}
         {hideLyrics && (
           <p className="mb-4 rounded-xl bg-surface-2 px-3 py-2 text-sm text-muted">
             A letra desta música não está autorizada para exibição. Mostrando apenas acordes e seções.
@@ -196,19 +291,31 @@ export function SongView() {
             lineHeight={prefs.lineHeight}
             showChords={prefs.showChords}
             hideLyrics={hideLyrics}
-            currentUserId={session?.user.id}
+            currentUserId={uid}
+            markMode={markMode}
+            onLineClick={setMarkLine}
+            onMarkClick={onMarkClick}
           />
         ) : (
           <p className="py-10 text-center text-muted">Esta música ainda não tem cifra cadastrada.</p>
         )}
-        {!song.canEdit && (
+
+        {next && (
+          <button className="card mt-10 flex w-full items-center gap-3 p-4 text-left transition hover:border-accent/50" onClick={next.go}>
+            <span className="min-w-0 flex-1">
+              <span className="block text-xs text-muted">Próxima música</span>
+              <span className="block truncate font-semibold">{next.title}</span>
+            </span>
+            <ChevronRight className="size-5 text-accent" />
+          </button>
+        )}
+        {!song.canEdit && !setlist && (
           <div className="mt-8 flex justify-center">
             <ReportButton songId={song.id} />
           </div>
         )}
       </div>
 
-      {/* Painel de leitura */}
       {panelOpen && !locked && (
         <div className="fixed inset-x-3 bottom-24 z-30 mx-auto max-w-md rounded-2xl border border-border bg-surface p-4 shadow-2xl shadow-black/40">
           <Stepper
@@ -238,13 +345,16 @@ export function SongView() {
               onChange={(e) => setPrefs((p) => ({ ...p, showChords: e.target.checked }))}
             />
           </label>
+          <button className="btn-ghost mt-2 w-full" onClick={toggleFullscreen}>
+            {fullscreen ? <Shrink className="size-4" /> : <Expand className="size-4" />}
+            {fullscreen ? 'Sair da tela cheia' : 'Tela cheia'}
+          </button>
         </div>
       )}
 
-      {/* Barra de controles ao vivo */}
       {!locked && (
         <div className="fixed inset-x-0 bottom-0 z-30 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-          <div className="mx-auto flex w-fit max-w-[calc(100%-1.5rem)] items-center gap-1.5 rounded-2xl border border-border bg-surface/95 p-1.5 shadow-2xl shadow-black/40 backdrop-blur">
+          <div className="mx-auto flex w-fit max-w-[calc(100%-1rem)] items-center gap-1.5 rounded-2xl border border-border bg-surface/95 p-1.5 shadow-2xl shadow-black/40 backdrop-blur">
             <button className="btn-icon" aria-label="Descer meio tom" onClick={() => shift(-1)} disabled={!song.content}>
               <Minus className="size-5" />
             </button>
@@ -259,8 +369,13 @@ export function SongView() {
             <button className="btn-icon" aria-label="Subir meio tom" onClick={() => shift(1)} disabled={!song.content}>
               <Plus className="size-5" />
             </button>
-            {offset !== 0 && (
-              <button className="btn-icon" aria-label="Voltar ao tom original" onClick={() => setOffset(0)}>
+            {original && currentKey !== (baseKey ?? original) && (
+              <button
+                className="btn-icon"
+                aria-label={resetLabel}
+                title={resetLabel}
+                onClick={() => setOffset(baseKey ? normalizeOffset(semitonesBetween(original, baseKey)) : 0)}
+              >
                 <RotateCcw className="size-5" />
               </button>
             )}
@@ -285,6 +400,7 @@ export function SongView() {
               aria-label="Bloquear toques"
               onClick={() => {
                 setPanelOpen(false)
+                setMarkMode(false)
                 setLocked(true)
               }}
             >
@@ -309,11 +425,21 @@ export function SongView() {
         minor={isMinor}
         current={currentKey}
         original={original}
-        personal={song.personalKey}
+        personal={setlist ? setlist.itemKey : song.personalKey}
+        personalLabel={setlist ? 'repertório' : 'meu tom'}
         onPick={(k) => {
           if (original) setOffset(normalizeOffset(semitonesBetween(original, k)))
           setPickerOpen(false)
         }}
+      />
+
+      <MarkDialog
+        songId={song.id}
+        lineIndex={markLine}
+        lineText={lineText}
+        setlistId={setlist?.id ?? null}
+        canShare={song.canShareMarks}
+        onClose={() => setMarkLine(null)}
       />
     </div>
   )

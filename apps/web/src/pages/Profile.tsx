@@ -3,7 +3,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import clsx from 'clsx'
 import { Check, LogOut, Moon, Star, Sun } from 'lucide-react'
 import { type FormEvent, useEffect, useState } from 'react'
-import { useNavigate } from 'react-router'
+import { useLocation, useNavigate } from 'react-router'
 import { ErrorState, PageSpinner, useToast } from '../components/ui'
 import { logout as endSession } from '../lib/auth'
 import { useMe, useSaveProfile } from '../lib/queries'
@@ -15,6 +15,8 @@ export function Profile() {
   const toast = useToast()
   const navigate = useNavigate()
   const qc = useQueryClient()
+  // Quem chegou por um convite volta para ele depois de preencher o perfil.
+  const from = (useLocation().state as { from?: string } | null)?.from
 
   const [name, setName] = useState('')
   const [city, setCity] = useState('')
@@ -60,7 +62,7 @@ export function Profile() {
       {
         onSuccess: () => {
           toast('Perfil salvo.')
-          if (onboarding) navigate('/inicio', { replace: true })
+          if (onboarding) navigate(from && from !== '/perfil' ? from : '/inicio', { replace: true })
         },
         onError: (err) => setFormError(err.message),
       },

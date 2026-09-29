@@ -72,3 +72,16 @@ export async function sendPasswordChangedEmail(to: string, name: string) {
     }),
   })
 }
+
+export async function sendSetlistInviteEmail(to: string, fromName: string, setlistName: string, url: string) {
+  await sendMail({
+    to,
+    subject: `${fromName} te convidou para o repertório "${setlistName}"`,
+    text: `${fromName} te convidou para participar do repertório "${setlistName}" no Ensaio Fácil.\n\nAbra o link para entrar (vale por 14 dias):\n${url}`,
+    html: layout({
+      title: `Convite para "${setlistName}"`,
+      body: `<p style="font-size:15px;line-height:1.5"><b>${escapeHtml(fromName)}</b> te convidou para participar do repertório <b>${escapeHtml(setlistName)}</b>. Lá você encontra a ordem das músicas, o tom de cada uma e as marcações da banda.</p>`,
+      button: { label: 'Entrar no repertório', url },
+    }),
+  })
+}

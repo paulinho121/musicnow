@@ -49,6 +49,10 @@ interface Props {
   /** Letra sem autorização de exibição: mostra só acordes e seções. */
   hideLyrics?: boolean
   currentUserId?: string
+  /** Modo de marcar: as linhas viram botões para criar marcação; as marcações, para apagar. */
+  markMode?: boolean
+  onLineClick?: (lineIndex: number) => void
+  onMarkClick?: (mark: SongMark) => void
 }
 
 export const ChordSheet = memo(function ChordSheet({
@@ -59,41 +63,72 @@ export const ChordSheet = memo(function ChordSheet({
   showChords = true,
   hideLyrics = false,
   currentUserId,
+  markMode = false,
+  onLineClick,
+  onMarkClick,
 }: Props) {
   const marksByLine = useMemo(() => {
     const m = new Map<number, SongMark[]>()
-    for (const mark of marks) m.set(mark.lineIndex, [...(m.get(mark.lineIndex) ?? []), mark])
+    for (const mark of marks) {
+      // Marcação numa linha de letra sobe para cima do acorde dela: não separa o acorde da sílaba.
+      const i = mark.lineIndex
+      const anchor = lines[i]?.kind === 'lyrics' && lines[i - 1]?.kind === 'chords' ? i - 1 : i
+      m.set(anchor, [...(m.get(anchor) ?? []), mark])
+    }
     return m
-  }, [marks])
+  }, [marks, lines])
 
   return (
     <div className="sheet overflow-x-auto pb-2" style={{ fontSize, lineHeight }}>
       {lines.map((line, i) => {
         const lineMarks = marksByLine.get(i)
+        const hidden = hideLyrics && line.kind === 'blank' && lines[i + 1]?.kind !== 'section'
         return (
           <div key={i} id={`linha-${i}`} className="scroll-mt-28">
             {lineMarks && (
               <div className="my-1.5 flex flex-wrap gap-1.5 font-sans whitespace-normal" style={{ fontSize: 13, lineHeight: 1.3 }}>
-                {lineMarks.map((m) => (
-                  <span
-                    key={m.id}
-                    className={clsx(
-                      'inline-flex items-center gap-1.5 rounded-lg border px-2 py-1',
-                      m.shared ? 'border-accent/40 bg-accent/10 text-text' : 'border-border border-dashed bg-surface text-muted',
-                    )}
-                    title={m.shared ? 'Marcação compartilhada' : 'Marcação privada (só você vê)'}
-                  >
-                    <b className="text-accent">{MARK_LABELS[m.type]}</b>
-                    {m.text}
-                    {!m.shared && m.authorId === currentUserId && <em className="not-italic opacity-60">· só você</em>}
-                  </span>
-                ))}
+                {lineMarks.map((m) => {
+                  const chip = (
+                    <>
+                      <b className="text-accent">{MARK_LABELS[m.type]}</b>
+                      {m.text}
+                      {!m.shared && m.authorId === currentUserId && <em className="not-italic opacity-60">· só você</em>}
+                      {m.shared && m.authorId !== currentUserId && m.authorName && (
+                        <em className="not-italic opacity-60">· {m.authorName.split(' ')[0]}</em>
+                      )}
+                    </>
+                  )
+                  const cls = clsx(
+                    'inline-flex items-center gap-1.5 rounded-lg border px-2 py-1 text-left',
+                    m.shared ? 'border-accent/40 bg-accent/10 text-text' : 'border-border border-dashed bg-surface text-muted',
+                  )
+                  const title = m.shared ? 'Marcação compartilhada' : 'Marcação pessoal (só você vê)'
+                  return markMode && onMarkClick ? (
+                    <button key={m.id} type="button" className={clsx(cls, 'ring-danger/60 hover:ring-2')} title={title} onClick={() => onMarkClick(m)}>
+                      {chip}
+                    </button>
+                  ) : (
+                    <span key={m.id} className={cls} title={title}>
+                      {chip}
+                    </span>
+                  )
+                })}
               </div>
             )}
             {/* Sem letra, as linhas em branco que sobram só ficam antes das seções. */}
-            {!(hideLyrics && line.kind === 'blank' && lines[i + 1]?.kind !== 'section') && (
-              <Line line={line} showChords={showChords} hideLyrics={hideLyrics} />
-            )}
+            {!hidden &&
+              (markMode && onLineClick && line.kind !== 'blank' ? (
+                <button
+                  type="button"
+                  className="-mx-2 block w-[calc(100%+1rem)] rounded-lg px-2 text-left hover:bg-accent/10 focus-visible:bg-accent/10"
+                  onClick={() => onLineClick(i)}
+                  aria-label={`Marcar a linha ${i + 1}`}
+                >
+                  <Line line={line} showChords={showChords} hideLyrics={hideLyrics} />
+                </button>
+              ) : (
+                <Line line={line} showChords={showChords} hideLyrics={hideLyrics} />
+              ))}
           </div>
         )
       })}

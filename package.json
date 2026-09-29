@@ -17,6 +17,7 @@
     "db:migrate": "npm run db:migrate -w @ensaio/api",
     "db:seed": "npm run db:seed -w @ensaio/api",
     "deploy": "powershell -ExecutionPolicy Bypass -File deploy/deploy.ps1",
-    "backup:baixar": "powershell -ExecutionPolicy Bypass -File deploy/baixar-backup.ps1"
+    "backup:baixar": "powershell -ExecutionPolicy Bypass -File deploy/baixar-backup.ps1",
+    "test:api": "npm run test -w @ensaio/api"
   }
 }

@@ -53,7 +53,7 @@ export function Dashboard() {
             ) : data?.upcoming.length ? (
               <div className="card divide-y divide-border">
                 {data.upcoming.map((s) => (
-                  <div key={s.id} className="flex items-center gap-3 p-4">
+                  <Link key={s.id} to={`/repertorios/${s.id}`} className="flex items-center gap-3 p-4 transition hover:bg-surface-2">
                     <div className="min-w-0 flex-1">
                       <p className="truncate font-semibold">{s.name}</p>
                       <p className="truncate text-sm text-muted">
@@ -61,12 +61,20 @@ export function Dashboard() {
                       </p>
                     </div>
                     <span className="chip h-7 text-xs">{SETLIST_STATUS[s.status]}</span>
-                  </div>
+                  </Link>
                 ))}
               </div>
             ) : (
-              <EmptyState icon={CalendarDays} title="Nenhum evento marcado">
-                Os repertórios compartilhados chegam na próxima etapa do app. Por enquanto, cadastre e organize suas músicas.
+              <EmptyState
+                icon={CalendarDays}
+                title="Nenhum evento marcado"
+                action={
+                  <Link to="/repertorios/novo" className="btn-primary">
+                    <Plus className="size-4" /> Criar repertório
+                  </Link>
+                }
+              >
+                Monte o repertório do próximo culto, show ou ensaio e convide a banda.
               </EmptyState>
             )}
           </Section>

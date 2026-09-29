@@ -10,7 +10,8 @@
     "typecheck": "tsc --noEmit",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx --env-file=.env src/migrate-cli.ts",
-    "db:seed": "tsx --env-file=.env src/seed.ts"
+    "db:seed": "tsx --env-file=.env src/seed.ts",
+    "test": "vitest run"
   },
   "dependencies": {
     "@ensaio/shared": "^0.1.0",
@@ -29,6 +30,7 @@
     "drizzle-kit": "^0.31.11",
     "esbuild": "^0.28.2",
     "tsx": "^4.23.15",
-    "typescript": "^7.0.2"
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.2"
   }
 }

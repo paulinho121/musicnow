@@ -1,0 +1,707 @@
+import { atLeast, isChord, type SetlistRole } from '@ensaio/shared'
+import { and, asc, desc, eq, gt, isNull, or, sql } from 'drizzle-orm'
+import { Hono } from 'hono'
+import { HTTPException } from 'hono/http-exception'
+import { randomInt } from 'node:crypto'
+import { z } from 'zod'
+import { db, schema } from '../db'
+import { env } from '../env'
+import { forbidden, notFound, requireUser, validate, type AppEnv } from '../http'
+import { sendSetlistInviteEmail } from '../mail'
+import { getRole } from '../access'
+import { canViewSong } from './songs'
+
+const { setlist, setlistItem, setlistMember, setlistSuggestion, invite, song, user, userInstrument, songUserState, changeLog } =
+  schema
+
+type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0]
+
+// ---------------------------------------------------------------------------
+// Acesso
+
+/** Exige um papel mínimo. Quem não participa recebe 404 (não revelamos que o repertório existe). */
+async function requireRole(setlistId: string, userId: string, min: SetlistRole) {
+  const access = await getRole(setlistId, userId)
+  if (!access) notFound('Repertório')
+  if (!atLeast(access.role, min)) {
+    forbidden(
+      min === 'admin' || min === 'owner'
+        ? 'Só quem administra o repertório pode fazer isso.'
+        : 'Sua permissão neste repertório não permite isso.',
+    )
+  }
+  return access
+}
+
+/** Toda alteração sobe a revisão (os aparelhos da banda sabem que precisam atualizar) e vai para o histórico. */
+async function touch(tx: Tx, setlistId: string, userId: string, action: string, diff?: Record<string, unknown>) {
+  await tx
+    .update(setlist)
+    .set({ revision: sql`${setlist.revision} + 1`, updatedAt: new Date() })
+    .where(eq(setlist.id, setlistId))
+  await tx.insert(changeLog).values({ entityType: 'setlist', entityId: setlistId, userId, action, diff: diff ?? null })
+}
+
+// Código de convite: 8 caracteres sem letras ambíguas (0/O, 1/I/L). ~1 trilhão de combinações.
+const CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'
+function newInviteCode() {
+  return Array.from({ length: 8 }, () => CODE_ALPHABET[randomInt(CODE_ALPHABET.length)]).join('')
+}
+
+const inviteUrl = (code: string) => `${env.APP_URL}/convite/${code}`
+
+// ---------------------------------------------------------------------------
+// Validação
+
+const idParam = z.object({ id: z.string().uuid() })
+const keySchema = z
+  .string()
+  .trim()
+  .max(8)
+  .refine((k) => isChord(k), 'Tom inválido')
+  .nullish()
+
+const setlistInput = z.object({
+  name: z.string().trim().min(1, 'Dê um nome ao repertório').max(120),
+  eventDate: z.coerce.date().nullish(),
+  location: z.string().trim().max(160).nullish(),
+  groupName: z.string().trim().max(120).nullish(),
+  notes: z.string().trim().max(5000).nullish(),
+  status: z.enum(schema.setlistStatus.enumValues).default('rascunho'),
+})
+
+const itemInput = z.object({
+  key: keySchema,
+  bpm: z.number().int().min(20).max(320).nullish(),
+  notes: z.string().trim().max(1000).nullish(),
+})
+
+// ---------------------------------------------------------------------------
+
+export const setlistsRoutes = new Hono<AppEnv>()
+  .use(requireUser)
+
+  .get('/', async (c) => {
+    const uid = c.var.user.id
+    const rows = await db
+      .select({
+        id: setlist.id,
+        name: setlist.name,
+        eventDate: setlist.eventDate,
+        location: setlist.location,
+        groupName: setlist.groupName,
+        status: setlist.status,
+        archived: setlist.archived,
+        updatedAt: setlist.updatedAt,
+        ownerId: setlist.ownerId,
+        ownerName: user.name,
+        myPermission: setlistMember.permission,
+        itemCount: sql<number>`(select count(*)::int from ${setlistItem} where ${setlistItem.setlistId} = ${setlist.id})`,
+        memberCount: sql<number>`(select count(*)::int from ${setlistMember} m where m.setlist_id = ${setlist.id})`,
+      })
+      .from(setlist)
+      .innerJoin(user, eq(user.id, setlist.ownerId))
+      .leftJoin(setlistMember, and(eq(setlistMember.setlistId, setlist.id), eq(setlistMember.userId, uid)))
+      .where(or(eq(setlist.ownerId, uid), eq(setlistMember.userId, uid)))
+      .orderBy(asc(setlist.eventDate), desc(setlist.updatedAt))
+    return c.json(
+      rows.map(({ myPermission, ...r }) => ({ ...r, role: (r.ownerId === uid ? 'owner' : myPermission) as SetlistRole })),
+    )
+  })
+
+  .post('/', validate('json', setlistInput), async (c) => {
+    const uid = c.var.user.id
+    const input = c.req.valid('json')
+    const created = await db.transaction(async (tx) => {
+      const [row] = await tx.insert(setlist).values({ ...input, ownerId: uid }).returning({ id: setlist.id })
+      await tx.insert(changeLog).values({ entityType: 'setlist', entityId: row.id, userId: uid, action: 'create' })
+      return row
+    })
+    return c.json(created, 201)
+  })
+
+  .get('/:id', validate('param', idParam), async (c) => {
+    const uid = c.var.user.id
+    const { id } = c.req.valid('param')
+    const { role } = await requireRole(id, uid, 'view')
+    const isAdmin = atLeast(role, 'admin')
+
+    const [s] = await db
+      .select({ setlist, ownerName: user.name })
+      .from(setlist)
+      .innerJoin(user, eq(user.id, setlist.ownerId))
+      .where(eq(setlist.id, id))
+
+    const [items, members, suggestions, invites, parent] = await Promise.all([
+      db
+        .select({
+          id: setlistItem.id,
+          position: setlistItem.position,
+          key: setlistItem.key,
+          bpm: setlistItem.bpm,
+          notes: setlistItem.notes,
+          song: {
+            id: song.id,
+            title: song.title,
+            artist: song.artist,
+            originalKey: song.originalKey,
+            bpm: song.bpm,
+            timeSignature: song.timeSignature,
+          },
+          personalKey: songUserState.personalKey,
+        })
+        .from(setlistItem)
+        .innerJoin(song, eq(song.id, setlistItem.songId))
+        .leftJoin(songUserState, and(eq(songUserState.songId, song.id), eq(songUserState.userId, uid)))
+        .where(eq(setlistItem.setlistId, id))
+        .orderBy(asc(setlistItem.position)),
+      db
+        .select({
+          userId: setlistMember.userId,
+          name: user.name,
+          image: user.image,
+          permission: setlistMember.permission,
+          instrument: sql<string | null>`coalesce(${setlistMember.instrument}::text, (select ui.instrument::text from ${userInstrument} ui where ui.user_id = ${user.id} and ui."primary" limit 1))`,
+          joinedAt: setlistMember.joinedAt,
+        })
+        .from(setlistMember)
+        .innerJoin(user, eq(user.id, setlistMember.userId))
+        .where(eq(setlistMember.setlistId, id))
+        .orderBy(asc(setlistMember.joinedAt)),
+      db
+        .select({
+          id: setlistSuggestion.id,
+          itemId: setlistSuggestion.itemId,
+          proposedKey: setlistSuggestion.proposedKey,
+          message: setlistSuggestion.message,
+          status: setlistSuggestion.status,
+          createdAt: setlistSuggestion.createdAt,
+          authorId: setlistSuggestion.authorId,
+          authorName: user.name,
+        })
+        .from(setlistSuggestion)
+        .innerJoin(user, eq(user.id, setlistSuggestion.authorId))
+        .where(
+          and(
+            eq(setlistSuggestion.setlistId, id),
+            // Quem administra vê as sugestões abertas; os demais, só as próprias.
+            isAdmin ? eq(setlistSuggestion.status, 'open') : eq(setlistSuggestion.authorId, uid),
+          ),
+        )
+        .orderBy(desc(setlistSuggestion.createdAt))
+        .limit(50),
+      isAdmin
+        ? db
+            .select({
+              id: invite.id,
+              code: invite.code,
+              email: invite.email,
+              permission: invite.permission,
+              uses: invite.uses,
+              maxUses: invite.maxUses,
+              expiresAt: invite.expiresAt,
+            })
+            .from(invite)
+            .where(
+              and(
+                eq(invite.setlistId, id),
+                isNull(invite.revokedAt),
+                or(isNull(invite.expiresAt), gt(invite.expiresAt, new Date())),
+              ),
+            )
+            .orderBy(desc(invite.createdAt))
+        : Promise.resolve([]),
+      s.setlist.parentId
+        ? db
+            .select({ id: setlist.id, name: setlist.name })
+            .from(setlist)
+            .leftJoin(setlistMember, and(eq(setlistMember.setlistId, setlist.id), eq(setlistMember.userId, uid)))
+            .where(and(eq(setlist.id, s.setlist.parentId), or(eq(setlist.ownerId, uid), eq(setlistMember.userId, uid))))
+            .then((r) => r[0] ?? null)
+        : Promise.resolve(null),
+    ])
+
+    const [ownerInstrument] = await db
+      .select({ instrument: userInstrument.instrument })
+      .from(userInstrument)
+      .where(and(eq(userInstrument.userId, s.setlist.ownerId), eq(userInstrument.primary, true)))
+
+    return c.json({
+      ...s.setlist,
+      ownerName: s.ownerName,
+      role,
+      parent,
+      items,
+      members: [
+        {
+          userId: s.setlist.ownerId,
+          name: s.ownerName,
+          image: null,
+          permission: 'owner' as const,
+          instrument: ownerInstrument?.instrument ?? null,
+          joinedAt: s.setlist.createdAt,
+        },
+        ...members,
+      ],
+      suggestions,
+      invites: invites.filter((i) => i.maxUses == null || i.uses < i.maxUses).map((i) => ({ ...i, url: inviteUrl(i.code) })),
+    })
+  })
+
+  // Só a revisão: os aparelhos consultam isto a cada poucos segundos para saber se algo mudou.
+  .get('/:id/revision', validate('param', idParam), async (c) => {
+    const { id } = c.req.valid('param')
+    await requireRole(id, c.var.user.id, 'view')
+    const [r] = await db.select({ revision: setlist.revision }).from(setlist).where(eq(setlist.id, id))
+    return c.json(r)
+  })
+
+  .put('/:id', validate('param', idParam), validate('json', setlistInput), async (c) => {
+    const uid = c.var.user.id
+    const { id } = c.req.valid('param')
+    const input = c.req.valid('json')
+    await requireRole(id, uid, 'admin')
+    await db.transaction(async (tx) => {
+      await tx.update(setlist).set(input).where(eq(setlist.id, id))
+      await touch(tx, id, uid, 'update', { fields: Object.keys(input) })
+    })
+    return c.json({ id })
+  })
+
+  .post(
+    '/:id/archive',
+    validate('param', idParam),
+    validate('json', z.object({ archived: z.boolean() })),
+    async (c) => {
+      const uid = c.var.user.id
+      const { id } = c.req.valid('param')
+      const { archived } = c.req.valid('json')
+      await requireRole(id, uid, 'admin')
+      await db.transaction(async (tx) => {
+        await tx.update(setlist).set({ archived }).where(eq(setlist.id, id))
+        await touch(tx, id, uid, archived ? 'archive' : 'unarchive')
+      })
+      return c.json({ archived })
+    },
+  )
+
+  .delete('/:id', validate('param', idParam), async (c) => {
+    const { id } = c.req.valid('param')
+    await requireRole(id, c.var.user.id, 'owner')
+    await db.delete(setlist).where(eq(setlist.id, id))
+    return c.body(null, 204)
+  })
+
+  // Duplicar só para quem administra: um músico que só vê não pode copiar as
+  // músicas (às vezes privadas) do líder para um repertório próprio e compartilhá-lo.
+  .post(
+    '/:id/duplicate',
+    validate('param', idParam),
+    validate('json', z.object({ name: z.string().trim().min(1).max(120).optional(), asVersion: z.boolean().default(false) })),
+    async (c) => {
+      const uid = c.var.user.id
+      const { id } = c.req.valid('param')
+      const { name, asVersion } = c.req.valid('json')
+      await requireRole(id, uid, 'admin')
+      const created = await db.transaction(async (tx) => {
+        const [src] = await tx.select().from(setlist).where(eq(setlist.id, id))
+        const [copy] = await tx
+          .insert(setlist)
+          .values({
+            ownerId: uid,
+            parentId: asVersion ? src.id : null,
+            name: name ?? `${src.name} (${asVersion ? 'nova versão' : 'cópia'})`,
+            eventDate: asVersion ? src.eventDate : null,
+            location: src.location,
+            groupName: src.groupName,
+            notes: src.notes,
+            status: 'rascunho',
+          })
+          .returning({ id: setlist.id })
+        const items = await tx.select().from(setlistItem).where(eq(setlistItem.setlistId, id)).orderBy(asc(setlistItem.position))
+        if (items.length) {
+          await tx.insert(setlistItem).values(
+            items.map(({ id: _id, setlistId: _s, ...it }) => ({ ...it, setlistId: copy.id })),
+          )
+        }
+        await tx.insert(changeLog).values({
+          entityType: 'setlist',
+          entityId: copy.id,
+          userId: uid,
+          action: asVersion ? 'version' : 'duplicate',
+          diff: { from: id },
+        })
+        return copy
+      })
+      return c.json(created, 201)
+    },
+  )
+
+  // ---------------------------------------------------------------- músicas
+
+  .post(
+    '/:id/items',
+    validate('param', idParam),
+    validate('json', itemInput.extend({ songId: z.string().uuid() })),
+    async (c) => {
+      const uid = c.var.user.id
+      const { id } = c.req.valid('param')
+      const { songId, ...input } = c.req.valid('json')
+      await requireRole(id, uid, 'admin')
+      const [visible] = await db.select({ id: song.id, title: song.title }).from(song).where(and(eq(song.id, songId), canViewSong(uid)))
+      if (!visible) notFound('Música')
+      const item = await db.transaction(async (tx) => {
+        const [{ next }] = await tx
+          .select({ next: sql<number>`coalesce(max(${setlistItem.position}) + 1, 0)::int` })
+          .from(setlistItem)
+          .where(eq(setlistItem.setlistId, id))
+        const [row] = await tx
+          .insert(setlistItem)
+          .values({ ...input, setlistId: id, songId, position: next })
+          .returning({ id: setlistItem.id })
+        await touch(tx, id, uid, 'add_song', { songId, title: visible.title })
+        return row
+      })
+      return c.json(item, 201)
+    },
+  )
+
+  .put(
+    '/:id/items/:itemId',
+    validate('param', idParam.extend({ itemId: z.string().uuid() })),
+    validate('json', itemInput),
+    async (c) => {
+      const uid = c.var.user.id
+      const { id, itemId } = c.req.valid('param')
+      const input = c.req.valid('json')
+      await requireRole(id, uid, 'admin')
+      await db.transaction(async (tx) => {
+        const updated = await tx
+          .update(setlistItem)
+          .set({ key: input.key ?? null, bpm: input.bpm ?? null, notes: input.notes ?? null })
+          .where(and(eq(setlistItem.id, itemId), eq(setlistItem.setlistId, id)))
+          .returning({ id: setlistItem.id })
+        if (!updated.length) notFound('Música do repertório')
+        await touch(tx, id, uid, 'update_song', { itemId, ...input })
+      })
+      return c.json({ id: itemId })
+    },
+  )
+
+  .delete('/:id/items/:itemId', validate('param', idParam.extend({ itemId: z.string().uuid() })), async (c) => {
+    const uid = c.var.user.id
+    const { id, itemId } = c.req.valid('param')
+    await requireRole(id, uid, 'admin')
+    await db.transaction(async (tx) => {
+      const deleted = await tx
+        .delete(setlistItem)
+        .where(and(eq(setlistItem.id, itemId), eq(setlistItem.setlistId, id)))
+        .returning({ songId: setlistItem.songId })
+      if (!deleted.length) notFound('Música do repertório')
+      // Mantém as posições contínuas (0, 1, 2...).
+      await tx.execute(sql`
+        update ${setlistItem} si set position = r.rn - 1
+        from (select id, row_number() over (order by position) as rn from ${setlistItem} where setlist_id = ${id}) r
+        where si.id = r.id`)
+      await touch(tx, id, uid, 'remove_song', { songId: deleted[0].songId })
+    })
+    return c.body(null, 204)
+  })
+
+  .put(
+    '/:id/order',
+    validate('param', idParam),
+    validate('json', z.object({ itemIds: z.array(z.string().uuid()).max(300) })),
+    async (c) => {
+      const uid = c.var.user.id
+      const { id } = c.req.valid('param')
+      const { itemIds } = c.req.valid('json')
+      await requireRole(id, uid, 'admin')
+      await db.transaction(async (tx) => {
+        const current = await tx.select({ id: setlistItem.id }).from(setlistItem).where(eq(setlistItem.setlistId, id))
+        const same =
+          current.length === itemIds.length && new Set(itemIds).size === itemIds.length && current.every((r) => itemIds.includes(r.id))
+        if (!same) throw new HTTPException(409, { message: 'O repertório mudou enquanto você reordenava. Atualize e tente de novo.' })
+        for (const [position, itemId] of itemIds.entries()) {
+          await tx.update(setlistItem).set({ position }).where(eq(setlistItem.id, itemId))
+        }
+        await touch(tx, id, uid, 'reorder')
+      })
+      return c.json({ ok: true })
+    },
+  )
+
+  // ---------------------------------------------------------------- músicos
+
+  .put(
+    '/:id/members/:userId',
+    validate('param', idParam.extend({ userId: z.string().min(1) })),
+    validate(
+      'json',
+      z.object({
+        permission: z.enum(schema.permission.enumValues).optional(),
+        instrument: z.enum(schema.instrument.enumValues).nullish(),
+      }),
+    ),
+    async (c) => {
+      const uid = c.var.user.id
+      const { id, userId } = c.req.valid('param')
+      const { permission, instrument } = c.req.valid('json')
+      const { role, ownerId } = await requireRole(id, uid, 'view')
+      if (userId === ownerId) forbidden('A permissão de quem criou o repertório não muda.')
+      const [target] = await db
+        .select({ permission: setlistMember.permission })
+        .from(setlistMember)
+        .where(and(eq(setlistMember.setlistId, id), eq(setlistMember.userId, userId)))
+      if (!target) notFound('Músico')
+
+      const patch: Partial<typeof setlistMember.$inferInsert> = {}
+      if (permission && permission !== target.permission) {
+        if (!atLeast(role, 'admin')) forbidden('Só quem administra pode mudar permissões.')
+        // Dar ou tirar "administrar" é decisão só do dono.
+        if ((permission === 'admin' || target.permission === 'admin') && role !== 'owner') {
+          forbidden('Só o dono do repertório pode dar ou tirar a permissão de administrar.')
+        }
+        patch.permission = permission
+      }
+      if (instrument !== undefined) {
+        // Cada um escolhe o próprio instrumento; quem administra pode ajustar o de todos.
+        if (userId !== uid && !atLeast(role, 'admin')) forbidden()
+        patch.instrument = instrument
+      }
+      if (Object.keys(patch).length) {
+        await db.transaction(async (tx) => {
+          await tx.update(setlistMember).set(patch).where(and(eq(setlistMember.setlistId, id), eq(setlistMember.userId, userId)))
+          await touch(tx, id, uid, 'update_member', { userId, ...patch })
+        })
+      }
+      return c.json({ ok: true })
+    },
+  )
+
+  .delete('/:id/members/:userId', validate('param', idParam.extend({ userId: z.string().min(1) })), async (c) => {
+    const uid = c.var.user.id
+    const { id, userId } = c.req.valid('param')
+    const { role, ownerId } = await requireRole(id, uid, 'view')
+    if (userId === ownerId) forbidden('Quem criou o repertório não pode sair dele. Exclua ou passe para outra pessoa.')
+    const [target] = await db
+      .select({ permission: setlistMember.permission })
+      .from(setlistMember)
+      .where(and(eq(setlistMember.setlistId, id), eq(setlistMember.userId, userId)))
+    if (!target) notFound('Músico')
+    const leaving = userId === uid
+    if (!leaving) {
+      if (!atLeast(role, 'admin')) forbidden('Só quem administra pode remover músicos.')
+      if (target.permission === 'admin' && role !== 'owner') forbidden('Só o dono pode remover quem administra.')
+    }
+    await db.transaction(async (tx) => {
+      await tx.delete(setlistMember).where(and(eq(setlistMember.setlistId, id), eq(setlistMember.userId, userId)))
+      await touch(tx, id, uid, leaving ? 'leave' : 'remove_member', { userId })
+    })
+    return c.body(null, 204)
+  })
+
+  // ---------------------------------------------------------------- convites
+
+  .post(
+    '/:id/invites',
+    validate('param', idParam),
+    validate(
+      'json',
+      z.object({
+        permission: z.enum(schema.permission.enumValues).default('view'),
+        email: z.string().trim().email('E-mail inválido').max(200).nullish(),
+        maxUses: z.number().int().min(1).max(200).nullish(),
+        expiresInDays: z.number().int().min(1).max(90).default(14),
+      }),
+    ),
+    async (c) => {
+      const uid = c.var.user.id
+      const { id } = c.req.valid('param')
+      const input = c.req.valid('json')
+      const { role } = await requireRole(id, uid, 'admin')
+      if (input.permission === 'admin' && role !== 'owner') forbidden('Só o dono pode convidar alguém para administrar.')
+
+      const expiresAt = new Date(Date.now() + input.expiresInDays * 24 * 60 * 60 * 1000)
+      let created: { id: string; code: string } | undefined
+      for (let attempt = 0; attempt < 5 && !created; attempt++) {
+        const rows = await db
+          .insert(invite)
+          .values({
+            setlistId: id,
+            code: newInviteCode(),
+            email: input.email ?? null,
+            permission: input.permission,
+            maxUses: input.email ? 1 : (input.maxUses ?? null),
+            expiresAt,
+            createdBy: uid,
+          })
+          .onConflictDoNothing()
+          .returning({ id: invite.id, code: invite.code })
+        created = rows[0]
+      }
+      if (!created) throw new HTTPException(500, { message: 'Não foi possível gerar o convite. Tente de novo.' })
+
+      if (input.email) {
+        const [s] = await db.select({ name: setlist.name }).from(setlist).where(eq(setlist.id, id))
+        sendSetlistInviteEmail(input.email, c.var.user.name, s.name, inviteUrl(created.code)).catch((e) =>
+          console.error('Falha ao enviar convite', e),
+        )
+      }
+      return c.json({ ...created, url: inviteUrl(created.code), expiresAt }, 201)
+    },
+  )
+
+  .delete('/:id/invites/:inviteId', validate('param', idParam.extend({ inviteId: z.string().uuid() })), async (c) => {
+    const { id, inviteId } = c.req.valid('param')
+    await requireRole(id, c.var.user.id, 'admin')
+    await db
+      .update(invite)
+      .set({ revokedAt: new Date() })
+      .where(and(eq(invite.id, inviteId), eq(invite.setlistId, id)))
+    return c.body(null, 204)
+  })
+
+  // ---------------------------------------------------------------- sugestões
+
+  .post(
+    '/:id/suggestions',
+    validate('param', idParam),
+    validate(
+      'json',
+      z
+        .object({
+          itemId: z.string().uuid().nullish(),
+          proposedKey: keySchema,
+          message: z.string().trim().max(1000).nullish(),
+        })
+        .refine((s) => s.proposedKey || s.message, { message: 'Escreva a sugestão ou escolha um tom.' }),
+    ),
+    async (c) => {
+      const uid = c.var.user.id
+      const { id } = c.req.valid('param')
+      const input = c.req.valid('json')
+      await requireRole(id, uid, 'suggest')
+      if (input.itemId) {
+        const [it] = await db
+          .select({ id: setlistItem.id })
+          .from(setlistItem)
+          .where(and(eq(setlistItem.id, input.itemId), eq(setlistItem.setlistId, id)))
+        if (!it) notFound('Música do repertório')
+      }
+      const [row] = await db
+        .insert(setlistSuggestion)
+        .values({ setlistId: id, authorId: uid, itemId: input.itemId ?? null, proposedKey: input.proposedKey ?? null, message: input.message ?? null })
+        .returning({ id: setlistSuggestion.id })
+      return c.json(row, 201)
+    },
+  )
+
+  .put(
+    '/:id/suggestions/:sid',
+    validate('param', idParam.extend({ sid: z.string().uuid() })),
+    validate('json', z.object({ status: z.enum(['accepted', 'rejected']) })),
+    async (c) => {
+      const uid = c.var.user.id
+      const { id, sid } = c.req.valid('param')
+      const { status } = c.req.valid('json')
+      await requireRole(id, uid, 'admin')
+      await db.transaction(async (tx) => {
+        const [sg] = await tx
+          .select()
+          .from(setlistSuggestion)
+          .where(and(eq(setlistSuggestion.id, sid), eq(setlistSuggestion.setlistId, id)))
+        if (!sg) notFound('Sugestão')
+        if (sg.status !== 'open') throw new HTTPException(409, { message: 'Esta sugestão já foi respondida.' })
+        await tx
+          .update(setlistSuggestion)
+          .set({ status, resolvedBy: uid, resolvedAt: new Date() })
+          .where(eq(setlistSuggestion.id, sid))
+        // Aceitar uma troca de tom já aplica o tom na música do repertório.
+        if (status === 'accepted' && sg.itemId && sg.proposedKey) {
+          await tx.update(setlistItem).set({ key: sg.proposedKey }).where(eq(setlistItem.id, sg.itemId))
+        }
+        await touch(tx, id, uid, status === 'accepted' ? 'accept_suggestion' : 'reject_suggestion', { suggestionId: sid })
+      })
+      return c.json({ status })
+    },
+  )
+
+  // ---------------------------------------------------------------- histórico
+
+  .get('/:id/history', validate('param', idParam), async (c) => {
+    const { id } = c.req.valid('param')
+    await requireRole(id, c.var.user.id, 'view')
+    const rows = await db
+      .select({ id: changeLog.id, action: changeLog.action, diff: changeLog.diff, createdAt: changeLog.createdAt, userName: user.name })
+      .from(changeLog)
+      .leftJoin(user, eq(user.id, changeLog.userId))
+      .where(and(eq(changeLog.entityType, 'setlist'), eq(changeLog.entityId, id)))
+      .orderBy(desc(changeLog.createdAt))
+      .limit(50)
+    return c.json(rows)
+  })
+
+// ---------------------------------------------------------------------------
+// Convites: prévia e aceite (a pessoa ainda não participa do repertório)
+
+async function loadValidInvite(code: string) {
+  const [row] = await db
+    .select({ invite, setlistName: setlist.name, eventDate: setlist.eventDate, location: setlist.location, groupName: setlist.groupName, ownerId: setlist.ownerId, ownerName: user.name })
+    .from(invite)
+    .innerJoin(setlist, eq(setlist.id, invite.setlistId))
+    .innerJoin(user, eq(user.id, setlist.ownerId))
+    .where(eq(invite.code, code.toUpperCase()))
+  const i = row?.invite
+  const invalid =
+    !i || i.revokedAt || (i.expiresAt && i.expiresAt < new Date()) || (i.maxUses != null && i.uses >= i.maxUses)
+  if (invalid) throw new HTTPException(404, { message: 'Convite inválido, expirado ou já usado. Peça um novo a quem te convidou.' })
+  return row
+}
+
+const codeParam = z.object({ code: z.string().trim().min(6).max(12) })
+
+export const invitesRoutes = new Hono<AppEnv>()
+  .use(requireUser)
+
+  .get('/:code', validate('param', codeParam), async (c) => {
+    const uid = c.var.user.id
+    const row = await loadValidInvite(c.req.valid('param').code)
+    const [{ n }] = await db
+      .select({ n: sql<number>`count(*)::int` })
+      .from(setlistItem)
+      .where(eq(setlistItem.setlistId, row.invite.setlistId))
+    const access = await getRole(row.invite.setlistId, uid)
+    return c.json({
+      setlistId: row.invite.setlistId,
+      name: row.setlistName,
+      eventDate: row.eventDate,
+      location: row.location,
+      groupName: row.groupName,
+      ownerName: row.ownerName,
+      permission: row.invite.permission,
+      songCount: n,
+      alreadyMember: Boolean(access),
+    })
+  })
+
+  .post('/:code/accept', validate('param', codeParam), async (c) => {
+    const uid = c.var.user.id
+    const row = await loadValidInvite(c.req.valid('param').code)
+    const setlistId = row.invite.setlistId
+    const access = await getRole(setlistId, uid)
+    if (access) return c.json({ setlistId, alreadyMember: true })
+
+    await db.transaction(async (tx) => {
+      // Soma o uso de forma atômica: dois cliques ao mesmo tempo não passam do limite.
+      const used = await tx
+        .update(invite)
+        .set({ uses: sql`${invite.uses} + 1` })
+        .where(and(eq(invite.id, row.invite.id), or(isNull(invite.maxUses), sql`${invite.uses} < ${invite.maxUses}`)))
+        .returning({ id: invite.id })
+      if (!used.length) throw new HTTPException(404, { message: 'Este convite já atingiu o limite de usos.' })
+      await tx.insert(setlistMember).values({ setlistId, userId: uid, permission: row.invite.permission }).onConflictDoNothing()
+      await touch(tx, setlistId, uid, 'join', { permission: row.invite.permission })
+    })
+    return c.json({ setlistId, alreadyMember: false }, 201)
+  })

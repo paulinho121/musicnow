@@ -1,0 +1,185 @@
+import { atLeast } from '@ensaio/shared'
+import clsx from 'clsx'
+import { Archive, ArchiveRestore, ArrowLeft, CalendarDays, Copy, GitBranch, MapPin, MoreVertical, Pencil, Play, Trash2, UserPlus, Users } from 'lucide-react'
+import { useState } from 'react'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
+import { BandPanel } from '../components/setlist/BandPanel'
+import { HistoryPanel } from '../components/setlist/HistoryPanel'
+import { SongsPanel } from '../components/setlist/SongsPanel'
+import { Sheet } from '../components/Sheet'
+import { ErrorState, PageSpinner, useToast } from '../components/ui'
+import { useArchiveSetlist, useDeleteSetlist, useDuplicateSetlist, useSetlist, useSetlistSync } from '../lib/setlists'
+import { roleLabel, StatusChip } from './Setlists'
+
+const dateFmt = new Intl.DateTimeFormat('pt-BR', { weekday: 'long', day: '2-digit', month: 'long', hour: '2-digit', minute: '2-digit' })
+
+const TABS = [
+  { id: 'musicas', label: 'Músicas' },
+  { id: 'banda', label: 'Banda' },
+  { id: 'historico', label: 'Histórico' },
+] as const
+
+export function SetlistDetail() {
+  const { id } = useParams()
+  const [params, setParams] = useSearchParams()
+  const tab = (params.get('aba') ?? 'musicas') as (typeof TABS)[number]['id']
+  const navigate = useNavigate()
+  const toast = useToast()
+  const { data: s, isLoading, error, refetch } = useSetlist(id)
+  useSetlistSync(id, s?.revision)
+  const archive = useArchiveSetlist(id ?? '')
+  const del = useDeleteSetlist(id ?? '')
+  const duplicate = useDuplicateSetlist(id ?? '')
+  const [menu, setMenu] = useState(false)
+
+  if (isLoading) return <PageSpinner />
+  if (error || !s) return <ErrorState error={error ?? new Error('Repertório não encontrado.')} onRetry={() => refetch()} />
+
+  const isAdmin = atLeast(s.role, 'admin')
+  const isOwner = s.role === 'owner'
+
+  const doDuplicate = (asVersion: boolean) =>
+    duplicate.mutate(
+      { asVersion },
+      {
+        onSuccess: (r) => {
+          setMenu(false)
+          toast(asVersion ? 'Nova versão criada.' : 'Cópia criada.')
+          navigate(`/repertorios/${r.id}`)
+        },
+        onError: (e) => toast(e.message, 'error'),
+      },
+    )
+
+  return (
+    <div className="space-y-5">
+      <div className="flex items-start gap-2">
+        <Link to="/repertorios" className="btn-icon shrink-0 border-transparent bg-transparent" aria-label="Voltar">
+          <ArrowLeft className="size-5" />
+        </Link>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <h1 className="text-2xl leading-tight font-bold">{s.name}</h1>
+            <StatusChip status={s.status} />
+            {s.archived && <span className="rounded-md bg-surface-2 px-2 py-0.5 text-xs text-muted">Arquivado</span>}
+          </div>
+          <p className="mt-1 text-sm text-muted">
+            {roleLabel(s.role)}
+            {s.role !== 'owner' && ` · de ${s.ownerName}`}
+          </p>
+        </div>
+        {isAdmin && (
+          <button className="btn-icon shrink-0" aria-label="Mais opções" onClick={() => setMenu(true)}>
+            <MoreVertical className="size-5" />
+          </button>
+        )}
+      </div>
+
+      <div className="flex flex-wrap gap-x-5 gap-y-1.5 text-sm text-muted">
+        {s.eventDate && (
+          <span className="inline-flex items-center gap-1.5 first-letter:uppercase">
+            <CalendarDays className="size-4" /> {dateFmt.format(new Date(s.eventDate))}
+          </span>
+        )}
+        {s.location && (
+          <span className="inline-flex items-center gap-1.5">
+            <MapPin className="size-4" /> {s.location}
+          </span>
+        )}
+        {s.groupName && (
+          <span className="inline-flex items-center gap-1.5">
+            <Users className="size-4" /> {s.groupName}
+          </span>
+        )}
+        {s.parent && (
+          <Link to={`/repertorios/${s.parent.id}`} className="inline-flex items-center gap-1.5 hover:text-text">
+            <GitBranch className="size-4" /> Versão de “{s.parent.name}”
+          </Link>
+        )}
+      </div>
+      {s.notes && <p className="rounded-xl border-l-4 border-accent bg-accent/10 px-3 py-2 text-sm whitespace-pre-line">{s.notes}</p>}
+
+      <div className="flex flex-wrap gap-2">
+        <button className="btn-primary" disabled={!s.items.length} onClick={() => navigate(`/repertorios/${s.id}/tocar/0`)}>
+          <Play className="size-4" /> {s.status === 'ensaio' ? 'Ensaiar' : 'Tocar'}
+        </button>
+        {isAdmin && (
+          <button className="btn-ghost" onClick={() => setParams({ aba: 'banda' }, { replace: true })}>
+            <UserPlus className="size-4" /> Convidar
+          </button>
+        )}
+      </div>
+
+      <div className="flex gap-1 border-b border-border" role="tablist">
+        {TABS.map((t) => (
+          <button
+            key={t.id}
+            role="tab"
+            aria-selected={tab === t.id}
+            onClick={() => setParams({ aba: t.id }, { replace: true })}
+            className={clsx(
+              '-mb-px border-b-2 px-4 py-2.5 text-sm font-medium transition',
+              tab === t.id ? 'border-accent text-text' : 'border-transparent text-muted hover:text-text',
+            )}
+          >
+            {t.label}
+            {t.id === 'musicas' && ` (${s.items.length})`}
+            {t.id === 'banda' && ` (${s.members.length})`}
+            {t.id === 'musicas' && isAdmin && s.suggestions.some((x) => x.status === 'open') && (
+              <span className="ml-1.5 inline-block size-2 rounded-full bg-accent" aria-label="Há sugestões novas" />
+            )}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'musicas' && <SongsPanel setlist={s} />}
+      {tab === 'banda' && <BandPanel setlist={s} />}
+      {tab === 'historico' && <HistoryPanel setlist={s} />}
+
+      <Sheet open={menu} onClose={() => setMenu(false)} title="Repertório">
+        <div className="space-y-2">
+          <Link to={`/repertorios/${s.id}/editar`} className="btn-ghost w-full justify-start">
+            <Pencil className="size-4" /> Editar dados
+          </Link>
+          <button className="btn-ghost w-full justify-start" onClick={() => doDuplicate(false)} disabled={duplicate.isPending}>
+            <Copy className="size-4" /> Duplicar (para outro culto ou show)
+          </button>
+          <button className="btn-ghost w-full justify-start" onClick={() => doDuplicate(true)} disabled={duplicate.isPending}>
+            <GitBranch className="size-4" /> Criar nova versão
+          </button>
+          <button
+            className="btn-ghost w-full justify-start"
+            onClick={() =>
+              archive.mutate(!s.archived, {
+                onSuccess: () => {
+                  setMenu(false)
+                  toast(s.archived ? 'Repertório desarquivado.' : 'Repertório arquivado.')
+                },
+              })
+            }
+          >
+            {s.archived ? <ArchiveRestore className="size-4" /> : <Archive className="size-4" />}
+            {s.archived ? 'Desarquivar' : 'Arquivar'}
+          </button>
+          {isOwner && (
+            <button
+              className="btn-ghost w-full justify-start text-danger"
+              onClick={() => {
+                if (!confirm(`Excluir "${s.name}"? A banda perde o acesso e isso não pode ser desfeito.`)) return
+                del.mutate(undefined, {
+                  onSuccess: () => {
+                    toast('Repertório excluído.')
+                    navigate('/repertorios', { replace: true })
+                  },
+                  onError: (e) => toast(e.message, 'error'),
+                })
+              }}
+            >
+              <Trash2 className="size-4" /> Excluir repertório
+            </button>
+          )}
+        </div>
+      </Sheet>
+    </div>
+  )
+}

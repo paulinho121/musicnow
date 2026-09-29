@@ -36,8 +36,9 @@ export function AuthPage({ mode }: { mode: 'login' | 'signup' }) {
     if (res.error) return setError(authErrorMessage(res.error))
     await clearOfflineData()
     qc.clear()
-    // Conta nova vai direto para o perfil (instrumento e tipo de atuação).
-    navigate(mode === 'signup' ? '/perfil' : from, { replace: true })
+    // Volta para onde a pessoa ia (ex.: um convite). Conta nova sem perfil preenchido
+    // é levada ao onboarding pelo roteador, que guarda esse destino para depois.
+    navigate(from, { replace: true })
   }
 
   const social = async (provider: 'google' | 'apple') => {
@@ -133,14 +134,14 @@ export function AuthPage({ mode }: { mode: 'login' | 'signup' }) {
         {mode === 'signup' ? (
           <>
             Já tem conta?{' '}
-            <Link to="/entrar" className="font-semibold text-accent">
+            <Link to="/entrar" state={location.state} className="font-semibold text-accent">
               Entrar
             </Link>
           </>
         ) : (
           <>
             Novo por aqui?{' '}
-            <Link to="/criar-conta" className="font-semibold text-accent">
+            <Link to="/criar-conta" state={location.state} className="font-semibold text-accent">
               Criar conta
             </Link>
           </>

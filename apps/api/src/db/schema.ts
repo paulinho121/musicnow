@@ -293,7 +293,9 @@ export const setlistItem = pgTable(
       .references(() => setlist.id, { onDelete: 'cascade' }),
     songId: uuid()
       .notNull()
-      .references(() => song.id, { onDelete: 'restrict' }),
+      // 'no action' (verificado no fim do comando): apagar uma conta leva junto os repertórios
+      // e as músicas dela sem travar; apagar só a música continua bloqueado se ela estiver em uso.
+      .references(() => song.id, { onDelete: 'no action' }),
     position: integer().notNull(),
     key: text(),
     bpm: integer(),
@@ -339,6 +341,30 @@ export const invite = pgTable(
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [uniqueIndex().on(t.code), index().on(t.setlistId)],
+)
+
+export const suggestionStatus = pgEnum('suggestion_status', ['open', 'accepted', 'rejected'])
+
+/** Sugestões de músicos com permissão "sugerir": o líder aceita (aplica) ou recusa. */
+export const setlistSuggestion = pgTable(
+  'setlist_suggestion',
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    setlistId: uuid()
+      .notNull()
+      .references(() => setlist.id, { onDelete: 'cascade' }),
+    itemId: uuid().references(() => setlistItem.id, { onDelete: 'cascade' }),
+    authorId: text()
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    proposedKey: text(),
+    message: text(),
+    status: suggestionStatus().notNull().default('open'),
+    resolvedBy: text().references(() => user.id, { onDelete: 'set null' }),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+    resolvedAt: timestamp({ withTimezone: true }),
+  },
+  (t) => [index().on(t.setlistId, t.status)],
 )
 
 /** Histórico de alterações (músicas e repertórios). */

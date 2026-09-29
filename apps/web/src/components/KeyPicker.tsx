@@ -11,6 +11,7 @@ export function KeyPicker({
   current,
   original,
   personal,
+  personalLabel = 'meu tom',
   onPick,
 }: {
   open: boolean
@@ -19,6 +20,7 @@ export function KeyPicker({
   current: string | null
   original: string | null
   personal: string | null
+  personalLabel?: string
   onPick: (key: string) => void
 }) {
   useEffect(() => {
@@ -57,7 +59,7 @@ export function KeyPicker({
               {k}
               {(k === original || k === personal) && (
                 <span className="absolute inset-x-0 bottom-1 font-sans text-[9px] font-semibold tracking-wide uppercase opacity-70">
-                  {k === original ? 'original' : 'meu tom'}
+                  {k === original ? 'original' : personalLabel}
                 </span>
               )}
             </button>

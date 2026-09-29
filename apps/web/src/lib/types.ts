@@ -1,4 +1,4 @@
-import type { ImportFormat, Instrument, License, MusicianRole, SetlistStatus, Visibility } from '@ensaio/shared'
+import type { ImportFormat, Instrument, License, MusicianRole, Permission, SetlistRole, SetlistStatus, Visibility } from '@ensaio/shared'
 
 export interface SongListItem {
   id: string
@@ -28,6 +28,8 @@ export interface SongMark {
   text: string | null
   instrument: Instrument | null
   shared: boolean
+  setlistId: string | null
+  authorName: string
 }
 
 export interface SongInput {
@@ -66,6 +68,9 @@ export interface SongDetail extends SongInput {
   lyricsHidden: boolean
   importedFrom: ImportFormat | null
   marks: SongMark[]
+  /** Papel no repertório quando a música é aberta dentro de um. */
+  setlistRole: SetlistRole | null
+  canShareMarks: boolean
   createdAt: string
   updatedAt: string
 }
@@ -95,4 +100,120 @@ export interface Dashboard {
     isOwner: boolean
   }[]
   counts: { mySongs: number; library: number }
+}
+
+export interface SetlistSummary {
+  id: string
+  name: string
+  eventDate: string | null
+  location: string | null
+  groupName: string | null
+  status: SetlistStatus
+  archived: boolean
+  updatedAt: string
+  ownerId: string
+  ownerName: string
+  role: SetlistRole
+  itemCount: number
+  memberCount: number
+}
+
+export interface SetlistItem {
+  id: string
+  position: number
+  key: string | null
+  bpm: number | null
+  notes: string | null
+  personalKey: string | null
+  song: {
+    id: string
+    title: string
+    artist: string | null
+    originalKey: string | null
+    bpm: number | null
+    timeSignature: string | null
+  }
+}
+
+export interface SetlistMember {
+  userId: string
+  name: string
+  image: string | null
+  permission: SetlistRole
+  instrument: Instrument | null
+  joinedAt: string
+}
+
+export interface SetlistInvite {
+  id: string
+  code: string
+  url: string
+  email: string | null
+  permission: Permission
+  uses: number
+  maxUses: number | null
+  expiresAt: string | null
+}
+
+export interface SetlistSuggestion {
+  id: string
+  itemId: string | null
+  proposedKey: string | null
+  message: string | null
+  status: 'open' | 'accepted' | 'rejected'
+  createdAt: string
+  authorId: string
+  authorName: string
+}
+
+export interface SetlistDetail {
+  id: string
+  ownerId: string
+  ownerName: string
+  parentId: string | null
+  parent: { id: string; name: string } | null
+  name: string
+  eventDate: string | null
+  location: string | null
+  groupName: string | null
+  notes: string | null
+  status: SetlistStatus
+  archived: boolean
+  revision: number
+  role: SetlistRole
+  items: SetlistItem[]
+  members: SetlistMember[]
+  suggestions: SetlistSuggestion[]
+  invites: SetlistInvite[]
+  createdAt: string
+  updatedAt: string
+}
+
+export interface SetlistInput {
+  name: string
+  eventDate: string | null
+  location: string | null
+  groupName: string | null
+  notes: string | null
+  status: SetlistStatus
+}
+
+export interface InvitePreview {
+  setlistId: string
+  name: string
+  eventDate: string | null
+  location: string | null
+  groupName: string | null
+  ownerName: string
+  permission: Permission
+  songCount: number
+  alreadyMember: boolean
+}
+
+export interface HistoryEntry {
+  id: string
+  action: string
+  diff: Record<string, unknown> | null
+  createdAt: string
+  userName: string | null
 }

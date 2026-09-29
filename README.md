@@ -33,7 +33,8 @@ Contas de demonstração: e-mails no topo de `apps/api/src/seed.ts`; a senha é 
 
 | Comando | Faz |
 | --- | --- |
-| `npm test` | Testes da lógica de cifras |
+| `npm test` | Testes da lógica de cifras e permissões |
+| `npm run test:api` | Testes da API (permissões de repertório). Precisa do túnel aberto; usa só o banco de dev |
 | `npm run typecheck` | Checagem de tipos de todos os pacotes |
 | `npm run db:generate` | Gera migração depois de mudar `apps/api/src/db/schema.ts` |
 | `npm run db:migrate` | Aplica migrações (a API também aplica ao iniciar) |

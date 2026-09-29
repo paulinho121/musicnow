@@ -1,8 +1,9 @@
-import { guessKey, isChord, normalizeSearch, PUBLIC_LICENSES, stripLyrics } from '@ensaio/shared'
-import { and, asc, desc, eq, exists, ilike, or, sql, type SQL } from 'drizzle-orm'
+import { atLeast, guessKey, isChord, normalizeSearch, PUBLIC_LICENSES, stripLyrics } from '@ensaio/shared'
+import { and, asc, desc, eq, exists, ilike, isNull, or, sql, type SQL } from 'drizzle-orm'
 import { Hono } from 'hono'
 import { HTTPException } from 'hono/http-exception'
 import { z } from 'zod'
+import { getRole } from '../access'
 import { db, schema } from '../db'
 import { forbidden, notFound, requireUser, validate, type AppEnv } from '../http'
 
@@ -236,9 +237,16 @@ export const songsRoutes = new Hono<AppEnv>()
     return c.json({ created, skipped }, 201)
   })
 
-  .get('/:id', validate('param', z.object({ id: z.string().uuid() })), async (c) => {
+  .get(
+    '/:id',
+    validate('param', z.object({ id: z.string().uuid() })),
+    // setlistId: a música está sendo vista dentro de um repertório (traz as marcações da banda).
+    validate('query', z.object({ setlistId: z.string().uuid().optional() })),
+    async (c) => {
     const uid = c.var.user.id
     const { id } = c.req.valid('param')
+    const access = c.req.valid('query').setlistId ? await getRole(c.req.valid('query').setlistId!, uid) : null
+    const setlistId = access ? c.req.valid('query').setlistId! : null
     const [row] = await db
       .select({
         song,
@@ -260,11 +268,26 @@ export const songsRoutes = new Hono<AppEnv>()
       })
       .returning()
 
+    // Marcações visíveis: as minhas (gerais ou deste repertório), as compartilhadas pela
+    // dona da música e, dentro de um repertório, as compartilhadas com a banda.
     const marks = await db
-      .select()
+      .select({ mark: songMark, authorName: user.name })
       .from(songMark)
-      .where(and(eq(songMark.songId, id), or(eq(songMark.authorId, uid), eq(songMark.shared, true))))
-      .orderBy(asc(songMark.lineIndex))
+      .innerJoin(user, eq(user.id, songMark.authorId))
+      .where(
+        and(
+          eq(songMark.songId, id),
+          or(
+            and(
+              eq(songMark.authorId, uid),
+              setlistId ? or(isNull(songMark.setlistId), eq(songMark.setlistId, setlistId)) : isNull(songMark.setlistId),
+            ),
+            and(eq(songMark.shared, true), isNull(songMark.setlistId), eq(songMark.authorId, row.song.ownerId)),
+            setlistId ? and(eq(songMark.shared, true), eq(songMark.setlistId, setlistId)) : undefined,
+          ),
+        ),
+      )
+      .orderBy(asc(songMark.lineIndex), asc(songMark.createdAt))
 
     const { searchText: _omit, ...data } = row.song
     const isOwner = row.song.ownerId === uid
@@ -278,7 +301,10 @@ export const songsRoutes = new Hono<AppEnv>()
       isFavorite: row.isFavorite,
       canEdit: isOwner,
       personalKey: state?.personalKey ?? null,
-      marks,
+      marks: marks.map((m) => ({ ...m.mark, authorName: m.authorName })),
+      setlistRole: access?.role ?? null,
+      // Fora de repertório só a dona compartilha marcações; dentro, quem tem permissão de marcar.
+      canShareMarks: access ? atLeast(access.role, 'mark') : isOwner,
     })
   })
 
@@ -410,8 +436,25 @@ export const songsRoutes = new Hono<AppEnv>()
       const uid = c.var.user.id
       const { id } = c.req.valid('param')
       const input = c.req.valid('json')
-      const [visible] = await db.select({ id: song.id }).from(song).where(and(eq(song.id, id), canViewSong(uid)))
+      const [visible] = await db
+        .select({ id: song.id, ownerId: song.ownerId })
+        .from(song)
+        .where(and(eq(song.id, id), canViewSong(uid)))
       if (!visible) notFound('Música')
+      if (input.setlistId) {
+        const access = await getRole(input.setlistId, uid)
+        if (!access) notFound('Repertório')
+        const [inSetlist] = await db
+          .select({ id: setlistItem.id })
+          .from(setlistItem)
+          .where(and(eq(setlistItem.setlistId, input.setlistId), eq(setlistItem.songId, id)))
+        if (!inSetlist) notFound('Música do repertório')
+        if (input.shared && !atLeast(access.role, 'mark')) {
+          forbidden('Sua permissão neste repertório só permite marcações pessoais.')
+        }
+      } else if (input.shared && visible.ownerId !== uid) {
+        forbidden('Só quem cadastrou a música pode criar marcações compartilhadas fora de um repertório.')
+      }
       const [mark] = await db.insert(songMark).values({ ...input, songId: id, authorId: uid }).returning()
       return c.json(mark, 201)
     },
@@ -421,12 +464,17 @@ export const songsRoutes = new Hono<AppEnv>()
     '/:id/marks/:markId',
     validate('param', z.object({ id: z.string().uuid(), markId: z.string().uuid() })),
     async (c) => {
+      const uid = c.var.user.id
       const { id, markId } = c.req.valid('param')
-      const deleted = await db
-        .delete(songMark)
-        .where(and(eq(songMark.id, markId), eq(songMark.songId, id), eq(songMark.authorId, c.var.user.id)))
-        .returning({ id: songMark.id })
-      if (!deleted.length) notFound('Marcação')
+      const [mark] = await db
+        .select({ authorId: songMark.authorId, setlistId: songMark.setlistId })
+        .from(songMark)
+        .where(and(eq(songMark.id, markId), eq(songMark.songId, id)))
+      if (!mark) notFound('Marcação')
+      // Quem criou apaga; num repertório, quem administra também pode apagar a de qualquer um.
+      const access = mark.setlistId ? await getRole(mark.setlistId, uid) : null
+      if (mark.authorId !== uid && !atLeast(access?.role, 'admin')) notFound('Marcação')
+      await db.delete(songMark).where(eq(songMark.id, markId))
       return c.body(null, 204)
     },
   )

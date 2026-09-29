@@ -36,13 +36,32 @@ export const SETLIST_STATUS = {
 } as const
 export type SetlistStatus = keyof typeof SETLIST_STATUS
 
+/** Permissões em escada: cada nível inclui tudo o que o anterior pode. */
 export const PERMISSIONS = {
   view: 'Apenas visualizar',
-  mark: 'Editar marcações',
   suggest: 'Sugerir alterações',
+  mark: 'Editar marcações',
   admin: 'Administrar',
 } as const
 export type Permission = keyof typeof PERMISSIONS
+export type SetlistRole = Permission | 'owner'
+
+export const PERMISSION_HINTS: Record<Permission, string> = {
+  view: 'Vê o repertório e faz marcações só para si.',
+  suggest: 'Também pode sugerir mudanças de tom e observações.',
+  mark: 'Também cria marcações que toda a banda vê.',
+  admin: 'Também edita músicas, ordem e tons, e convida ou remove músicos.',
+}
+
+const ROLE_RANK: Record<SetlistRole, number> = { view: 0, suggest: 1, mark: 2, admin: 3, owner: 4 }
+
+/** Ex.: atLeast('mark', 'suggest') é verdadeiro; atLeast('view', 'admin') é falso. */
+export function atLeast(role: SetlistRole | null | undefined, min: SetlistRole): boolean {
+  return role != null && ROLE_RANK[role] >= ROLE_RANK[min]
+}
+
+export const SUGGESTION_STATUS = { open: 'Aberta', accepted: 'Aceita', rejected: 'Recusada' } as const
+export type SuggestionStatus = keyof typeof SUGGESTION_STATUS
 
 export const TIME_SIGNATURES = ['2/4', '3/4', '4/4', '6/8', '12/8'] as const
 

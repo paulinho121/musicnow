@@ -48,7 +48,8 @@ export const auth = betterAuth({
   },
   rateLimit: {
     // Limite de tentativas por IP. Os mais apertados protegem contra adivinhação de senha.
-    enabled: true,
+    // (Desligado só nos testes automáticos, que criam várias contas em sequência.)
+    enabled: process.env.NODE_ENV !== 'test',
     window: 60,
     max: 100,
     customRules: {

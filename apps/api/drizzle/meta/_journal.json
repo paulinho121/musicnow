@@ -22,6 +22,13 @@
       "when": 1790646390251,
       "tag": "0002_licenca_importacao_denuncias",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1790649600849,
+      "tag": "0003_repertorios_sugestoes",
+      "breakpoints": true
     }
   ]
 }

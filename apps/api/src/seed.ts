@@ -411,7 +411,63 @@ async function main() {
     ])
   }
 
-  console.log(`Seed concluído: ${people.length} usuários, ${songs.length} músicas.`)
+  // Repertório de demonstração: a Marina lidera; Rafael marca; Júlia sugere.
+  const SETLIST = 'Culto de domingo (demo)'
+  let [demoSetlist] = await db
+    .select({ id: schema.setlist.id })
+    .from(schema.setlist)
+    .where(and(eq(schema.setlist.ownerId, leaderId), eq(schema.setlist.name, SETLIST)))
+  if (!demoSetlist) {
+    const nextSunday = new Date()
+    nextSunday.setDate(nextSunday.getDate() + ((7 - nextSunday.getDay()) % 7 || 7))
+    nextSunday.setHours(19, 0, 0, 0)
+    ;[demoSetlist] = await db
+      .insert(schema.setlist)
+      .values({
+        ownerId: leaderId,
+        name: SETLIST,
+        eventDate: nextSunday,
+        location: 'Igreja Central, Fortaleza',
+        groupName: 'Ministério de Louvor',
+        notes: 'Chegar 18h para passagem de som. Ceia após a terceira música.',
+        status: 'ensaio',
+      })
+      .returning({ id: schema.setlist.id })
+    const order: [string, string | null, string | null][] = [
+      ['Luz da Manhã', 'C', 'Abertura: começar só teclado e voz'],
+      ['Tudo Tem Seu Tempo', null, null],
+      ['Amazing Grace', 'A', 'Momento da ceia, bem suave'],
+      ['When the Saints Go Marching In', null, 'Encerramento com metais'],
+    ]
+    const items = await db
+      .insert(schema.setlistItem)
+      .values(order.map(([title, key, notes], position) => ({ setlistId: demoSetlist.id, songId: ids[title], position, key, notes })))
+      .returning({ id: schema.setlistItem.id, songId: schema.setlistItem.songId })
+    await db.insert(schema.setlistMember).values([
+      { setlistId: demoSetlist.id, userId: bassId, permission: 'mark', instrument: 'baixo' },
+      { setlistId: demoSetlist.id, userId: singerId, permission: 'suggest', instrument: 'voz' },
+    ])
+    await db.insert(schema.songMark).values({
+      songId: ids['Luz da Manhã'],
+      setlistId: demoSetlist.id,
+      authorId: bassId,
+      lineIndex: 28,
+      type: 'parada',
+      text: 'Parada da banda no fim da ponte (só neste culto)',
+      shared: true,
+    })
+    const tudo = items.find((i) => i.songId === ids['Tudo Tem Seu Tempo'])!
+    await db.insert(schema.setlistSuggestion).values({
+      setlistId: demoSetlist.id,
+      itemId: tudo.id,
+      authorId: singerId,
+      proposedKey: 'Bb',
+      message: 'Em C fica alto para mim no refrão. Pode ser Bb?',
+    })
+    await db.insert(schema.changeLog).values({ entityType: 'setlist', entityId: demoSetlist.id, userId: leaderId, action: 'create' })
+  }
+
+  console.log(`Seed concluído: ${people.length} usuários, ${songs.length} músicas, 1 repertório.`)
 }
 
 main()
