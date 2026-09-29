@@ -1,0 +1,4 @@
+# Finais de linha no padrão Linux: os scripts rodam na VM e quebram com CRLF.
+* text=auto eol=lf
+*.ps1 text eol=crlf
+*.svg text eol=lf
