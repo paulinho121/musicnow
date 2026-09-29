@@ -225,3 +225,20 @@ export function guessKey(content: string): string | null {
   }
   return null
 }
+
+/**
+ * Remove a letra, mantendo acordes, seções e a numeração das linhas
+ * (as marcações apontam para o número da linha). Usado quando a letra
+ * não tem autorização para ser exibida a outras pessoas.
+ */
+export function stripLyrics(content: string): string {
+  return content
+    .replace(/\r\n?/g, '\n')
+    .split('\n')
+    .map((line) => {
+      if (!line.trim()) return ''
+      if (SECTION_RE.test(line) || isChordLine(line)) return line
+      return ''
+    })
+    .join('\n')
+}

@@ -20,13 +20,31 @@ tar -czf "$TMP/api.tgz" -C apps/api/dist index.js index.js.map -C .. drizzle
 tar -czf "$TMP/web.tgz" -C apps/web/dist .
 
 echo "== enviando para $HOST"
-scp -q -i "$KEY" -o BatchMode=yes "$TMP/api.tgz" "$TMP/web.tgz" deploy/setup-vm.sh "$HOST:/tmp/"
+scp -q -i "$KEY" -o BatchMode=yes "$TMP/api.tgz" "$TMP/web.tgz" deploy/setup-vm.sh deploy/pg-backup.sh deploy/caddy/ensaio-facil.caddy "$HOST:/tmp/"
 rm -rf "$TMP"
 
 $SSH "$HOST" "DOMAIN=$DOMAIN bash -s" <<'REMOTE'
 set -euo pipefail
 cd /
-[ -f /etc/systemd/system/ensaio-api.service ] || bash /tmp/setup-vm.sh "$DOMAIN"
+# Configuração da VM (idempotente: só muda o que estiver diferente).
+bash /tmp/setup-vm.sh "$DOMAIN" >/dev/null
+
+# Caddy: instala o site do projeto e só recarrega se a configuração mudou e for válida.
+sed "s/__DOMAIN__/$DOMAIN/g" /tmp/ensaio-facil.caddy > /tmp/ensaio-facil.caddy.final
+if ! sudo cmp -s /tmp/ensaio-facil.caddy.final /etc/caddy/ensaio-facil.caddy; then
+  sudo cp /etc/caddy/ensaio-facil.caddy /etc/caddy/ensaio-facil.caddy.bak 2>/dev/null || true
+  sudo install -m 644 /tmp/ensaio-facil.caddy.final /etc/caddy/ensaio-facil.caddy
+  if sudo caddy validate --config /etc/caddy/Caddyfile >/dev/null 2>&1; then
+    sudo systemctl reload caddy
+    echo "Configuração do Caddy atualizada."
+  else
+    echo "Configuração do Caddy inválida: mantendo a anterior."
+    [ -f /etc/caddy/ensaio-facil.caddy.bak ] && sudo mv /etc/caddy/ensaio-facil.caddy.bak /etc/caddy/ensaio-facil.caddy
+    sudo caddy validate --config /etc/caddy/Caddyfile 2>&1 | tail -3
+    exit 1
+  fi
+fi
+rm -f /tmp/ensaio-facil.caddy /tmp/ensaio-facil.caddy.final
 
 # API: troca os arquivos e reinicia (as migrações rodam na inicialização).
 rm -rf /opt/ensaio-facil/api.new && mkdir -p /opt/ensaio-facil/api.new

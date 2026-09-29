@@ -6,6 +6,7 @@ import {
   normalizeOffset,
   parseSheet,
   semitonesBetween,
+  stripLyrics,
   transposeChord,
   transposeChordLine,
   transposeKey,
@@ -110,5 +111,15 @@ Tudo em paz, tudo bem`
   it('usa bemóis em tons bemolizados', () => {
     const out = transposeSheet(sheet, 3, 'Bb')
     expect(out).toContain('[Intro] Bb F  Gm  Eb')
+  })
+})
+
+describe('stripLyrics', () => {
+  it('tira a letra e mantém acordes, seções e número de linhas', () => {
+    const src = '[Refrão]\nC     G\nLetra protegida\n\nAm   F\nOutra linha'
+    const out = stripLyrics(src)
+    expect(out).toBe('[Refrão]\nC     G\n\n\nAm   F\n')
+    expect(out.split('\n')).toHaveLength(src.split('\n').length)
+    expect(out).not.toContain('Letra')
   })
 })

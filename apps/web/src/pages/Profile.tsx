@@ -5,7 +5,7 @@ import { Check, LogOut, Moon, Star, Sun } from 'lucide-react'
 import { type FormEvent, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router'
 import { ErrorState, PageSpinner, useToast } from '../components/ui'
-import { signOut } from '../lib/auth'
+import { logout as endSession } from '../lib/auth'
 import { useMe, useSaveProfile } from '../lib/queries'
 import { getTheme, setTheme, type Theme } from '../lib/storage'
 
@@ -68,7 +68,7 @@ export function Profile() {
   }
 
   const logout = async () => {
-    await signOut()
+    await endSession()
     qc.clear()
     navigate('/', { replace: true })
   }

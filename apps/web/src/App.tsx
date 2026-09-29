@@ -7,6 +7,7 @@ import { AuthPage } from './pages/AuthPage'
 import { Dashboard } from './pages/Dashboard'
 import { Importer } from './pages/Importer'
 import { Library } from './pages/Library'
+import { ForgotPassword, ResetPassword } from './pages/PasswordReset'
 import { Profile } from './pages/Profile'
 import { Setlists } from './pages/Setlists'
 import { SongEditor } from './pages/SongEditor'
@@ -39,8 +40,11 @@ export const router = createBrowserRouter([
       { path: '/', element: <Welcome /> },
       { path: '/entrar', element: <AuthPage mode="login" /> },
       { path: '/criar-conta', element: <AuthPage mode="signup" /> },
+      { path: '/esqueci-senha', element: <ForgotPassword /> },
     ],
   },
+  // Aberta mesmo logado: o link do e-mail pode ser aberto em qualquer aparelho.
+  { path: '/redefinir-senha', element: <ResetPassword /> },
   {
     element: <RequireAuth />,
     children: [

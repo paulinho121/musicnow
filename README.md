@@ -19,7 +19,7 @@ Produção: https://ensaio.152-67-63-31.sslip.io (VM Oracle `paulinhoben10`)
    ```powershell
    powershell -ExecutionPolicy Bypass -File "$HOME\.pgvm\tunel-postgres.ps1"
    ```
-2. Crie `apps/api/.env` a partir de `apps/api/.env.example` (a connection string está em `~/.pgvm/ensaio_facil.env`).
+2. Crie `apps/api/.env` a partir de `apps/api/.env.example`. Use o banco de **desenvolvimento** (`~/.pgvm/ensaio_facil_dev.env`) — nunca o de produção.
 3. Em dois terminais:
    ```bash
    npm run dev:api
@@ -27,7 +27,7 @@ Produção: https://ensaio.152-67-63-31.sslip.io (VM Oracle `paulinhoben10`)
    ```
 4. Abra http://localhost:5173
 
-Contas de demonstração: veja o topo de `apps/api/src/seed.ts`.
+Contas de demonstração: e-mails no topo de `apps/api/src/seed.ts`; a senha é o `SEED_PASSWORD` do seu `.env` (em produção, veja `~/.pgvm/contas-demo.txt`).
 
 ## Comandos
 
@@ -38,7 +38,8 @@ Contas de demonstração: veja o topo de `apps/api/src/seed.ts`.
 | `npm run db:generate` | Gera migração depois de mudar `apps/api/src/db/schema.ts` |
 | `npm run db:migrate` | Aplica migrações (a API também aplica ao iniciar) |
 | `npm run db:seed` | Recria os dados de demonstração |
-| `bash deploy/deploy.sh` | Testa, builda e publica na VM |
+| `npm run deploy` | Testa, builda e publica na VM (use no PowerShell) |
+| `npm run backup:baixar` | Baixa para o PC os backups de produção |
 
 ## Formato da cifra
 
@@ -59,4 +60,20 @@ Aceita a notação brasileira (`7M`, `7(9)`, `m7(b5)`, `4`, `°`, baixo invertid
 - API: serviço `ensaio-api` (systemd), usuário `ensaio`, limite de 220 MB. Logs: `sudo journalctl -u ensaio-api -f`
 - Variáveis e segredos: `/etc/ensaio-facil/api.env`
 - Front: `/var/www/ensaio-facil` · Caddy: `/etc/caddy/Caddyfile`
-- Backup do banco: diário às 03:00 em `/var/backups/postgres`
+- Bancos: `ensaio_facil` (produção) e `ensaio_facil_dev` (desenvolvimento), com usuários separados
+- Backup: diário às 03:00 em `/var/backups/postgres` (7 dias). Para mandar também ao Object Storage, preencha `BACKUP_PAR_URL` em `/etc/ensaio-facil/backup.env`
+- Caddy do site: `deploy/caddy/ensaio-facil.caddy` (instalado a cada deploy, com CSP e HSTS)
+
+## E-mail (recuperação de senha)
+
+Preencha no `/etc/ensaio-facil/api.env` da VM e reinicie (`sudo systemctl restart ensaio-api`):
+
+```
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=seu-email@gmail.com
+SMTP_PASS=senha-de-app-de-16-letras
+MAIL_FROM="Ensaio Fácil <seu-email@gmail.com>"
+```
+
+Sem isso, a tela "Esqueci minha senha" avisa que a recuperação não está ativa.

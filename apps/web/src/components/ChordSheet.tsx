@@ -90,7 +90,10 @@ export const ChordSheet = memo(function ChordSheet({
                 ))}
               </div>
             )}
-            <Line line={line} showChords={showChords} hideLyrics={hideLyrics} />
+            {/* Sem letra, as linhas em branco que sobram só ficam antes das seções. */}
+            {!(hideLyrics && line.kind === 'blank' && lines[i + 1]?.kind !== 'section') && (
+              <Line line={line} showChords={showChords} hideLyrics={hideLyrics} />
+            )}
           </div>
         )
       })}

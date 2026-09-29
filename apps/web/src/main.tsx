@@ -8,7 +8,7 @@ import { RouterProvider } from 'react-router'
 import { router } from './App'
 import { ToastProvider } from './components/ui'
 import { ApiError } from './lib/api'
-import { signOut } from './lib/auth'
+import { logout } from './lib/auth'
 
 // Sessão que o servidor não reconhece mais (expirou, conta removida, outro dispositivo saiu):
 // limpa o login local e volta para a tela de entrada, em vez de ficar preso num erro.
@@ -16,7 +16,7 @@ let signingOut = false
 function onApiError(err: unknown) {
   if (!(err instanceof ApiError) || err.status !== 401 || signingOut) return
   signingOut = true
-  signOut().finally(() => {
+  logout().finally(() => {
     queryClient.clear()
     window.location.assign(`/entrar`)
   })

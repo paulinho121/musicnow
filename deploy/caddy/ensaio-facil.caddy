@@ -1,0 +1,31 @@
+# Ensaio Fácil — instalado pelo deploy em /etc/caddy/ensaio-facil.caddy.
+# __DOMAIN__ é substituído pelo domínio na hora do deploy.
+__DOMAIN__ {
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		Referrer-Policy strict-origin-when-cross-origin
+		Permissions-Policy "camera=(), microphone=(), geolocation=(), screen-wake-lock=(self), fullscreen=(self)"
+		# Só executa scripts vindos do próprio site: bloqueia scripts injetados (XSS).
+		# style 'unsafe-inline' é necessário para os estilos dinâmicos do React (tamanho da fonte da cifra).
+		Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self'; worker-src 'self'; manifest-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'"
+		-Server
+	}
+
+	handle /api/* {
+		reverse_proxy 127.0.0.1:3001
+	}
+
+	handle {
+		root * /var/www/ensaio-facil
+		@static path /assets/*
+		header @static Cache-Control "public, max-age=31536000, immutable"
+		@fresh not path /assets/*
+		header @fresh Cache-Control "no-cache"
+		try_files {path} /index.html
+		file_server
+	}
+}

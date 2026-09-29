@@ -66,35 +66,29 @@ EOF
 sudo systemctl daemon-reload
 sudo systemctl enable ensaio-api >/dev/null 2>&1
 
-echo "== Caddy"
-if ! grep -q "# ensaio-facil" /etc/caddy/Caddyfile; then
-  sudo tee -a /etc/caddy/Caddyfile >/dev/null <<EOF
-
-# ensaio-facil
-${DOMAIN} {
-	encode zstd gzip
-	header {
-		X-Content-Type-Options nosniff
-		Referrer-Policy strict-origin-when-cross-origin
-		-Server
-	}
-
-	handle /api/* {
-		reverse_proxy 127.0.0.1:3001
-	}
-
-	handle {
-		root * /var/www/ensaio-facil
-		@static path /assets/*
-		header @static Cache-Control "public, max-age=31536000, immutable"
-		@fresh not path /assets/*
-		header @fresh Cache-Control "no-cache"
-		try_files {path} /index.html
-		file_server
-	}
-}
+echo "== backup do banco"
+if [ -f /tmp/pg-backup.sh ]; then
+  sudo install -m 755 /tmp/pg-backup.sh /usr/local/bin/pg-backup
+  echo '0 3 * * * postgres /usr/local/bin/pg-backup >> /var/log/pg-backup.log 2>&1' | sudo tee /etc/cron.d/pg-backup >/dev/null
+  sudo touch /var/log/pg-backup.log && sudo chown postgres:postgres /var/log/pg-backup.log
+fi
+if [ ! -f /etc/ensaio-facil/backup.env ]; then
+  sudo tee /etc/ensaio-facil/backup.env >/dev/null <<'EOF'
+# URL de "pre-authenticated request" (PAR) de um bucket do Object Storage da Oracle,
+# com permissão de escrita. Com ela preenchida, o backup diário vai também para fora da VM.
+# BACKUP_PAR_URL=https://objectstorage.sa-saopaulo-1.oraclecloud.com/p/.../n/.../b/.../o/
 EOF
-  sudo caddy validate --config /etc/caddy/Caddyfile >/dev/null
-  sudo systemctl reload caddy
+  sudo chown root:postgres /etc/ensaio-facil/backup.env
+  sudo chmod 640 /etc/ensaio-facil/backup.env
+fi
+
+echo "== Caddy"
+# O site fica num arquivo próprio (/etc/caddy/ensaio-facil.caddy), atualizado a cada deploy.
+# Versões antigas deste script colavam o bloco no fim do Caddyfile: remove esse bloco.
+if grep -q '^# ensaio-facil$' /etc/caddy/Caddyfile; then
+  sudo sed -i '/^# ensaio-facil$/,$d' /etc/caddy/Caddyfile
+fi
+if ! grep -q 'import /etc/caddy/ensaio-facil.caddy' /etc/caddy/Caddyfile; then
+  printf '\nimport /etc/caddy/ensaio-facil.caddy\n' | sudo tee -a /etc/caddy/Caddyfile >/dev/null
 fi
 echo "VM pronta para o deploy."

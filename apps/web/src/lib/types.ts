@@ -62,6 +62,8 @@ export interface SongDetail extends SongInput {
   isFavorite: boolean
   canEdit: boolean
   personalKey: string | null
+  /** A letra foi removida pelo servidor (sem autorização de exibição). */
+  lyricsHidden: boolean
   importedFrom: ImportFormat | null
   marks: SongMark[]
   createdAt: string

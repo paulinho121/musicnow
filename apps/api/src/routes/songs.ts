@@ -1,4 +1,4 @@
-import { guessKey, isChord, normalizeSearch, PUBLIC_LICENSES } from '@ensaio/shared'
+import { guessKey, isChord, normalizeSearch, PUBLIC_LICENSES, stripLyrics } from '@ensaio/shared'
 import { and, asc, desc, eq, exists, ilike, or, sql, type SQL } from 'drizzle-orm'
 import { Hono } from 'hono'
 import { HTTPException } from 'hono/http-exception'
@@ -267,11 +267,16 @@ export const songsRoutes = new Hono<AppEnv>()
       .orderBy(asc(songMark.lineIndex))
 
     const { searchText: _omit, ...data } = row.song
+    const isOwner = row.song.ownerId === uid
+    // Letra sem autorização só sai para quem cadastrou; os outros recebem apenas acordes e seções.
+    const lyricsHidden = !row.song.lyricsAuthorized && !isOwner
     return c.json({
       ...data,
+      content: lyricsHidden ? stripLyrics(data.content) : data.content,
+      lyricsHidden,
       ownerName: row.ownerName,
       isFavorite: row.isFavorite,
-      canEdit: row.song.ownerId === uid,
+      canEdit: isOwner,
       personalKey: state?.personalKey ?? null,
       marks,
     })

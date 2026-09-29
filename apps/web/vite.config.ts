@@ -9,7 +9,7 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['icon.svg'],
+      includeAssets: ['icon.svg', 'theme.js'],
       manifest: {
         name: 'Ensaio Fácil',
         short_name: 'Ensaio Fácil',

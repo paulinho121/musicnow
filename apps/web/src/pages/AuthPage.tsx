@@ -4,7 +4,7 @@ import { type FormEvent, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router'
 import { Logo } from '../components/Logo'
 import { api } from '../lib/api'
-import { authErrorMessage, signIn, signUp } from '../lib/auth'
+import { authErrorMessage, clearOfflineData, signIn, signUp } from '../lib/auth'
 
 export function AuthPage({ mode }: { mode: 'login' | 'signup' }) {
   const navigate = useNavigate()
@@ -34,6 +34,7 @@ export function AuthPage({ mode }: { mode: 'login' | 'signup' }) {
         : await signIn.email({ email: email.trim(), password })
     setBusy(false)
     if (res.error) return setError(authErrorMessage(res.error))
+    await clearOfflineData()
     qc.clear()
     // Conta nova vai direto para o perfil (instrumento e tipo de atuação).
     navigate(mode === 'signup' ? '/perfil' : from, { replace: true })
@@ -110,6 +111,11 @@ export function AuthPage({ mode }: { mode: 'login' | 'signup' }) {
             </button>
           </div>
           {mode === 'signup' && <span className="mt-1 block text-xs text-muted">Mínimo de 8 caracteres.</span>}
+          {mode === 'login' && (
+            <Link to="/esqueci-senha" className="mt-2 inline-block text-sm text-muted hover:text-text">
+              Esqueci minha senha
+            </Link>
+          )}
         </label>
 
         {error && (

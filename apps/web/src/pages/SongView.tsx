@@ -97,7 +97,7 @@ export function SongView() {
       </div>
     )
 
-  const hideLyrics = !song.lyricsAuthorized && !song.canEdit
+  const hideLyrics = song.lyricsHidden
   const personalDiffers = currentKey !== (song.personalKey ?? original)
 
   const toggleFullscreen = () => {
