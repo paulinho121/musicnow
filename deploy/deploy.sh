@@ -1,6 +1,10 @@
 #!/bin/bash
-# Publica o Ensaio Fácil na VM: builda no PC, envia e reinicia a API.
-# Uso (Git Bash, na raiz do projeto):  bash deploy/deploy.sh
+# Publica o Ensaio Fácil na VM a partir do PC: testa, builda, atualiza a
+# configuração do servidor (Caddy, backup, scripts) e instala a nova versão.
+# Uso: npm run deploy   (no PowerShell)   ou   bash deploy/deploy.sh   (Git Bash)
+#
+# O GitHub Actions faz a mesma instalação a cada push na main (.github/workflows/deploy.yml),
+# mas sem tocar na configuração do servidor — isso fica só para este script.
 set -euo pipefail
 
 HOST="${DEPLOY_HOST:-ubuntu@152.67.63.31}"
@@ -16,13 +20,11 @@ npm run build --silent
 
 echo "== empacotando"
 TMP=$(mktemp -d)
-tar -czf "$TMP/api.tgz" -C apps/api/dist index.js index.js.map -C .. drizzle
-tar -czf "$TMP/web.tgz" -C apps/web/dist .
+trap 'rm -rf "$TMP"' EXIT
+bash deploy/make-bundle.sh "$TMP/bundle.tgz"
 
-echo "== enviando para $HOST"
-scp -q -i "$KEY" -o BatchMode=yes "$TMP/api.tgz" "$TMP/web.tgz" deploy/setup-vm.sh deploy/pg-backup.sh deploy/caddy/ensaio-facil.caddy "$HOST:/tmp/"
-rm -rf "$TMP"
-
+echo "== atualizando a configuração do servidor"
+scp -q -i "$KEY" -o BatchMode=yes deploy/setup-vm.sh deploy/pg-backup.sh deploy/ci-deploy.sh deploy/caddy/ensaio-facil.caddy "$HOST:/tmp/"
 $SSH "$HOST" "DOMAIN=$DOMAIN bash -s" <<'REMOTE'
 set -euo pipefail
 cd /
@@ -44,33 +46,10 @@ if ! sudo cmp -s /tmp/ensaio-facil.caddy.final /etc/caddy/ensaio-facil.caddy; th
     exit 1
   fi
 fi
-rm -f /tmp/ensaio-facil.caddy /tmp/ensaio-facil.caddy.final
-
-# API: troca os arquivos e reinicia (as migrações rodam na inicialização).
-rm -rf /opt/ensaio-facil/api.new && mkdir -p /opt/ensaio-facil/api.new
-tar -xzf /tmp/api.tgz -C /opt/ensaio-facil/api.new
-rm -rf /opt/ensaio-facil/api.old
-[ -d /opt/ensaio-facil/api ] && mv /opt/ensaio-facil/api /opt/ensaio-facil/api.old
-mv /opt/ensaio-facil/api.new /opt/ensaio-facil/api
-sudo systemctl restart ensaio-api
-
-# Front: substitui de uma vez para ninguém pegar metade dos arquivos.
-rm -rf /var/www/ensaio-facil.new && mkdir -p /var/www/ensaio-facil.new
-tar -xzf /tmp/web.tgz -C /var/www/ensaio-facil.new
-rm -rf /var/www/ensaio-facil.old
-mv /var/www/ensaio-facil /var/www/ensaio-facil.old && mv /var/www/ensaio-facil.new /var/www/ensaio-facil
-rm -f /tmp/api.tgz /tmp/web.tgz
-
-for i in $(seq 1 20); do
-  curl -sf http://127.0.0.1:3001/api/health >/dev/null && break
-  sleep 1
-done
-if ! curl -sf http://127.0.0.1:3001/api/health >/dev/null; then
-  echo "A API não subiu. Últimas linhas do log:"
-  sudo journalctl -u ensaio-api -n 30 --no-pager
-  exit 1
-fi
-echo "API no ar. Memória da API: $(systemctl show ensaio-api -p MemoryCurrent --value | numfmt --to=iec)"
+rm -f /tmp/ensaio-facil.caddy /tmp/ensaio-facil.caddy.final /tmp/setup-vm.sh /tmp/pg-backup.sh /tmp/ci-deploy.sh
 REMOTE
+
+echo "== instalando a nova versão"
+$SSH "$HOST" "sudo /usr/local/bin/ensaio-deploy-artifact" < "$TMP/bundle.tgz"
 
 echo "== publicado: https://$DOMAIN"

@@ -1,0 +1,102 @@
+# A cada push na main: testa, builda e publica na VM.
+# Se qualquer etapa falhar, nada é publicado e o site continua na versão anterior.
+# Também dá para rodar à mão em: GitHub → Actions → "Testar e publicar" → Run workflow.
+name: Testar e publicar
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - '**.md'
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+# Um deploy por vez; um push novo cancela o anterior que ainda estiver testando.
+concurrency:
+  group: deploy-producao
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  testar:
+    name: Testes e build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Instalar dependências
+        run: npm ci --no-audit --no-fund
+
+      - name: Testes (cifras, importação e permissões)
+        run: npm test
+
+      - name: Checagem de tipos
+        run: npm run typecheck
+
+      - name: Build
+        run: npm run build
+
+      - name: Montar pacote
+        run: bash deploy/make-bundle.sh bundle.tgz
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pacote
+          path: bundle.tgz
+          retention-days: 7
+
+  publicar:
+    name: Publicar na VM
+    needs: testar
+    # Pull requests só testam; publicar é só na main.
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: producao
+      url: https://ensaio.152-67-63-31.sslip.io
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: pacote
+
+      - name: Preparar acesso SSH
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          # Identidade da VM fixada: só conecta nesta máquina.
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
+
+      - name: Publicar
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+        run: |
+          # A chave só consegue rodar o script de publicação na VM (restrito no authorized_keys).
+          ssh -i ~/.ssh/deploy_key -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes \
+            "$DEPLOY_HOST" < bundle.tgz
+
+      - name: Conferir o site
+        run: |
+          for i in $(seq 1 10); do
+            if curl -sf https://ensaio.152-67-63-31.sslip.io/api/health; then echo; exit 0; fi
+            sleep 3
+          done
+          echo "O site não respondeu depois da publicação." >&2
+          exit 1
+
+      - name: Apagar a chave
+        if: always()
+        run: rm -f ~/.ssh/deploy_key

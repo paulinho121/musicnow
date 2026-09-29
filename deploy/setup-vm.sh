@@ -66,6 +66,11 @@ EOF
 sudo systemctl daemon-reload
 sudo systemctl enable ensaio-api >/dev/null 2>&1
 
+echo "== script de publicação (usado pelo deploy manual e pelo GitHub Actions)"
+if [ -f /tmp/ci-deploy.sh ]; then
+  sudo install -o root -g root -m 755 /tmp/ci-deploy.sh /usr/local/bin/ensaio-deploy-artifact
+fi
+
 echo "== backup do banco"
 if [ -f /tmp/pg-backup.sh ]; then
   sudo install -m 755 /tmp/pg-backup.sh /usr/local/bin/pg-backup

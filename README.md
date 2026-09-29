@@ -39,8 +39,14 @@ Contas de demonstração: e-mails no topo de `apps/api/src/seed.ts`; a senha é 
 | `npm run db:generate` | Gera migração depois de mudar `apps/api/src/db/schema.ts` |
 | `npm run db:migrate` | Aplica migrações (a API também aplica ao iniciar) |
 | `npm run db:seed` | Recria os dados de demonstração |
-| `npm run deploy` | Testa, builda e publica na VM (use no PowerShell) |
+| `npm run deploy` | Publica do PC, incluindo mudanças de configuração do servidor (Caddy, backup) |
 | `npm run backup:baixar` | Baixa para o PC os backups de produção |
+
+## Publicação automática
+
+Cada `git push` na `main` roda o GitHub Actions (`.github/workflows/deploy.yml`): testes, checagem de tipos, build e publicação na VM. Se algo falhar, nada é publicado; se a API nova não subir na VM, ela volta sozinha para a versão anterior. Acompanhe em GitHub → Actions.
+
+A chave SSH do GitHub (segredo `DEPLOY_SSH_KEY`) só consegue rodar `/usr/local/bin/ensaio-deploy-artifact` na VM — não abre terminal nem roda outros comandos. Mudanças na configuração do servidor (`deploy/setup-vm.sh`, `deploy/caddy/`, `deploy/pg-backup.sh`) continuam exigindo `npm run deploy` pelo PC.
 
 ## Formato da cifra
 
