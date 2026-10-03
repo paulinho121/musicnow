@@ -1,7 +1,10 @@
 # Ensaio Fácil — instalado pelo deploy em /etc/caddy/ensaio-facil.caddy.
 # __DOMAIN__ é substituído pelo domínio na hora do deploy.
 __DOMAIN__ {
-	encode zstd gzip
+	# Conexão ao vivo (Modo Palco): sem compressão nem buffer, cada aviso sai na hora.
+	@live path_regexp live ^/api/setlists/[^/]+/events$
+	@compress not path_regexp ^/api/setlists/[^/]+/events$
+	encode @compress zstd gzip
 
 	header {
 		Strict-Transport-Security "max-age=31536000; includeSubDomains"
@@ -13,6 +16,12 @@ __DOMAIN__ {
 		# style 'unsafe-inline' é necessário para os estilos dinâmicos do React (tamanho da fonte da cifra).
 		Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self'; worker-src 'self'; manifest-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'"
 		-Server
+	}
+
+	handle @live {
+		reverse_proxy 127.0.0.1:3001 {
+			flush_interval -1
+		}
 	}
 
 	handle /api/* {

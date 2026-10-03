@@ -48,6 +48,10 @@ Cada `git push` na `main` roda o GitHub Actions (`.github/workflows/deploy.yml`)
 
 A chave SSH do GitHub (segredo `DEPLOY_SSH_KEY`) só consegue rodar `/usr/local/bin/ensaio-deploy-artifact` na VM — não abre terminal nem roda outros comandos. Mudanças na configuração do servidor (`deploy/setup-vm.sh`, `deploy/caddy/`, `deploy/pg-backup.sh`) continuam exigindo `npm run deploy` pelo PC.
 
+## Tempo real e Modo Palco
+
+Cada repertório aberto mantém uma conexão ao vivo (Server-Sent Events em `GET /api/setlists/:id/events`). Por ela chegam, na hora, as alterações do repertório, as marcações da banda, quem está conectado e o **Modo Palco**: quem administra toca em "Comandar a banda" e os aparelhos que estão seguindo mudam de música (e de seção) junto. A central fica em memória (`apps/api/src/realtime.ts`), no único processo da API; se a API reiniciar, os aparelhos reconectam sozinhos e o líder retoma a posição. Sem conexão ao vivo, o app volta a checar a revisão a cada 15 s.
+
 ## Formato da cifra
 
 Acordes na linha de cima da letra, seções entre colchetes:

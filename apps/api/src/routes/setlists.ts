@@ -1,6 +1,8 @@
 import { atLeast, isChord, type SetlistRole } from '@ensaio/shared'
 import { and, asc, desc, eq, gt, isNull, or, sql } from 'drizzle-orm'
 import { Hono } from 'hono'
+import { createMiddleware } from 'hono/factory'
+import { streamSSE } from 'hono/streaming'
 import { HTTPException } from 'hono/http-exception'
 import { randomInt } from 'node:crypto'
 import { z } from 'zod'
@@ -9,6 +11,20 @@ import { env } from '../env'
 import { forbidden, notFound, requireUser, validate, type AppEnv } from '../http'
 import { sendSetlistInviteEmail } from '../mail'
 import { getRole } from '../access'
+import {
+  closeRoom,
+  connectionsOf,
+  getStage,
+  join,
+  kick,
+  LIMITS,
+  notifyChanged,
+  presence,
+  setFollowing,
+  stopStage,
+  totalConnections,
+  updateStage,
+} from '../realtime'
 import { canViewSong } from './songs'
 
 const { setlist, setlistItem, setlistMember, setlistSuggestion, invite, song, user, userInstrument, songUserState, changeLog } =
@@ -41,6 +57,27 @@ async function touch(tx: Tx, setlistId: string, userId: string, action: string, 
     .where(eq(setlist.id, setlistId))
   await tx.insert(changeLog).values({ entityType: 'setlist', entityId: setlistId, userId, action, diff: diff ?? null })
 }
+
+/**
+ * Depois de qualquer escrita bem-sucedida num repertório, avisa os aparelhos conectados
+ * (já com a transação concluída, para eles não lerem dados antigos).
+ */
+async function announce(setlistId: string) {
+  const [r] = await db.select({ revision: setlist.revision }).from(setlist).where(eq(setlist.id, setlistId))
+  if (r) notifyChanged(setlistId, r.revision)
+}
+
+const SETLIST_PATH = /^\/api\/setlists\/([0-9a-f-]{36})(\/.*)?$/
+const announceWrites = createMiddleware<AppEnv>(async (c, next) => {
+  await next()
+  if (c.req.method === 'GET' || c.res.status >= 400) return
+  const m = SETLIST_PATH.exec(c.req.path)
+  if (!m) return
+  const [, id, rest = ''] = m
+  if (/^\/(stage|presence|events|duplicate)$/.test(rest)) return
+  if (c.req.method === 'DELETE' && rest === '') return closeRoom(id)
+  await announce(id).catch(() => {})
+})
 
 // Código de convite: 8 caracteres sem letras ambíguas (0/O, 1/I/L). ~1 trilhão de combinações.
 const CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'
@@ -80,6 +117,7 @@ const itemInput = z.object({
 
 export const setlistsRoutes = new Hono<AppEnv>()
   .use(requireUser)
+  .use(announceWrites)
 
   .get('/', async (c) => {
     const uid = c.var.user.id
@@ -244,6 +282,7 @@ export const setlistsRoutes = new Hono<AppEnv>()
         ...members,
       ],
       suggestions,
+      stage: getStage(id),
       invites: invites.filter((i) => i.maxUses == null || i.uses < i.maxUses).map((i) => ({ ...i, url: inviteUrl(i.code) })),
     })
   })
@@ -255,6 +294,95 @@ export const setlistsRoutes = new Hono<AppEnv>()
     const [r] = await db.select({ revision: setlist.revision }).from(setlist).where(eq(setlist.id, id))
     return c.json(r)
   })
+
+  // ---------------------------------------------------------------- tempo real
+
+  // Conexão ao vivo (SSE): avisos de alteração, Modo Palco e quem está conectado.
+  .get('/:id/events', validate('param', idParam), async (c) => {
+    const me = c.var.user
+    const { id } = c.req.valid('param')
+    await requireRole(id, me.id, 'view')
+    if (totalConnections() >= LIMITS.total) {
+      throw new HTTPException(503, { message: 'Muitas conexões ao vivo agora. Tente em instantes.' })
+    }
+    if (connectionsOf(id, me.id) >= LIMITS.perUserPerRoom) {
+      throw new HTTPException(429, { message: 'Este repertório já está aberto em muitos aparelhos seus.' })
+    }
+    const [r] = await db.select({ revision: setlist.revision }).from(setlist).where(eq(setlist.id, id))
+
+    return streamSSE(c, async (stream) => {
+      let open = true
+      const send = (event: string, data: unknown) =>
+        open ? stream.writeSSE({ event, data: JSON.stringify(data) }).catch(() => {}) : undefined
+      const conn = join(id, { id: me.id, name: me.name }, send, () => {
+        open = false
+        void stream.close()
+      })
+      stream.onAbort(() => {
+        open = false
+        conn.leave()
+      })
+      await stream.writeSSE({
+        event: 'hello',
+        // retry: o navegador espera 3 s antes de reconectar se a conexão cair.
+        retry: 3000,
+        data: JSON.stringify({ clientId: conn.id, revision: r.revision, stage: getStage(id), presence: presence(id) }),
+      })
+      // Sinal de vida a cada 25 s: proxies e redes móveis derrubam conexões silenciosas.
+      while (open) {
+        await stream.sleep(25_000)
+        if (open) await stream.writeSSE({ event: 'ping', data: '{}' }).catch(() => (open = false))
+      }
+      conn.leave()
+    })
+  })
+
+  // Modo Palco: quem administra comanda; os aparelhos que estão seguindo vão junto.
+  .post(
+    '/:id/stage',
+    validate('param', idParam),
+    validate(
+      'json',
+      z.object({
+        action: z.enum(['go', 'stop']),
+        position: z.number().int().min(0).optional(),
+        section: z.number().int().min(0).nullish(),
+      }),
+    ),
+    async (c) => {
+      const me = c.var.user
+      const { id } = c.req.valid('param')
+      const { action, position, section } = c.req.valid('json')
+      await requireRole(id, me.id, 'admin')
+      if (action === 'stop') {
+        stopStage(id)
+        return c.json({ stage: null })
+      }
+      const [{ n }] = await db
+        .select({ n: sql<number>`count(*)::int` })
+        .from(setlistItem)
+        .where(eq(setlistItem.setlistId, id))
+      if (position === undefined || position >= n) {
+        throw new HTTPException(400, { message: 'Posição fora do repertório.' })
+      }
+      // Outro admin pode assumir o comando a qualquer momento (ex.: o líder ficou sem bateria).
+      const stage = updateStage(id, { leaderId: me.id, leaderName: me.name, position, section: section ?? null })
+      return c.json({ stage })
+    },
+  )
+
+  .post(
+    '/:id/presence',
+    validate('param', idParam),
+    validate('json', z.object({ clientId: z.string().uuid(), following: z.boolean() })),
+    async (c) => {
+      const { id } = c.req.valid('param')
+      const { clientId, following } = c.req.valid('json')
+      // Só a própria pessoa muda o estado da própria conexão.
+      if (!setFollowing(id, clientId, c.var.user.id, following)) notFound('Conexão')
+      return c.json({ following })
+    },
+  )
 
   .put('/:id', validate('param', idParam), validate('json', setlistInput), async (c) => {
     const uid = c.var.user.id
@@ -498,6 +626,8 @@ export const setlistsRoutes = new Hono<AppEnv>()
       await tx.delete(setlistMember).where(and(eq(setlistMember.setlistId, id), eq(setlistMember.userId, userId)))
       await touch(tx, id, uid, leaving ? 'leave' : 'remove_member', { userId })
     })
+    // Quem saiu ou foi removido para de receber os avisos ao vivo na hora.
+    kick(id, userId)
     return c.body(null, 204)
   })
 
@@ -703,5 +833,6 @@ export const invitesRoutes = new Hono<AppEnv>()
       await tx.insert(setlistMember).values({ setlistId, userId: uid, permission: row.invite.permission }).onConflictDoNothing()
       await touch(tx, setlistId, uid, 'join', { permission: row.invite.permission })
     })
+    await announce(setlistId).catch(() => {})
     return c.json({ setlistId, alreadyMember: false }, 201)
   })

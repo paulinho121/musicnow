@@ -4,6 +4,7 @@ import { Hono } from 'hono'
 import { HTTPException } from 'hono/http-exception'
 import { z } from 'zod'
 import { getRole } from '../access'
+import { publish } from '../realtime'
 import { db, schema } from '../db'
 import { forbidden, notFound, requireUser, validate, type AppEnv } from '../http'
 
@@ -456,6 +457,8 @@ export const songsRoutes = new Hono<AppEnv>()
         forbidden('Só quem cadastrou a música pode criar marcações compartilhadas fora de um repertório.')
       }
       const [mark] = await db.insert(songMark).values({ ...input, songId: id, authorId: uid }).returning()
+      // Marcação da banda: os aparelhos com o repertório aberto atualizam a cifra na hora.
+      if (mark.setlistId && mark.shared) publish(mark.setlistId, 'marks', { songId: id })
       return c.json(mark, 201)
     },
   )
@@ -475,6 +478,7 @@ export const songsRoutes = new Hono<AppEnv>()
       const access = mark.setlistId ? await getRole(mark.setlistId, uid) : null
       if (mark.authorId !== uid && !atLeast(access?.role, 'admin')) notFound('Marcação')
       await db.delete(songMark).where(eq(songMark.id, markId))
+      if (mark.setlistId) publish(mark.setlistId, 'marks', { songId: id })
       return c.body(null, 204)
     },
   )

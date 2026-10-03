@@ -8,7 +8,9 @@ import { HistoryPanel } from '../components/setlist/HistoryPanel'
 import { SongsPanel } from '../components/setlist/SongsPanel'
 import { Sheet } from '../components/Sheet'
 import { ErrorState, PageSpinner, useToast } from '../components/ui'
-import { useArchiveSetlist, useDeleteSetlist, useDuplicateSetlist, useSetlist, useSetlistSync } from '../lib/setlists'
+import { useSession } from '../lib/auth'
+import { useSetlistLive } from '../lib/live'
+import { useArchiveSetlist, useDeleteSetlist, useDuplicateSetlist, useSetlist } from '../lib/setlists'
 import { roleLabel, StatusChip } from './Setlists'
 
 const dateFmt = new Intl.DateTimeFormat('pt-BR', { weekday: 'long', day: '2-digit', month: 'long', hour: '2-digit', minute: '2-digit' })
@@ -26,7 +28,9 @@ export function SetlistDetail() {
   const navigate = useNavigate()
   const toast = useToast()
   const { data: s, isLoading, error, refetch } = useSetlist(id)
-  useSetlistSync(id, s?.revision)
+  // Ao vivo: alterações chegam na hora e o aviso do Modo Palco aparece aqui.
+  const live = useSetlistLive(id, s?.revision)
+  const { data: session } = useSession()
   const archive = useArchiveSetlist(id ?? '')
   const del = useDeleteSetlist(id ?? '')
   const duplicate = useDuplicateSetlist(id ?? '')
@@ -98,6 +102,27 @@ export function SetlistDetail() {
         )}
       </div>
       {s.notes && <p className="rounded-xl border-l-4 border-accent bg-accent/10 px-3 py-2 text-sm whitespace-pre-line">{s.notes}</p>}
+
+      {live.stage && s.items[live.stage.position] && (
+        <button
+          className="card flex w-full items-center gap-3 border-danger/50 bg-danger/10 p-4 text-left transition hover:border-danger"
+          onClick={() => navigate(`/repertorios/${s.id}/tocar/${live.stage!.position}`)}
+        >
+          <span className="relative flex size-3 shrink-0">
+            <span className="absolute inline-flex size-full animate-ping rounded-full bg-danger opacity-60" />
+            <span className="relative inline-flex size-3 rounded-full bg-danger" />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block font-semibold">
+              {live.stage.leaderId === session?.user.id ? 'Você está comandando a banda' : `Ao vivo agora · ${live.stage.leaderName} no comando`}
+            </span>
+            <span className="block truncate text-sm text-muted">
+              Tocando: {s.items[live.stage.position].song.title} · {live.presence.length} conectados
+            </span>
+          </span>
+          <span className="btn-primary h-9 shrink-0 px-3">Entrar</span>
+        </button>
+      )}
 
       <div className="flex flex-wrap gap-2">
         <button className="btn-primary" disabled={!s.items.length} onClick={() => navigate(`/repertorios/${s.id}/tocar/0`)}>

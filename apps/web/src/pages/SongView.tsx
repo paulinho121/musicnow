@@ -24,6 +24,7 @@ import { Link, useNavigate, useParams } from 'react-router'
 import { AddToSetlistButton } from '../components/AddToSetlist'
 import { ChordSheet, sectionsOf, useSheet } from '../components/ChordSheet'
 import { KeyPicker } from '../components/KeyPicker'
+import { LiveStrip, type LiveControls } from '../components/LiveStrip'
 import { MarkDialog } from '../components/MarkDialog'
 import { ReportButton } from '../components/ReportDialog'
 import { ErrorState, PageSpinner, useToast } from '../components/ui'
@@ -46,6 +47,10 @@ export interface SetlistContext {
   prev?: { title: string; go: () => void }
   next?: { title: string; go: () => void }
   onExit: () => void
+  /** Modo Palco (tempo real). */
+  live?: LiveControls
+  /** O líder mandou rolar até uma linha (nonce muda a cada comando). */
+  scrollTarget?: { line: number | null; nonce: number }
 }
 
 /** Rota /musicas/:id — a música solta. */
@@ -90,6 +95,21 @@ export function SongViewer({ songId, setlist }: { songId: string; setlist?: Setl
     setScrolling(false)
     setMarkLine(null)
   }, [songId])
+
+  // Comando do líder no Modo Palco: rola até a seção (ou o topo) escolhida por ele.
+  const scrollTarget = setlist?.scrollTarget
+  useEffect(() => {
+    if (!scrollTarget) return
+    const t = setTimeout(() => {
+      // Em segundo plano (tela apagada, outro app) a rolagem suave não acontece:
+      // aí rola direto, para a pessoa voltar já no lugar certo.
+      const behavior: ScrollBehavior = document.hidden ? 'auto' : 'smooth'
+      if (scrollTarget.line == null) window.scrollTo({ top: 0, behavior })
+      else document.getElementById(`linha-${scrollTarget.line}`)?.scrollIntoView({ behavior, block: 'start' })
+    }, 150)
+    return () => clearTimeout(t)
+    // Só o nonce importa: o mesmo comando repetido (mesma seção) deve rolar de novo.
+  }, [scrollTarget?.nonce])
 
   const original = song?.originalKey ?? null
   const currentKey = original ? transposeKey(original, offset) : null
@@ -190,6 +210,7 @@ export function SongViewer({ songId, setlist }: { songId: string; setlist?: Setl
             </button>
           </div>
         )}
+        {setlist?.live && <LiveStrip live={setlist.live} />}
         <div className="mx-auto flex max-w-4xl items-center gap-1 px-2 py-2">
           <button
             className="btn-icon shrink-0 border-transparent bg-transparent"
@@ -240,7 +261,11 @@ export function SongViewer({ songId, setlist }: { songId: string; setlist?: Setl
                 <button
                   key={s.index}
                   className="chip h-8 shrink-0 text-xs"
-                  onClick={() => document.getElementById(`linha-${s.index}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+                  onClick={() => {
+                    document.getElementById(`linha-${s.index}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                    // No comando, a seção vai também para a tela de toda a banda.
+                    if (setlist?.live?.isLeader && setlist.live.stage) setlist.live.onSection(s.index)
+                  }}
                 >
                   {s.label}
                 </button>
