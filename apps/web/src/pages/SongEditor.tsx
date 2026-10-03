@@ -141,7 +141,7 @@ export function SongEditor() {
         <Link to={editing ? `/musicas/${id}` : '/musicas'} className="btn-icon border-transparent bg-transparent" aria-label="Voltar">
           <ArrowLeft className="size-5" />
         </Link>
-        <h1 className="flex-1 text-2xl font-bold">{editing ? 'Editar música' : 'Nova música'}</h1>
+        <h1 className="flex-1 text-xl sm:text-2xl font-bold">{editing ? 'Editar música' : 'Nova música'}</h1>
       </div>
 
       <section className="card grid gap-4 p-4 md:grid-cols-2 md:p-5">
@@ -289,7 +289,7 @@ export function SongEditor() {
           </>
         ) : form.content.trim() ? (
           <div className="rounded-xl bg-bg p-4">
-            <ChordSheet lines={lines} fontSize={15} lineHeight={1.45} />
+            <ChordSheet lines={lines} fontSize={15} lineHeight={1.45} wrap />
           </div>
         ) : (
           <p className="py-10 text-center text-sm text-muted">Nada para visualizar ainda.</p>

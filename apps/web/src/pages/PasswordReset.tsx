@@ -12,7 +12,7 @@ function Shell({ title, subtitle, children }: { title: string; subtitle?: string
       <Link to="/" className="mb-8 self-center">
         <Logo />
       </Link>
-      <h1 className="text-2xl font-bold">{title}</h1>
+      <h1 className="text-xl sm:text-2xl font-bold">{title}</h1>
       {subtitle && <p className="mt-1 mb-6 text-sm text-muted">{subtitle}</p>}
       {children}
     </div>

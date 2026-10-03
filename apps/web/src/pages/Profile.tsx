@@ -78,7 +78,7 @@ export function Profile() {
   return (
     <form onSubmit={submit} className="space-y-6" noValidate>
       <header>
-        <h1 className="text-2xl font-bold">{onboarding ? 'Bem-vindo ao Ensaio Fácil!' : 'Perfil'}</h1>
+        <h1 className="text-xl sm:text-2xl font-bold">{onboarding ? 'Bem-vindo ao Ensaio Fácil!' : 'Perfil'}</h1>
         {onboarding && <p className="mt-1 text-muted">Conte um pouco sobre você para personalizarmos o app.</p>}
       </header>
 

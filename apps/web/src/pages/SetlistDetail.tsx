@@ -64,7 +64,7 @@ export function SetlistDetail() {
         </Link>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <h1 className="text-2xl leading-tight font-bold">{s.name}</h1>
+            <h1 className="text-xl sm:text-2xl leading-tight font-bold">{s.name}</h1>
             <StatusChip status={s.status} />
             {s.archived && <span className="rounded-md bg-surface-2 px-2 py-0.5 text-xs text-muted">Arquivado</span>}
           </div>
@@ -125,8 +125,9 @@ export function SetlistDetail() {
         </button>
       )}
 
-      <div className="flex flex-wrap gap-2">
-        <button className="btn-primary" disabled={!s.items.length} onClick={() => navigate(`/repertorios/${s.id}/tocar/0`)}>
+      {/* Celular: o botão principal ocupa a linha toda; os outros dividem a de baixo. */}
+      <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+        <button className="btn-primary col-span-2" disabled={!s.items.length} onClick={() => navigate(`/repertorios/${s.id}/tocar/0`)}>
           <Play className="size-4" /> {s.status === 'ensaio' ? 'Ensaiar' : 'Tocar'}
         </button>
         <ExportButton setlist={s} />

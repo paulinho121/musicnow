@@ -65,8 +65,8 @@ export function ChordDetails({ symbol }: { symbol: string }) {
             <Icon className="size-4" /> {label}
           </button>
         ))}
-        <button className="chip ml-auto h-9" onClick={play} aria-label="Ouvir o acorde">
-          <Volume2 className="size-4" /> Ouvir
+        <button className="chip ml-auto h-9 max-[380px]:px-3" onClick={play} aria-label="Ouvir o acorde">
+          <Volume2 className="size-4" /> <span className="max-[380px]:sr-only">Ouvir</span>
         </button>
       </div>
 

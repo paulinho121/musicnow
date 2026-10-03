@@ -124,32 +124,35 @@ function ItemRow({
       { onError: (e) => toast(e.message, 'error') },
     )
 
+  const keyControl = isAdmin ? (
+    <select
+      className="h-9 max-w-28 min-w-0 rounded-lg border border-border bg-surface-2 px-2 font-mono text-sm font-bold text-chord"
+      value={item.key ?? ''}
+      onChange={(e) => save({ key: e.target.value || null })}
+      aria-label={`Tom de ${item.song.title}`}
+      disabled={!item.song.originalKey}
+    >
+      <option value="">{item.song.originalKey ? `${item.song.originalKey} (orig.)` : '—'}</option>
+      {keyOptions(item.song.originalKey).map((k) => (
+        <option key={k}>{k}</option>
+      ))}
+    </select>
+  ) : (
+    <KeyBadge value={key} />
+  )
+
   return (
     <li className="p-3">
       <div className="flex items-center gap-3">
         <span className="w-6 shrink-0 text-center font-mono text-sm text-muted">{index + 1}</span>
         <button className="min-w-0 flex-1 text-left" onClick={onPlay}>
-          <p className="truncate font-semibold">{item.song.title}</p>
+          <p className="line-clamp-2 leading-snug font-semibold break-words sm:truncate">{item.song.title}</p>
           <p className="truncate text-sm text-muted">
             {[item.song.artist, item.bpm ?? item.song.bpm ? `${item.bpm ?? item.song.bpm} BPM` : null].filter(Boolean).join(' · ')}
           </p>
         </button>
-        {isAdmin ? (
-          <select
-            className="h-9 rounded-lg border border-border bg-surface-2 px-2 font-mono text-sm font-bold text-chord"
-            value={item.key ?? ''}
-            onChange={(e) => save({ key: e.target.value || null })}
-            aria-label={`Tom de ${item.song.title}`}
-            disabled={!item.song.originalKey}
-          >
-            <option value="">{item.song.originalKey ? `${item.song.originalKey} (orig.)` : '—'}</option>
-            {keyOptions(item.song.originalKey).map((k) => (
-              <option key={k}>{k}</option>
-            ))}
-          </select>
-        ) : (
-          <KeyBadge value={key} />
-        )}
+        {/* No celular o tom desce para a linha de ações: o nome da música fica legível. */}
+        <div className="hidden sm:block">{keyControl}</div>
       </div>
 
       {item.personalKey && item.personalKey !== key && (
@@ -185,20 +188,22 @@ function ItemRow({
         </div>
       )}
 
-      <div className="mt-2 flex items-center gap-1 pl-8">
-        <button className="inline-flex h-8 items-center gap-1.5 rounded-lg px-2 text-xs font-medium text-accent hover:bg-accent/10" onClick={onPlay}>
+      {/* Celular: sem recuo e sem "Abrir" (tocar no nome já abre); o tom vem para esta linha. */}
+      <div className="mt-2 flex items-center gap-1 sm:pl-8">
+        <div className="mr-1 sm:hidden">{keyControl}</div>
+        <button className="hidden h-8 items-center gap-1.5 rounded-lg px-2 text-xs font-medium text-accent hover:bg-accent/10 sm:inline-flex" onClick={onPlay}>
           <Play className="size-3.5" /> Abrir
         </button>
         {isAdmin && (
           <>
-            <button className="grid size-8 place-items-center rounded-lg text-muted hover:bg-surface-2 hover:text-text disabled:opacity-30" onClick={() => onMove(-1)} disabled={index === 0} aria-label="Subir na ordem">
+            <button className="grid size-8 shrink-0 place-items-center rounded-lg text-muted hover:bg-surface-2 hover:text-text disabled:opacity-30" onClick={() => onMove(-1)} disabled={index === 0} aria-label="Subir na ordem">
               <ArrowUp className="size-4" />
             </button>
-            <button className="grid size-8 place-items-center rounded-lg text-muted hover:bg-surface-2 hover:text-text disabled:opacity-30" onClick={() => onMove(1)} disabled={index === count - 1} aria-label="Descer na ordem">
+            <button className="grid size-8 shrink-0 place-items-center rounded-lg text-muted hover:bg-surface-2 hover:text-text disabled:opacity-30" onClick={() => onMove(1)} disabled={index === count - 1} aria-label="Descer na ordem">
               <ArrowDown className="size-4" />
             </button>
             <button
-              className="grid size-8 place-items-center rounded-lg text-muted hover:bg-surface-2 hover:text-text"
+              className="grid size-8 shrink-0 place-items-center rounded-lg text-muted hover:bg-surface-2 hover:text-text"
               onClick={() => {
                 setNotes(item.notes ?? '')
                 setEditingNotes(true)
@@ -208,7 +213,7 @@ function ItemRow({
               <StickyNote className="size-4" />
             </button>
             <button
-              className="ml-auto grid size-8 place-items-center rounded-lg text-muted hover:bg-danger/10 hover:text-danger"
+              className="ml-auto grid size-8 shrink-0 place-items-center rounded-lg text-muted hover:bg-danger/10 hover:text-danger"
               onClick={() => confirm(`Tirar "${item.song.title}" do repertório?`) && remove.mutate(item.id, { onError: (e) => toast(e.message, 'error') })}
               aria-label="Tirar do repertório"
             >
@@ -250,9 +255,9 @@ function SuggestionsBox({ setlist }: { setlist: SetlistDetail }) {
                 )}
               </p>
               {s.message && <p className="mt-1 text-muted">“{s.message}”</p>}
-              <div className="mt-2 flex gap-2">
+              <div className="mt-2 flex flex-wrap gap-2">
                 <button
-                  className="btn-primary h-9 px-3"
+                  className="btn-primary h-9 px-3 whitespace-nowrap"
                   onClick={() =>
                     resolve.mutate(
                       { sid: s.id, status: 'accepted' },

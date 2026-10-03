@@ -5,9 +5,11 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
+  EllipsisVertical,
   Expand,
   FileDown,
   ListMusic,
+  ListPlus,
   Lock,
   Minus,
   Pause,
@@ -25,8 +27,8 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
 import { AddToSetlistButton } from '../components/AddToSetlist'
-import { ChordDialog } from '../components/ChordDictionary'
 import { GuitarDiagram } from '../components/ChordDiagrams'
+import { ChordDialog } from '../components/ChordDictionary'
 import { ChordSheet, sectionsOf, useSheet } from '../components/ChordSheet'
 import { FindLinks } from '../components/FindLinks'
 import { KeyPicker } from '../components/KeyPicker'
@@ -34,6 +36,7 @@ import { LiveStrip, type LiveControls } from '../components/LiveStrip'
 import { MarkDialog } from '../components/MarkDialog'
 import { ReferencePlayer } from '../components/ReferencePlayer'
 import { ReportButton } from '../components/ReportDialog'
+import { Sheet } from '../components/Sheet'
 import { ErrorState, PageSpinner, useToast } from '../components/ui'
 import { useSession } from '../lib/auth'
 import { useDeleteMark, useSavePersonalKey, useSong, useToggleFavorite } from '../lib/queries'
@@ -41,7 +44,7 @@ import { downloadText } from '../lib/download'
 import { useLocalState } from '../lib/storage'
 import type { SongMark } from '../lib/types'
 
-const VIEWER_DEFAULTS = { fontSize: 17, lineHeight: 1.45, speed: 3, showChords: true, chordStrip: false }
+const VIEWER_DEFAULTS = { fontSize: 17, lineHeight: 1.45, speed: 3, showChords: true, chordStrip: false, wrap: true }
 
 /** Contexto quando a música é tocada dentro de um repertório. */
 export interface SetlistContext {
@@ -86,6 +89,8 @@ export function SongViewer({ songId, setlist }: { songId: string; setlist?: Setl
   const [markMode, setMarkMode] = useState(false)
   const [markLine, setMarkLine] = useState<number | null>(null)
   const [chordOpen, setChordOpen] = useState<string | null>(null)
+  const [addOpen, setAddOpen] = useState(false)
+  const [moreOpen, setMoreOpen] = useState(false)
 
   // Tom inicial: o do repertório; fora dele, o tom pessoal do músico; senão, o original.
   const baseKey = setlist?.itemKey ?? song?.personalKey ?? null
@@ -132,6 +137,7 @@ export function SongViewer({ songId, setlist }: { songId: string; setlist?: Setl
   const prev = setlist?.prev
 
   useAutoScroll(scrolling, prefs.speed, () => setScrolling(false))
+  const headerHidden = useHideOnScroll() && !markMode
   useWakeLock(Boolean(song))
 
   useEffect(() => {
@@ -203,7 +209,12 @@ export function SongViewer({ songId, setlist }: { songId: string; setlist?: Setl
 
   return (
     <div className="min-h-dvh pb-36">
-      <header className="sticky top-0 z-30 border-b border-border bg-bg/95 backdrop-blur">
+      <header
+        className={clsx(
+          'sticky top-0 z-30 border-b border-border bg-bg/95 backdrop-blur transition-transform duration-200',
+          headerHidden && '-translate-y-full',
+        )}
+      >
         {setlist && (
           <div className="flex items-center gap-1 border-b border-border bg-surface/60 px-2 py-1">
             <button className="btn-icon size-9 shrink-0 border-transparent bg-transparent" onClick={setlist.onExit} aria-label="Voltar ao repertório">
@@ -230,7 +241,7 @@ export function SongViewer({ songId, setlist }: { songId: string; setlist?: Setl
             <ArrowLeft className="size-5" />
           </button>
           <div className="min-w-0 flex-1">
-            <h1 className="truncate text-base leading-tight font-bold md:text-lg">{song.title}</h1>
+            <h1 className="line-clamp-2 text-base leading-tight font-bold break-words sm:truncate md:text-lg">{song.title}</h1>
             <p className="truncate text-sm text-muted">{song.artist}</p>
           </div>
           <button
@@ -252,11 +263,26 @@ export function SongViewer({ songId, setlist }: { songId: string; setlist?: Setl
           >
             <Tag className="size-5" />
           </button>
-          {!setlist && <AddToSetlistButton songId={song.id} songTitle={song.title} isPrivate={song.visibility === 'private'} />}
+          {!setlist && (
+            <AddToSetlistButton
+              songId={song.id}
+              songTitle={song.title}
+              isPrivate={song.visibility === 'private'}
+              className="hidden sm:inline-flex"
+              open={addOpen}
+              onOpenChange={setAddOpen}
+            />
+          )}
           {song.canEdit && !setlist && (
-            <Link to={`/musicas/${song.id}/editar`} className="btn-icon shrink-0 border-transparent bg-transparent" aria-label="Editar">
+            <Link to={`/musicas/${song.id}/editar`} className="btn-icon hidden shrink-0 border-transparent bg-transparent sm:inline-flex" aria-label="Editar">
               <Pencil className="size-5" />
             </Link>
+          )}
+          {/* Celular: as ações menos usadas ficam num menu, para o título ter espaço. */}
+          {!setlist && (
+            <button className="btn-icon shrink-0 border-transparent bg-transparent sm:hidden" aria-label="Mais opções" onClick={() => setMoreOpen(true)}>
+              <EllipsisVertical className="size-5" />
+            </button>
           )}
         </div>
 
@@ -339,6 +365,7 @@ export function SongViewer({ songId, setlist }: { songId: string; setlist?: Setl
             fontSize={prefs.fontSize}
             lineHeight={prefs.lineHeight}
             showChords={prefs.showChords}
+            wrap={prefs.wrap}
             hideLyrics={hideLyrics}
             currentUserId={uid}
             markMode={markMode}
@@ -401,6 +428,18 @@ export function SongViewer({ songId, setlist }: { songId: string; setlist?: Setl
               className="size-5 accent-[var(--accent)]"
               checked={prefs.showChords}
               onChange={(e) => setPrefs((p) => ({ ...p, showChords: e.target.checked }))}
+            />
+          </label>
+          <label className="flex min-h-11 items-center justify-between gap-3 text-sm">
+            <span>
+              Quebrar linhas longas
+              <span className="block text-xs text-muted">A cifra cabe na tela, sem rolar para o lado</span>
+            </span>
+            <input
+              type="checkbox"
+              className="size-5 shrink-0 accent-[var(--accent)]"
+              checked={prefs.wrap}
+              onChange={(e) => setPrefs((p) => ({ ...p, wrap: e.target.checked }))}
             />
           </label>
           <button className="btn-ghost mt-2 w-full" onClick={toggleFullscreen}>
@@ -516,6 +555,28 @@ export function SongViewer({ songId, setlist }: { songId: string; setlist?: Setl
         onClose={() => setMarkLine(null)}
       />
 
+      <Sheet open={moreOpen} onClose={() => setMoreOpen(false)} title={song.title}>
+        <div className="-mx-2 flex flex-col">
+          <button
+            className="flex h-12 items-center gap-3 rounded-xl px-2 text-left hover:bg-surface-2"
+            onClick={() => {
+              setMoreOpen(false)
+              setAddOpen(true)
+            }}
+          >
+            <ListPlus className="size-5 text-muted" /> Adicionar ao repertório
+          </button>
+          {song.canEdit && (
+            <Link to={`/musicas/${song.id}/editar`} className="flex h-12 items-center gap-3 rounded-xl px-2 hover:bg-surface-2">
+              <Pencil className="size-5 text-muted" /> Editar música
+            </Link>
+          )}
+          <Link to={`/musicas/${song.id}/imprimir${offset ? `?st=${offset}` : ''}`} className="flex h-12 items-center gap-3 rounded-xl px-2 hover:bg-surface-2">
+            <Printer className="size-5 text-muted" /> Imprimir ou salvar PDF
+          </Link>
+        </div>
+      </Sheet>
+
       <ChordDialog symbol={chordOpen} onClose={() => setChordOpen(null)} related={songChords} onPick={setChordOpen} />
     </div>
   )
@@ -614,6 +675,27 @@ function LockOverlay({ onUnlock }: { onUnlock: () => void }) {
 }
 
 /** Rolagem automática suave; para sozinha ao chegar no fim. */
+/**
+ * Em tela baixa (celular), o cabeçalho some enquanto a pessoa desce lendo a cifra
+ * e volta assim que ela rola um pouco para cima.
+ */
+function useHideOnScroll() {
+  const [hidden, setHidden] = useState(false)
+  useEffect(() => {
+    let last = window.scrollY
+    const onScroll = () => {
+      const y = window.scrollY
+      if (window.innerHeight > 900 || y < 120) setHidden(false)
+      else if (y > last + 6) setHidden(true)
+      else if (y < last - 6) setHidden(false)
+      if (Math.abs(y - last) > 6) last = y
+    }
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [])
+  return hidden
+}
+
 function useAutoScroll(active: boolean, speed: number, onEnd: () => void) {
   const endRef = useRef(onEnd)
   endRef.current = onEnd

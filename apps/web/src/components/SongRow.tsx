@@ -12,9 +12,10 @@ export function SongRow({ song }: { song: SongListItem }) {
       <Link to={`/musicas/${song.id}`} className="flex min-w-0 flex-1 items-center gap-3 py-3 pl-4">
         <KeyBadge value={song.originalKey} className="shrink-0" />
         <div className="min-w-0 flex-1">
-          <p className="flex items-center gap-1.5 truncate font-semibold">
+          {/* Celular: o nome pode ocupar 2 linhas em vez de ser cortado. */}
+          <p className="line-clamp-2 leading-snug font-semibold break-words sm:truncate">
             {song.title}
-            {song.visibility === 'private' && <Lock aria-label="Privada" className="size-3.5 shrink-0 text-muted" />}
+            {song.visibility === 'private' && <Lock aria-label="Privada" className="ml-1.5 inline size-3.5 align-[-2px] text-muted" />}
           </p>
           <p className="truncate text-sm text-muted">
             {[song.artist, song.style, song.bpm ? `${song.bpm} BPM` : null].filter(Boolean).join(' · ')}

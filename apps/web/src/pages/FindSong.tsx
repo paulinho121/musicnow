@@ -79,7 +79,7 @@ export function FindSong() {
           <ArrowLeft className="size-5" />
         </Link>
         <div>
-          <h1 className="text-2xl font-bold">Encontrar música</h1>
+          <h1 className="text-xl sm:text-2xl font-bold">Encontrar música</h1>
           <p className="text-sm text-muted">Ache a música, veja a cifra no site de origem e monte a sua versão aqui.</p>
         </div>
       </div>

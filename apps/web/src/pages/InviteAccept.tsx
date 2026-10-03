@@ -34,7 +34,7 @@ export function InviteAccept() {
         </div>
         <div>
           <p className="text-sm text-muted">{data.ownerName} te convidou para</p>
-          <h1 className="mt-1 text-2xl font-bold">{data.name}</h1>
+          <h1 className="mt-1 text-xl sm:text-2xl font-bold">{data.name}</h1>
           {data.groupName && <p className="text-sm text-muted">{data.groupName}</p>}
         </div>
         <div className="flex flex-col items-center gap-1 text-sm text-muted">

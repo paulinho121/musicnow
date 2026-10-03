@@ -51,7 +51,7 @@ export function Setlists() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-3">
-        <h1 className="text-2xl font-bold">Repertórios</h1>
+        <h1 className="text-xl sm:text-2xl font-bold">Repertórios</h1>
         <Link to="/repertorios/novo" className="btn-primary">
           <Plus className="size-4" /> Novo
         </Link>

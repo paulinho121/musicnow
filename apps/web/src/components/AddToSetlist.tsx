@@ -1,4 +1,5 @@
 import { atLeast } from '@ensaio/shared'
+import clsx from 'clsx'
 import { useQueryClient } from '@tanstack/react-query'
 import { Check, ListPlus, Plus } from 'lucide-react'
 import { useState } from 'react'
@@ -11,8 +12,25 @@ import { Spinner, useToast } from './ui'
 const dateFmt = new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: 'short' })
 
 /** Botão "Adicionar ao repertório" da tela da música: lista os repertórios que a pessoa administra. */
-export function AddToSetlistButton({ songId, songTitle, isPrivate }: { songId: string; songTitle: string; isPrivate: boolean }) {
-  const [open, setOpen] = useState(false)
+export function AddToSetlistButton({
+  songId,
+  songTitle,
+  isPrivate,
+  className,
+  open: controlledOpen,
+  onOpenChange,
+}: {
+  songId: string
+  songTitle: string
+  isPrivate: boolean
+  className?: string
+  /** Controlado de fora (ex.: aberto por um menu): aí o botão próprio pode ficar escondido. */
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
+}) {
+  const [ownOpen, setOwnOpen] = useState(false)
+  const open = controlledOpen ?? ownOpen
+  const setOpen = (v: boolean) => (onOpenChange ? onOpenChange(v) : setOwnOpen(v))
   const [added, setAdded] = useState<string[]>([])
   const [busy, setBusy] = useState<string | null>(null)
   const { data, isLoading } = useSetlists()
@@ -37,7 +55,11 @@ export function AddToSetlistButton({ songId, songTitle, isPrivate }: { songId: s
 
   return (
     <>
-      <button className="btn-icon shrink-0 border-transparent bg-transparent" aria-label="Adicionar ao repertório" onClick={() => setOpen(true)}>
+      <button
+        className={clsx('btn-icon shrink-0 border-transparent bg-transparent', className)}
+        aria-label="Adicionar ao repertório"
+        onClick={() => setOpen(true)}
+      >
         <ListPlus className="size-5" />
       </button>
       <Sheet open={open} onClose={() => setOpen(false)} title="Adicionar ao repertório">

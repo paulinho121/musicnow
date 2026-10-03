@@ -72,7 +72,7 @@ export function SetlistForm() {
         <Link to={editing ? `/repertorios/${id}` : '/repertorios'} className="btn-icon border-transparent bg-transparent" aria-label="Voltar">
           <ArrowLeft className="size-5" />
         </Link>
-        <h1 className="text-2xl font-bold">{editing ? 'Editar repertório' : 'Novo repertório'}</h1>
+        <h1 className="text-xl sm:text-2xl font-bold">{editing ? 'Editar repertório' : 'Novo repertório'}</h1>
       </div>
 
       <section className="card grid gap-4 p-4 md:grid-cols-2 md:p-5">

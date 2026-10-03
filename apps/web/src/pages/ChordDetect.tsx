@@ -113,7 +113,7 @@ export function ChordDetect() {
           <ArrowLeft className="size-5" />
         </Link>
         <div>
-          <h1 className="flex items-center gap-2 text-2xl font-bold">
+          <h1 className="flex items-center gap-2 text-xl sm:text-2xl font-bold">
             Detectar acordes <span className="rounded-md bg-accent/15 px-1.5 py-0.5 text-xs font-semibold text-accent">beta</span>
           </h1>
           <p className="text-sm text-muted">O app ouve uma gravação e sugere acordes, tom e BPM.</p>

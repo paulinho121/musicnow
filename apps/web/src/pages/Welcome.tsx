@@ -15,7 +15,7 @@ export function Welcome() {
       <Logo />
       <div className="grid flex-1 items-center gap-10 py-10 md:grid-cols-2">
         <div>
-          <h1 className="text-4xl leading-tight font-extrabold tracking-tight md:text-5xl">
+          <h1 className="text-3xl leading-tight font-extrabold tracking-tight sm:text-4xl md:text-5xl">
             Cifras, tons e repertório. <span className="text-accent">Tudo pronto para tocar.</span>
           </h1>
           <p className="mt-4 text-lg text-muted">

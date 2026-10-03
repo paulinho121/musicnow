@@ -49,18 +49,27 @@ export function Library() {
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-bold">Músicas</h1>
-        <div className="flex flex-wrap gap-2">
-          <Link to="/musicas/encontrar" className="btn-ghost">
+        <h1 className="text-xl sm:text-2xl font-bold">Músicas</h1>
+        <div className="flex gap-2">
+          <Link to="/musicas/encontrar" className="btn-ghost hidden sm:inline-flex">
             <Globe className="size-4" /> Encontrar
           </Link>
-          <Link to="/musicas/importar" className="btn-ghost">
+          <Link to="/musicas/importar" className="btn-ghost hidden sm:inline-flex">
             <FileUp className="size-4" /> Importar
           </Link>
           <Link to="/musicas/nova" className="btn-primary">
             <Plus className="size-4" /> Nova
           </Link>
         </div>
+      </div>
+      {/* Celular: as outras formas de trazer música dividem uma linha, embaixo do título. */}
+      <div className="grid grid-cols-2 gap-2 sm:hidden">
+        <Link to="/musicas/encontrar" className="btn-ghost">
+          <Globe className="size-4" /> Encontrar
+        </Link>
+        <Link to="/musicas/importar" className="btn-ghost">
+          <FileUp className="size-4" /> Importar
+        </Link>
       </div>
 
       <div className="relative">
@@ -80,7 +89,8 @@ export function Library() {
         )}
       </div>
 
-      <div className="flex flex-wrap items-center gap-2">
+      {/* Filtros: no celular, uma linha que desliza para o lado (não ocupa meia tela). */}
+      <div className="-mx-4 flex items-center gap-2 overflow-x-auto px-4 [scrollbar-width:none] *:shrink-0 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0">
         {SCOPES.map((s) => (
           <button key={s.value} className={clsx('chip', scope === s.value && 'chip-on')} onClick={() => setParam('escopo', s.value)}>
             {s.label}

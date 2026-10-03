@@ -1,5 +1,6 @@
 import { X } from 'lucide-react'
 import { useEffect, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 
 /** Folha que sobe de baixo no celular (alcance do polegar) e vira janela central no computador. */
 export function Sheet({
@@ -28,7 +29,8 @@ export function Sheet({
   }, [open, onClose])
 
   if (!open) return null
-  return (
+  // Portal: um cabeçalho com desfoque ou animação prenderia a janela dentro dele.
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 md:items-center md:p-6" onClick={onClose}>
       <div
         role="dialog"
@@ -45,6 +47,7 @@ export function Sheet({
         </div>
         <div className="overflow-y-auto px-5 py-4 pb-[max(1.25rem,env(safe-area-inset-bottom))]">{children}</div>
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }

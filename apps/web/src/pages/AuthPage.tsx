@@ -52,7 +52,7 @@ export function AuthPage({ mode }: { mode: 'login' | 'signup' }) {
       <Link to="/" className="mb-8 self-center">
         <Logo />
       </Link>
-      <h1 className="text-2xl font-bold">{mode === 'signup' ? 'Criar conta' : 'Entrar'}</h1>
+      <h1 className="text-xl sm:text-2xl font-bold">{mode === 'signup' ? 'Criar conta' : 'Entrar'}</h1>
       <p className="mt-1 mb-6 text-sm text-muted">
         {mode === 'signup' ? 'Leva menos de um minuto.' : 'Bom te ver de novo.'}
       </p>

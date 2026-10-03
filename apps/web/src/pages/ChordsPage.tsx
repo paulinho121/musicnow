@@ -48,7 +48,7 @@ export function ChordsPage() {
           <ArrowLeft className="size-5" />
         </Link>
         <div>
-          <h1 className="text-2xl font-bold">Dicionário de acordes</h1>
+          <h1 className="text-xl sm:text-2xl font-bold">Dicionário de acordes</h1>
           <p className="text-sm text-muted">Como montar qualquer acorde no violão e no teclado.</p>
         </div>
       </div>

@@ -3,6 +3,7 @@ import {
   guessKey,
   isChord,
   isChordLine,
+  wrapChordPair,
   normalizeOffset,
   parseSheet,
   semitonesBetween,
@@ -123,5 +124,39 @@ describe('stripLyrics', () => {
     expect(out).toBe('[Refrão]\nC     G\n\n\nAm   F\n')
     expect(out.split('\n')).toHaveLength(src.split('\n').length)
     expect(out).not.toContain('Letra')
+  })
+})
+
+describe('quebra de linha em tela pequena', () => {
+  it('não quebra o que já cabe', () => {
+    expect(wrapChordPair('C     G', 'Letra curta', 40)).toEqual([{ chords: 'C     G', lyrics: 'Letra curta' }])
+  })
+
+  it('corta acorde e letra no mesmo ponto, num espaço', () => {
+    const chords = 'C              G              Am           F'
+    const lyrics = 'Quando eu olho pro céu e vejo as estrelas a brilhar'
+    const rows = wrapChordPair(chords, lyrics, 24)
+    expect(rows.length).toBeGreaterThan(1)
+    for (const r of rows) expect(Math.max(r.chords!.length, r.lyrics!.length)).toBeLessThanOrEqual(24)
+    // Cada acorde continua sobre a mesma sílaba
+    const syllableUnder = (chord: string) => {
+      const r = rows.find((x) => x.chords!.includes(chord))!
+      const i = r.chords!.indexOf(chord)
+      return r.lyrics!.slice(i, i + 3)
+    }
+    expect(syllableUnder('G')).toBe(lyrics.slice(chords.indexOf('G')).slice(0, 3))
+    expect(syllableUnder('Am')).toBe(lyrics.slice(chords.indexOf('Am')).slice(0, 3))
+    expect(rows.map((r) => r.lyrics).join(' ').replace(/\s+/g, ' ')).toBe(lyrics)
+  })
+
+  it('linha só de acordes quebra entre os acordes', () => {
+    const rows = wrapChordPair('| Dm7(9)   | Dm7(9)   | Em7(b5)  A7(b13) | Dm7(9) |', null, 20)
+    for (const r of rows) {
+      expect(r.lyrics).toBeNull()
+      expect(r.chords!.length).toBeLessThanOrEqual(20)
+    }
+    expect(rows.map((r) => r.chords).join(' ').split(/\s+/).filter((t) => t !== '|')).toEqual([
+      'Dm7(9)', 'Dm7(9)', 'Em7(b5)', 'A7(b13)', 'Dm7(9)',
+    ])
   })
 })

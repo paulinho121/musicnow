@@ -186,7 +186,7 @@ export function Importer() {
           <ArrowLeft className="size-5" />
         </Link>
         <div>
-          <h1 className="text-2xl font-bold">Importar cifras</h1>
+          <h1 className="text-xl sm:text-2xl font-bold">Importar cifras</h1>
           <p className="text-sm text-muted">ChordPro, OnSong, OpenSong ou texto copiado de qualquer lugar.</p>
         </div>
       </div>
@@ -449,7 +449,7 @@ function ImportRow({
       {open && (
         <div className="mt-3 max-h-96 overflow-auto rounded-xl bg-bg p-3 md:ml-8">
           {song.content.trim() ? (
-            <ChordSheet lines={lines} fontSize={14} lineHeight={1.4} />
+            <ChordSheet lines={lines} fontSize={14} lineHeight={1.4} wrap />
           ) : (
             <p className="text-sm text-muted">Arquivo sem conteúdo.</p>
           )}

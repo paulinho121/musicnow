@@ -28,7 +28,7 @@ export function Dashboard() {
     <div className="space-y-8">
       <header>
         <p className="text-sm text-muted">{greeting()},</p>
-        <h1 className="text-2xl font-bold">{me?.name?.split(' ')[0] ?? '...'}</h1>
+        <h1 className="text-xl sm:text-2xl font-bold">{me?.name?.split(' ')[0] ?? '...'}</h1>
       </header>
 
       <form onSubmit={search} className="relative">

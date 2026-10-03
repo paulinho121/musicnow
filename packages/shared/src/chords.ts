@@ -243,3 +243,48 @@ export function stripLyrics(content: string): string {
     })
     .join('\n')
 }
+
+export interface WrappedRow {
+  chords: string | null
+  lyrics: string | null
+}
+
+/**
+ * Quebra um par "acordes em cima + letra embaixo" (ou uma linha só de acordes) para caber
+ * em `cols` colunas, cortando os dois no MESMO ponto: cada acorde continua em cima da sua sílaba.
+ * Corta de preferência num espaço da letra, nunca no meio de um acorde.
+ */
+export function wrapChordPair(chords: string | null, lyrics: string | null, cols: number): WrappedRow[] {
+  let c = chords ?? ''
+  let l = lyrics ?? ''
+  const rows: WrappedRow[] = []
+  const out = (a: string, b: string) =>
+    rows.push({ chords: chords === null ? null : a.trimEnd(), lyrics: lyrics === null ? null : b.trimEnd() })
+  if (cols < 8) cols = 8
+  while (Math.max(c.length, l.length) > cols) {
+    const insideChord = (b: number) => b > 0 && b < c.length && c[b - 1] !== ' ' && c[b] !== ' '
+    const atSpace = (b: number) => b >= l.length || l[b - 1] === ' ' || l[b] === ' '
+    let cut = -1
+    for (let b = cols; b >= Math.ceil(cols / 3); b--) {
+      if (!insideChord(b) && atSpace(b) && (b < c.length || b < l.length)) {
+        cut = b
+        break
+      }
+    }
+    if (cut < 0) for (let b = cols; b >= 1; b--) if (!insideChord(b)) { cut = b; break }
+    if (cut < 0) cut = cols
+    out(c.slice(0, cut), l.slice(0, cut))
+    c = c.slice(cut)
+    l = l.slice(cut)
+    // Tira o recuo comum que sobrou no começo da continuação.
+    const lead = (s: string) => (s.trim() === '' ? Infinity : s.length - s.trimStart().length)
+    const k = Math.min(lead(c), lead(l))
+    if (Number.isFinite(k) && k > 0) {
+      c = c.slice(k)
+      l = l.slice(k)
+    }
+    if (c.trim() === '' && l.trim() === '') return rows
+  }
+  out(c, l)
+  return rows
+}

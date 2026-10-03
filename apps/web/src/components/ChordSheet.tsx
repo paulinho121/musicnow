@@ -1,6 +1,6 @@
-import { isChordLine, parseSheet, SECTION_LABELS, splitChordLine, type SectionType, type SheetLine } from '@ensaio/shared'
+import { isChordLine, parseSheet, SECTION_LABELS, splitChordLine, wrapChordPair, type SectionType, type SheetLine } from '@ensaio/shared'
 import clsx from 'clsx'
-import { memo, useMemo } from 'react'
+import { memo, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { MarkType, SongMark } from '../lib/types'
 
 const SECTION_COLOR: Record<SectionType, string> = {
@@ -55,6 +55,28 @@ interface Props {
   onMarkClick?: (mark: SongMark) => void
   /** Toque num acorde (fora do modo de marcar): abre o dicionário. */
   onChordClick?: (chord: string) => void
+  /** Quebra as linhas longas para caber na tela (acorde e letra juntos), sem rolagem lateral. */
+  wrap?: boolean
+}
+
+/** Quantas colunas da fonte monoespaçada cabem no elemento (acompanha giro de tela e zoom). */
+function useColumns(enabled: boolean, fontSize: number) {
+  const ref = useRef<HTMLDivElement>(null)
+  const probe = useRef<HTMLSpanElement>(null)
+  const [cols, setCols] = useState<number | null>(null)
+  useLayoutEffect(() => {
+    const el = ref.current
+    if (!enabled || !el) return setCols(null)
+    const measure = () => {
+      const charW = (probe.current?.getBoundingClientRect().width ?? 0) / 50
+      if (charW > 0) setCols(Math.max(12, Math.floor((el.clientWidth - 2) / charW)))
+    }
+    measure()
+    const ro = new ResizeObserver(measure)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [enabled, fontSize])
+  return { ref, probe, cols }
 }
 
 export const ChordSheet = memo(function ChordSheet({
@@ -69,7 +91,9 @@ export const ChordSheet = memo(function ChordSheet({
   onLineClick,
   onMarkClick,
   onChordClick,
+  wrap = false,
 }: Props) {
+  const { ref, probe, cols } = useColumns(wrap, fontSize)
   const marksByLine = useMemo(() => {
     const m = new Map<number, SongMark[]>()
     for (const mark of marks) {
@@ -82,10 +106,21 @@ export const ChordSheet = memo(function ChordSheet({
   }, [marks, lines])
 
   return (
-    <div className="sheet overflow-x-auto pb-2" style={{ fontSize, lineHeight }}>
+    <div ref={ref} className={clsx('sheet relative pb-2', cols ? 'overflow-x-hidden' : 'overflow-x-auto')} style={{ fontSize, lineHeight }}>
+      {wrap && (
+        <span ref={probe} aria-hidden className="pointer-events-none invisible absolute">
+          {'0'.repeat(50)}
+        </span>
+      )}
       {lines.map((line, i) => {
         const lineMarks = marksByLine.get(i)
-        const hidden = hideLyrics && line.kind === 'blank' && lines[i + 1]?.kind !== 'section'
+        // Com quebra, a letra que fica embaixo de uma linha de acordes é desenhada junto com ela.
+        const pairedBelow =
+          cols !== null && showChords && !hideLyrics && line.kind === 'chords' && lines[i + 1]?.kind === 'lyrics'
+        const pairedAbove =
+          cols !== null && showChords && !hideLyrics && line.kind === 'lyrics' && lines[i - 1]?.kind === 'chords'
+        const pair = pairedBelow ? (lines[i + 1] as { text: string }).text : null
+        const hidden = (hideLyrics && line.kind === 'blank' && lines[i + 1]?.kind !== 'section') || pairedAbove
         return (
           <div key={i} id={`linha-${i}`} className="scroll-mt-28">
             {lineMarks && (
@@ -127,10 +162,10 @@ export const ChordSheet = memo(function ChordSheet({
                   onClick={() => onLineClick(i)}
                   aria-label={`Marcar a linha ${i + 1}`}
                 >
-                  <Line line={line} showChords={showChords} hideLyrics={hideLyrics} />
+                  <Line line={line} showChords={showChords} hideLyrics={hideLyrics} cols={cols} pair={pair} />
                 </button>
               ) : (
-                <Line line={line} showChords={showChords} hideLyrics={hideLyrics} onChordClick={onChordClick} />
+                <Line line={line} showChords={showChords} hideLyrics={hideLyrics} onChordClick={onChordClick} cols={cols} pair={pair} />
               ))}
           </div>
         )
@@ -144,26 +179,45 @@ function Line({
   showChords,
   hideLyrics,
   onChordClick,
+  cols = null,
+  pair = null,
 }: {
   line: SheetLine
   showChords: boolean
   hideLyrics: boolean
   onChordClick?: (chord: string) => void
+  /** Colunas disponíveis (quebra ligada) ou null (linha inteira, com rolagem lateral). */
+  cols?: number | null
+  /** Letra que vai embaixo desta linha de acordes (quebrada junto com ela). */
+  pair?: string | null
 }) {
   switch (line.kind) {
     case 'blank':
       return <div aria-hidden>{' '}</div>
     case 'lyrics':
-      return hideLyrics ? null : <div>{line.text}</div>
+      return hideLyrics ? null : <div className={clsx(cols && 'whitespace-pre-wrap')}>{line.text}</div>
     case 'chords':
-      return showChords ? (
+      if (!showChords) return null
+      if (cols) {
+        return (
+          <>
+            {wrapChordPair(line.text, pair, cols).map((row, k) => (
+              <div key={k}>
+                <div className="font-bold text-chord">{row.chords ? <Chords text={row.chords} onChordClick={onChordClick} /> : ' '}</div>
+                {row.lyrics !== null && <div>{row.lyrics || ' '}</div>}
+              </div>
+            ))}
+          </>
+        )
+      }
+      return (
         <div className="font-bold text-chord">
           <Chords text={line.text} onChordClick={onChordClick} />
         </div>
-      ) : null
+      )
     case 'section':
       return (
-        <div className="mt-3 mb-1 flex items-baseline gap-3">
+        <div className={clsx('mt-3 mb-1 flex items-baseline gap-x-3', cols && 'flex-wrap whitespace-pre-wrap')}>
           <span
             className={clsx(
               'rounded-md border-l-4 bg-surface-2 px-2 py-0.5 font-sans text-[0.8em] font-bold tracking-wide uppercase',
