@@ -55,9 +55,9 @@ Cada repertório aberto mantém uma conexão ao vivo (Server-Sent Events em `GET
 ## Exportar e integrações
 
 - **ChordPro (.cho)**: cada música (no tom atual) e o repertório inteiro (nos tons do repertório), num formato que OnSong, SongbookPro e Planning Center abrem. A exportação e o importador fazem ida e volta sem perder o alinhamento dos acordes.
-- **Imprimir / PDF**:  e  usam a impressão do navegador ("Salvar como PDF"), em cores claras e uma música por página.
-- **MusicBrainz** (): preenche artista e compositores. Só metadados, nunca letra ou cifra. As consultas passam pelo servidor (1 por segundo para o app inteiro, com cache e novas tentativas).
-- **Gravação de referência**: link do YouTube tocado no player oficial (, o único site liberado em ).
+- **Imprimir / PDF**: `/musicas/:id/imprimir` e `/repertorios/:id/imprimir` usam a impressão do navegador ("Salvar como PDF"), em cores claras e uma música por página.
+- **MusicBrainz** (`apps/api/src/routes/catalog.ts`): preenche artista e compositores. Só metadados, nunca letra ou cifra. As consultas passam pelo servidor (1 por segundo para o app inteiro, com cache e novas tentativas).
+- **Gravação de referência**: link do YouTube tocado no player oficial (`youtube-nocookie.com`, o único site liberado em `frame-src`).
 
 ## Formato da cifra
 
