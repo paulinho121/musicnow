@@ -1,10 +1,13 @@
 import { serve } from '@hono/node-server'
 import { app } from './app'
+import { startCoverWorker } from './covers'
 import { client } from './db'
 import { env } from './env'
 import { runMigrations } from './migrate'
 
 await runMigrations()
+// Preenche as capas das músicas aos poucos, em segundo plano.
+startCoverWorker()
 
 const server = serve({ fetch: app.fetch, port: env.PORT, hostname: '127.0.0.1' }, (info) => {
   console.log(`API do Ensaio Fácil em http://127.0.0.1:${info.port}`)

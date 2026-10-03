@@ -35,7 +35,7 @@ export function Layout() {
         ))}
       </aside>
 
-      <main className="mx-auto w-full max-w-4xl flex-1 px-4 pt-5 pb-28 md:px-8 md:pt-8 md:pb-10">
+      <main className="mx-auto w-full min-w-0 max-w-4xl flex-1 px-4 pt-5 pb-28 md:px-8 md:pt-8 md:pb-10">
         <Outlet />
       </main>
 

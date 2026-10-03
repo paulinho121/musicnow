@@ -185,6 +185,7 @@ export const setlistsRoutes = new Hono<AppEnv>()
             originalKey: song.originalKey,
             bpm: song.bpm,
             timeSignature: song.timeSignature,
+            coverUrl: song.coverUrl,
           },
           personalKey: songUserState.personalKey,
         })

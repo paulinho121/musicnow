@@ -2,6 +2,7 @@ import { ArrowLeft, AudioLines, Check, Database, Loader2, PenLine, Search } from
 import { type FormEvent, useEffect, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router'
 import { FindLinks } from '../components/FindLinks'
+import { SongCover } from '../components/SongCover'
 import { Spinner, useToast } from '../components/ui'
 import { api } from '../lib/api'
 import type { CatalogDetails, CatalogResult } from '../lib/types'
@@ -20,6 +21,7 @@ export function FindSong() {
   const [loading, setLoading] = useState(false)
   const [picked, setPicked] = useState<(CatalogDetails & { id: string }) | null>(null)
   const [picking, setPicking] = useState<string | null>(null)
+  const [cover, setCover] = useState<string | null>(null)
 
   const search = async (e?: FormEvent) => {
     e?.preventDefault()
@@ -46,9 +48,16 @@ export function FindSong() {
 
   const pick = async (r: CatalogResult) => {
     setPicking(r.id)
+    setCover(null)
     try {
       const d = await api<CatalogDetails>(`/catalog/recording/${r.id}`)
-      setPicked({ ...d, id: r.id, artist: d.artist ?? r.artist })
+      const artistName = d.artist ?? r.artist
+      setPicked({ ...d, id: r.id, artist: artistName })
+      // A capa chega depois (não segura a tela).
+      if (artistName)
+        api<{ url: string | null }>(`/catalog/cover?${new URLSearchParams({ title: d.title, artist: artistName })}`)
+          .then(({ url }) => setCover(url))
+          .catch(() => {})
     } catch {
       setPicked({ id: r.id, title: r.title, artist: r.artist, composer: null, year: r.year, source: '' })
     } finally {
@@ -56,7 +65,7 @@ export function FindSong() {
     }
   }
 
-  const createMine = (song: { title: string; artist: string | null; composer: string | null }) =>
+  const createMine = (song: { title: string; artist: string | null; composer: string | null; coverUrl?: string | null }) =>
     navigate('/musicas/nova', {
       state: {
         draft: {
@@ -66,6 +75,7 @@ export function FindSong() {
           visibility: 'private',
           license: 'unknown',
           lyricsAuthorized: false,
+          coverUrl: song.coverUrl ?? null,
         },
       },
     })
@@ -103,15 +113,18 @@ export function FindSong() {
 
       {picked ? (
         <section className="card space-y-4 p-5">
-          <div>
-            <p className="flex items-center gap-1.5 text-xs font-semibold text-ok">
-              <Check className="size-3.5" /> Música encontrada
-            </p>
-            <h2 className="mt-1 text-xl font-bold">{picked.title}</h2>
-            <p className="text-sm text-muted">
-              {[picked.artist, picked.year].filter(Boolean).join(' · ')}
-              {picked.composer && <span className="block">Composição: {picked.composer}</span>}
-            </p>
+          <div className="flex items-center gap-4">
+            <SongCover song={{ title: picked.title, artist: picked.artist, coverUrl: cover }} hd className="size-24 rounded-2xl shadow-xl shadow-black/40" />
+            <div className="min-w-0">
+              <p className="flex items-center gap-1.5 text-xs font-semibold text-ok">
+                <Check className="size-3.5" /> Música encontrada
+              </p>
+              <h2 className="mt-1 text-xl font-bold">{picked.title}</h2>
+              <p className="text-sm text-muted">
+                {[picked.artist, picked.year].filter(Boolean).join(' · ')}
+                {picked.composer && <span className="block">Composição: {picked.composer}</span>}
+              </p>
+            </div>
           </div>
           <div>
             <p className="label">1. Veja a cifra e ouça a música</p>
@@ -120,7 +133,7 @@ export function FindSong() {
           <div>
             <p className="label">2. Monte a sua versão no Ensaio Fácil</p>
             <div className="flex flex-col gap-2 sm:flex-row">
-              <button className="btn-primary" onClick={() => createMine(picked)}>
+              <button className="btn-primary" onClick={() => createMine({ ...picked, coverUrl: cover })}>
                 <PenLine className="size-4" /> Criar minha versão
               </button>
               <Link to="/musicas/detectar" className="btn-ghost">

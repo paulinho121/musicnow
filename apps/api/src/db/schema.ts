@@ -139,6 +139,13 @@ export const song = pgTable(
     content: text().notNull().default(''),
     /** Gravação de referência (link do YouTube), tocada no player oficial do YouTube. */
     referenceUrl: text(),
+    /**
+     * Capa do álbum (link do Cover Art Archive). null = ainda não procurada;
+     * '' = a pessoa preferiu a capa gerada pelo app (não procurar de novo).
+     */
+    coverUrl: text(),
+    /** Quando a capa foi procurada pela última vez (para não repetir a busca toda hora). */
+    coverCheckedAt: timestamp({ withTimezone: true }),
     /** Letra liberada para exibição (direitos autorais). */
     lyricsAuthorized: boolean().notNull().default(false),
     visibility: visibility().notNull().default('private'),

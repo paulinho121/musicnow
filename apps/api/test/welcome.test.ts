@@ -59,3 +59,22 @@ describe('conta nova', () => {
     expect(song.data.lyricsHidden).toBe(false)
   })
 })
+
+describe('capa da música', () => {
+  it('só aceita link do Cover Art Archive, ou "" para a capa gerada', async () => {
+    const u = await signUp('capa')
+    const bad = await call(u, 'POST', '/songs', { title: 'Teste capa', coverUrl: 'https://exemplo.com/capa.jpg' })
+    expect(bad.status).toBe(400)
+    const ok = await call(u, 'POST', '/songs', {
+      title: 'Teste capa',
+      coverUrl: 'https://coverartarchive.org/release-group/b3d1fbf7-dd1c-4119-a16e-58c2feb5bcb0/front-250',
+    })
+    expect(ok.status).toBe(201)
+    const generated = await call(u, 'POST', '/songs', { title: 'Teste capa gerada', coverUrl: '' })
+    expect(generated.status).toBe(201)
+    const list = await call(u, 'GET', '/songs?scope=mine')
+    const byTitle = Object.fromEntries(list.data.map((s: { title: string; coverUrl: string | null }) => [s.title, s.coverUrl]))
+    expect(byTitle['Teste capa']).toMatch(/^https:\/\/coverartarchive\.org\//)
+    expect(byTitle['Teste capa gerada']).toBe('')
+  })
+})

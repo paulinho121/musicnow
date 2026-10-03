@@ -37,6 +37,7 @@ import { MarkDialog } from '../components/MarkDialog'
 import { ReferencePlayer } from '../components/ReferencePlayer'
 import { ReportButton } from '../components/ReportDialog'
 import { Sheet } from '../components/Sheet'
+import { CoverGlow, SongCover } from '../components/SongCover'
 import { ErrorState, PageSpinner, useToast } from '../components/ui'
 import { useSession } from '../lib/auth'
 import { useDeleteMark, useSavePersonalKey, useSong, useToggleFavorite } from '../lib/queries'
@@ -312,26 +313,41 @@ export function SongViewer({ songId, setlist }: { songId: string; setlist?: Setl
       </header>
 
       <div className="mx-auto max-w-4xl px-4 pt-4">
-        <div className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted">
-          {setlist?.itemKey && (
-            <span>
-              Tom do repertório <b className="font-mono text-accent">{setlist.itemKey}</b>
-            </span>
-          )}
-          {original && (
-            <span>
-              Tom original <b className="font-mono text-text">{original}</b>
-            </span>
-          )}
-          {song.personalKey && !setlist && (
-            <span>
-              Meu tom <b className="font-mono text-accent">{song.personalKey}</b>
-            </span>
-          )}
-          {song.bpm && <span>{song.bpm} BPM</span>}
-          {song.timeSignature && <span>{song.timeSignature}</span>}
-          {song.style && <span>{song.style}</span>}
-        </div>
+        {/* Destaque: capa, nome e as informações para tocar */}
+        <section className="relative mb-5 overflow-hidden rounded-3xl border border-border bg-surface">
+          <CoverGlow song={song} />
+          <div className="relative flex items-center gap-4 p-4 sm:gap-6 sm:p-6">
+            <SongCover
+              song={song}
+              hd
+              className={clsx('rounded-2xl shadow-2xl shadow-black/50', setlist ? 'size-20 sm:size-28' : 'size-24 sm:size-36')}
+            />
+            <div className="min-w-0 flex-1">
+              <p className="text-[11px] font-bold tracking-widest text-muted uppercase">{song.style ?? 'Música'}</p>
+              <h2 className="mt-0.5 line-clamp-2 text-xl leading-tight font-extrabold tracking-tight break-words sm:text-3xl">{song.title}</h2>
+              <p className="mt-0.5 truncate text-sm text-muted">{[song.artist, song.composer && song.composer !== song.artist ? song.composer : null].filter(Boolean).join(' · ')}</p>
+              <div className="mt-3 flex flex-wrap gap-1.5 text-xs">
+                {setlist?.itemKey && (
+                  <HeroChip>
+                    Repertório <b className="font-mono text-chord">{setlist.itemKey}</b>
+                  </HeroChip>
+                )}
+                {original && (
+                  <HeroChip>
+                    Original <b className="font-mono">{original}</b>
+                  </HeroChip>
+                )}
+                {song.personalKey && !setlist && (
+                  <HeroChip>
+                    Meu tom <b className="font-mono text-chord">{song.personalKey}</b>
+                  </HeroChip>
+                )}
+                {song.bpm && <HeroChip>{song.bpm} BPM</HeroChip>}
+                {song.timeSignature && <HeroChip>{song.timeSignature}</HeroChip>}
+              </div>
+            </div>
+          </div>
+        </section>
         {song.referenceUrl && (
           <div className="-mt-1 mb-4">
             <ReferencePlayer url={song.referenceUrl} title={song.title} />
@@ -580,6 +596,10 @@ export function SongViewer({ songId, setlist }: { songId: string; setlist?: Setl
       <ChordDialog symbol={chordOpen} onClose={() => setChordOpen(null)} related={songChords} onPick={setChordOpen} />
     </div>
   )
+}
+
+function HeroChip({ children }: { children: React.ReactNode }) {
+  return <span className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-black/25 px-2.5 py-1 backdrop-blur-sm">{children}</span>
 }
 
 /** "Acordes desta música": os desenhos de todos os acordes, no tom que está na tela. */

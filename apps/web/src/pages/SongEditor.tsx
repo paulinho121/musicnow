@@ -17,6 +17,7 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router'
 import { ChordSheet, useSheet } from '../components/ChordSheet'
 import { FindLinks } from '../components/FindLinks'
+import { CoverPicker } from '../components/CoverPicker'
 import { MetadataLookup } from '../components/MetadataLookup'
 import { ErrorState, PageSpinner, useToast } from '../components/ui'
 import { useDeleteSong, useFacets, useSaveSong, useSong } from '../lib/queries'
@@ -70,8 +71,8 @@ export function SongEditor() {
 
   useEffect(() => {
     if (!song) return
-    const { title, artist, composer, originalKey, bpm, timeSignature, style, notes, tags, content, lyricsAuthorized, visibility, license, referenceUrl } = song
-    setForm({ title, artist, composer, originalKey, bpm, timeSignature, style, notes, tags, content, lyricsAuthorized, visibility, license, referenceUrl })
+    const { title, artist, composer, originalKey, bpm, timeSignature, style, notes, tags, content, lyricsAuthorized, visibility, license, referenceUrl, coverUrl } = song
+    setForm({ title, artist, composer, originalKey, bpm, timeSignature, style, notes, tags, content, lyricsAuthorized, visibility, license, referenceUrl, coverUrl })
     setTagsText(tags.join(', '))
   }, [song])
 
@@ -233,6 +234,11 @@ export function SongEditor() {
             <span className="mt-1 block text-xs text-danger">Use um link do YouTube (youtube.com ou youtu.be).</span>
           )}
         </Field>
+        {/* div, não label: dentro de um label, clicar no texto acionaria o primeiro botão */}
+        <div className="md:col-span-2">
+          <span className="label">Capa</span>
+          <CoverPicker title={form.title} artist={form.artist} value={form.coverUrl} onChange={(v) => set('coverUrl', v)} />
+        </div>
         <Field label="Observações de execução" className="md:col-span-2">
           <textarea
             className="input h-20 py-2"

@@ -6,6 +6,7 @@ import { useNavigate } from 'react-router'
 import { useRemoveItem, useReorder, useResolveSuggestion, useSuggest, useUpdateItem } from '../../lib/setlists'
 import type { SetlistDetail, SetlistItem } from '../../lib/types'
 import { Sheet } from '../Sheet'
+import { SongCover } from '../SongCover'
 import { EmptyState, KeyBadge, useToast } from '../ui'
 import { AddSongDialog } from './AddSongDialog'
 
@@ -144,7 +145,10 @@ function ItemRow({
   return (
     <li className="p-3">
       <div className="flex items-center gap-3">
-        <span className="w-6 shrink-0 text-center font-mono text-sm text-muted">{index + 1}</span>
+        <span className="w-5 shrink-0 text-center font-mono text-sm text-muted">{index + 1}</span>
+        <button className="shrink-0" onClick={onPlay} aria-hidden tabIndex={-1}>
+          <SongCover song={item.song} className="size-12 rounded-lg shadow-md shadow-black/30" />
+        </button>
         <button className="min-w-0 flex-1 text-left" onClick={onPlay}>
           <p className="line-clamp-2 leading-snug font-semibold break-words sm:truncate">{item.song.title}</p>
           <p className="truncate text-sm text-muted">
@@ -156,14 +160,14 @@ function ItemRow({
       </div>
 
       {item.personalKey && item.personalKey !== key && (
-        <p className="mt-1 pl-9 text-xs text-muted">
+        <p className="mt-1 sm:pl-[5.75rem] text-xs text-muted">
           Seu tom pessoal: <b className="font-mono text-accent">{item.personalKey}</b> (o repertório usa {key})
         </p>
       )}
-      {item.notes && !editingNotes && <p className="mt-1.5 pl-9 text-sm text-muted">📝 {item.notes}</p>}
+      {item.notes && !editingNotes && <p className="mt-1.5 sm:pl-[5.75rem] text-sm text-muted">📝 {item.notes}</p>}
 
       {editingNotes && (
-        <div className="mt-2 flex gap-2 pl-9">
+        <div className="mt-2 flex gap-2 sm:pl-[5.75rem]">
           <input
             className="input h-10"
             value={notes}
@@ -189,7 +193,7 @@ function ItemRow({
       )}
 
       {/* Celular: sem recuo e sem "Abrir" (tocar no nome já abre); o tom vem para esta linha. */}
-      <div className="mt-2 flex items-center gap-1 sm:pl-8">
+      <div className="mt-2 flex items-center gap-1 sm:pl-[5.5rem]">
         <div className="mr-1 sm:hidden">{keyControl}</div>
         <button className="hidden h-8 items-center gap-1.5 rounded-lg px-2 text-xs font-medium text-accent hover:bg-accent/10 sm:inline-flex" onClick={onPlay}>
           <Play className="size-3.5" /> Abrir

@@ -13,6 +13,8 @@ export interface SongListItem {
   ownerName: string
   isFavorite: boolean
   updatedAt: string
+  /** Capa do álbum (Cover Art Archive); null/'' = capa gerada pelo app. */
+  coverUrl: string | null
 }
 
 export type MarkType =
@@ -47,6 +49,8 @@ export interface SongInput {
   visibility: Visibility
   license: License
   referenceUrl: string | null
+  /** Capa: link do Cover Art Archive, '' = capa gerada, null = o app procura sozinho. */
+  coverUrl?: string | null
 }
 
 export interface ImportSongInput extends SongInput {
@@ -99,6 +103,9 @@ export interface Dashboard {
     location: string | null
     status: SetlistStatus
     isOwner: boolean
+    songCount: number
+    /** As primeiras músicas (para o mosaico de capas). */
+    songs: { title: string; artist: string | null; coverUrl: string | null }[]
   }[]
   counts: { mySongs: number; library: number }
 }
@@ -133,6 +140,7 @@ export interface SetlistItem {
     originalKey: string | null
     bpm: number | null
     timeSignature: string | null
+    coverUrl: string | null
   }
 }
 

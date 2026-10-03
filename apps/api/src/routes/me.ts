@@ -1,11 +1,11 @@
-import { and, asc, desc, eq, gte, isNotNull, or, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, gte, inArray, isNotNull, or, sql } from 'drizzle-orm'
 import { Hono } from 'hono'
 import { z } from 'zod'
 import { db, schema } from '../db'
 import { requireUser, validate, type AppEnv } from '../http'
 import { canViewSong, isFavoriteExpr, songListColumns } from './songs'
 
-const { user, profile, userInstrument, song, songUserState, favorite, setlist, setlistMember } = schema
+const { user, profile, userInstrument, song, songUserState, favorite, setlist, setlistMember, setlistItem } = schema
 
 const profileInput = z.object({
   name: z.string().trim().min(1, 'Informe seu nome').max(120),
@@ -131,5 +131,19 @@ export const meRoutes = new Hono<AppEnv>()
         .where(canViewSong(uid)),
     ])
 
-    return c.json({ recent, favorites, upcoming, counts: counts[0] })
+    // Capas das músicas de cada repertório próximo (mosaico no card do início).
+    const items = upcoming.length
+      ? await db
+          .select({ setlistId: setlistItem.setlistId, title: song.title, artist: song.artist, coverUrl: song.coverUrl })
+          .from(setlistItem)
+          .innerJoin(song, eq(song.id, setlistItem.songId))
+          .where(inArray(setlistItem.setlistId, upcoming.map((s) => s.id)))
+          .orderBy(asc(setlistItem.position))
+      : []
+    const withSongs = upcoming.map((s) => {
+      const mine = items.filter((i) => i.setlistId === s.id)
+      return { ...s, songCount: mine.length, songs: mine.slice(0, 4).map(({ setlistId: _, ...rest }) => rest) }
+    })
+
+    return c.json({ recent, favorites, upcoming: withSongs, counts: counts[0] })
   })

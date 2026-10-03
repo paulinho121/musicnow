@@ -4,6 +4,7 @@ import { Hono } from 'hono'
 import { HTTPException } from 'hono/http-exception'
 import { z } from 'zod'
 import { getRole } from '../access'
+import { COVER_URL_RE } from '../covers'
 import { publish } from '../realtime'
 import { db, schema } from '../db'
 import { forbidden, notFound, requireUser, validate, type AppEnv } from '../http'
@@ -38,6 +39,8 @@ const songFields = z.object({
     .max(500)
     .refine((u) => youtubeId(u) !== null, 'Use um link do YouTube (youtube.com ou youtu.be).')
     .nullish(),
+  // Capa: link do Cover Art Archive, '' (capa gerada pelo app) ou null (procurar sozinho).
+  coverUrl: z.union([z.literal(''), z.string().regex(COVER_URL_RE, 'Capa inválida')]).nullish(),
 })
 
 // Catálogo público só com direitos conhecidos (própria, domínio público ou licenciada).
@@ -124,6 +127,7 @@ export const songListColumns = {
   ownerId: song.ownerId,
   ownerName: user.name,
   updatedAt: song.updatedAt,
+  coverUrl: song.coverUrl,
 }
 
 function dupKey(title: string, artist?: string | null) {
@@ -334,9 +338,18 @@ export const songsRoutes = new Hono<AppEnv>()
     const input = c.req.valid('json')
     const before = await loadOwnSong(id, uid)
     const originalKey = input.originalKey || guessKey(input.content)
+    // Mudou o nome ou o artista e a capa ainda não foi decidida: procura de novo logo.
+    const renamed = before.title !== input.title || (before.artist ?? null) !== (input.artist ?? null)
+    const coverUrl = input.coverUrl === undefined ? before.coverUrl : input.coverUrl
     await db
       .update(song)
-      .set({ ...input, originalKey, searchText: buildSearchText({ ...input, originalKey }) })
+      .set({
+        ...input,
+        originalKey,
+        searchText: buildSearchText({ ...input, originalKey }),
+        coverUrl,
+        coverCheckedAt: coverUrl !== null ? new Date() : renamed ? null : before.coverCheckedAt,
+      })
       .where(eq(song.id, id))
     // Guarda a versão anterior da cifra: permite restaurar e auditar alterações.
     const changed = Object.keys(input).filter(

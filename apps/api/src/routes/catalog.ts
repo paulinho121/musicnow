@@ -9,6 +9,7 @@
 import { Hono } from 'hono'
 import { HTTPException } from 'hono/http-exception'
 import { z } from 'zod'
+import { findCover } from '../covers'
 import { requireUser, validate, type AppEnv } from '../http'
 
 const MB = 'https://musicbrainz.org/ws/2'
@@ -32,7 +33,7 @@ function throttled<T>(fn: () => Promise<T>): Promise<T> {
 }
 
 const cache = new Map<string, { at: number; value: unknown }>()
-async function mbGet<T>(path: string): Promise<T> {
+export async function mbGet<T>(path: string): Promise<T> {
   const hit = cache.get(path)
   if (hit && Date.now() - hit.at < CACHE_TTL_MS) return hit.value as T
   // O MusicBrainz responde 503 quando está cheio ou limitando o IP (IPs de nuvem são
@@ -73,7 +74,7 @@ function checkUserRate(userId: string) {
 }
 
 /** Escapa caracteres especiais da busca do MusicBrainz (sintaxe Lucene). */
-const lucene = (s: string) => s.replace(/([+\-&|!(){}[\]^"~*?:\\/])/g, '\\$1')
+export const lucene = (s: string) => s.replace(/([+\-&|!(){}[\]^"~*?:\\/])/g, '\\$1')
 
 interface MbArtistCredit {
   name: string
@@ -153,6 +154,17 @@ export const catalogRoutes = new Hono<AppEnv>()
         .slice(0, 8)
         .map((g) => g.item)
       return c.json(results)
+    },
+  )
+
+  // Capa do álbum para título + artista (botão "Buscar capa" no editor).
+  .get(
+    '/cover',
+    validate('query', z.object({ title: z.string().trim().min(1).max(200), artist: z.string().trim().min(1).max(200) })),
+    async (c) => {
+      checkUserRate(c.var.user.id)
+      const { title, artist } = c.req.valid('query')
+      return c.json({ url: await findCover(title, artist) })
     },
   )
 
