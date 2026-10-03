@@ -7,8 +7,13 @@ import { createRoot } from 'react-dom/client'
 import { RouterProvider } from 'react-router'
 import { router } from './App'
 import { ToastProvider } from './components/ui'
+import { UpdateBanner } from './components/UpdateBanner'
 import { ApiError } from './lib/api'
 import { logout } from './lib/auth'
+import { onRouteChange, setupUpdates } from './lib/updates'
+
+setupUpdates()
+router.subscribe(onRouteChange)
 
 // Sessão que o servidor não reconhece mais (expirou, conta removida, outro dispositivo saiu):
 // limpa o login local e volta para a tela de entrada, em vez de ficar preso num erro.
@@ -40,6 +45,7 @@ createRoot(document.getElementById('root')!).render(
     <QueryClientProvider client={queryClient}>
       <ToastProvider>
         <RouterProvider router={router} />
+        <UpdateBanner />
       </ToastProvider>
     </QueryClientProvider>
   </StrictMode>,

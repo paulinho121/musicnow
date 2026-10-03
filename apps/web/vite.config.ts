@@ -8,7 +8,9 @@ export default defineConfig({
     react(),
     tailwindcss(),
     VitePWA({
-      registerType: 'autoUpdate',
+      // O app decide quando trocar de versão (src/lib/updates.ts): nunca no meio de uma música.
+      registerType: 'prompt',
+      injectRegister: false,
       includeAssets: ['icon.svg', 'theme.js'],
       manifest: {
         name: 'Ensaio Fácil',
