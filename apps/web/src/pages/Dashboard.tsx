@@ -1,5 +1,5 @@
 import { SETLIST_STATUS } from '@ensaio/shared'
-import { CalendarDays, Clock, Plus, Search, Star } from 'lucide-react'
+import { CalendarDays, Clock, Guitar, Plus, Search, Star } from 'lucide-react'
 import { type FormEvent, useState } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { SongCard } from '../components/SongRow'
@@ -96,6 +96,13 @@ export function Dashboard() {
               <Link to="/musicas/nova" className="card flex flex-col justify-between p-4 transition hover:border-accent/50">
                 <Plus className="size-6 text-accent" />
                 <p className="text-sm font-semibold">Cadastrar música</p>
+              </Link>
+              <Link to="/acordes" className="card col-span-2 flex items-center gap-3 p-4 transition hover:border-accent/50">
+                <Guitar className="size-6 shrink-0 text-accent" />
+                <span>
+                  <span className="block text-sm font-semibold">Dicionário de acordes</span>
+                  <span className="block text-xs text-muted">Como montar qualquer acorde no violão e no teclado</span>
+                </span>
               </Link>
             </div>
           )}

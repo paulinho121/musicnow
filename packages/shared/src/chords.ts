@@ -22,7 +22,7 @@ export const MINOR_KEYS = ['Cm', 'C#m', 'Dm', 'Ebm', 'Em', 'Fm', 'F#m', 'Gm', 'G
 // Raiz + sufixo (qualidade/extensões) + baixo opcional. O sufixo aceita a notação
 // brasileira: 7M, 7(9), m7(b5), 4, 9, °, º, ø, +, sus4, add9, dim, aug...
 const CHORD_RE =
-  /^([A-G])([#b]?)((?:maj|min|dim|aug|sus|add|m|M|[0-9]|[#b+\-°º◦ø]|\((?:[0-9#b+\-,/ ]|maj|add)*\))*)(?:\/([A-G])([#b]?))?$/
+  /^([A-G])([#b]?)((?:maj|min|dim|aug|sus|add|m|M|[0-9]|[#b+\-°º◦ø]|\/(?:9|11|13)(?![0-9])|\((?:[0-9#b+\-,/ ]|maj|add)*\))*)(?:\/([A-G])([#b]?))?$/
 
 export interface ParsedChord {
   root: string
@@ -140,7 +140,8 @@ export function isChordLine(line: string): boolean {
   let chords = 0
   let other = 0
   for (const t of tokens) {
-    const clean = t.replace(/^\(|\)$/g, '')
+    // "(G7)" vira "G7", mas "C7(9)" já é um acorde e fica como está.
+    const clean = isChord(t) ? t : t.replace(/^\(|\)$/g, '')
     if (isChord(clean)) chords++
     else if (!NOISE_RE.test(t) && !NOISE_RE.test(clean)) other++
   }

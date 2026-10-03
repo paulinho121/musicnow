@@ -1,4 +1,4 @@
-import { parseSheet, SECTION_LABELS, type SectionType, type SheetLine } from '@ensaio/shared'
+import { isChordLine, parseSheet, SECTION_LABELS, splitChordLine, type SectionType, type SheetLine } from '@ensaio/shared'
 import clsx from 'clsx'
 import { memo, useMemo } from 'react'
 import type { MarkType, SongMark } from '../lib/types'
@@ -53,6 +53,8 @@ interface Props {
   markMode?: boolean
   onLineClick?: (lineIndex: number) => void
   onMarkClick?: (mark: SongMark) => void
+  /** Toque num acorde (fora do modo de marcar): abre o dicionário. */
+  onChordClick?: (chord: string) => void
 }
 
 export const ChordSheet = memo(function ChordSheet({
@@ -66,6 +68,7 @@ export const ChordSheet = memo(function ChordSheet({
   markMode = false,
   onLineClick,
   onMarkClick,
+  onChordClick,
 }: Props) {
   const marksByLine = useMemo(() => {
     const m = new Map<number, SongMark[]>()
@@ -127,7 +130,7 @@ export const ChordSheet = memo(function ChordSheet({
                   <Line line={line} showChords={showChords} hideLyrics={hideLyrics} />
                 </button>
               ) : (
-                <Line line={line} showChords={showChords} hideLyrics={hideLyrics} />
+                <Line line={line} showChords={showChords} hideLyrics={hideLyrics} onChordClick={onChordClick} />
               ))}
           </div>
         )
@@ -136,14 +139,28 @@ export const ChordSheet = memo(function ChordSheet({
   )
 })
 
-function Line({ line, showChords, hideLyrics }: { line: SheetLine; showChords: boolean; hideLyrics: boolean }) {
+function Line({
+  line,
+  showChords,
+  hideLyrics,
+  onChordClick,
+}: {
+  line: SheetLine
+  showChords: boolean
+  hideLyrics: boolean
+  onChordClick?: (chord: string) => void
+}) {
   switch (line.kind) {
     case 'blank':
       return <div aria-hidden>{' '}</div>
     case 'lyrics':
       return hideLyrics ? null : <div>{line.text}</div>
     case 'chords':
-      return showChords ? <div className="font-bold text-chord">{line.text}</div> : null
+      return showChords ? (
+        <div className="font-bold text-chord">
+          <Chords text={line.text} onChordClick={onChordClick} />
+        </div>
+      ) : null
     case 'section':
       return (
         <div className="mt-3 mb-1 flex items-baseline gap-3">
@@ -155,8 +172,36 @@ function Line({ line, showChords, hideLyrics }: { line: SheetLine; showChords: b
           >
             {line.label}
           </span>
-          {line.chords && showChords && <span className="font-bold text-chord">{line.chords}</span>}
+          {line.chords && showChords && (
+            <span className="font-bold text-chord">
+              {isChordLine(line.chords) ? <Chords text={line.chords} onChordClick={onChordClick} /> : line.chords}
+            </span>
+          )}
         </div>
       )
   }
+}
+
+/** Acordes como botões, sem mudar a largura de nada: as colunas da cifra continuam alinhadas. */
+function Chords({ text, onChordClick }: { text: string; onChordClick?: (chord: string) => void }) {
+  if (!onChordClick) return <>{text}</>
+  return (
+    <>
+      {splitChordLine(text).map((p, i) =>
+        p.chord ? (
+          <button
+            key={i}
+            type="button"
+            className="cursor-pointer rounded-sm underline decoration-chord/30 decoration-dotted underline-offset-4 hover:bg-chord/15 hover:decoration-chord focus-visible:bg-chord/15"
+            onClick={() => onChordClick(p.chord!)}
+            title={`Como tocar ${p.chord}`}
+          >
+            {p.text}
+          </button>
+        ) : (
+          <span key={i}>{p.text}</span>
+        ),
+      )}
+    </>
+  )
 }

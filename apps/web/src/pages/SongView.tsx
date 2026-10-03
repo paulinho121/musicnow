@@ -1,7 +1,8 @@
-import { atLeast, fileNameFor, normalizeOffset, parseChord, semitonesBetween, songInKey, toChordPro, transposeKey } from '@ensaio/shared'
+import { atLeast, chordsInSheet, fileNameFor, guitarVoicings, normalizeOffset, parseChord, semitonesBetween, songInKey, toChordPro, transposeKey } from '@ensaio/shared'
 import clsx from 'clsx'
 import {
   ArrowLeft,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   Expand,
@@ -21,9 +22,11 @@ import {
   Type,
   Unlock,
 } from 'lucide-react'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
 import { AddToSetlistButton } from '../components/AddToSetlist'
+import { ChordDialog } from '../components/ChordDictionary'
+import { GuitarDiagram } from '../components/ChordDiagrams'
 import { ChordSheet, sectionsOf, useSheet } from '../components/ChordSheet'
 import { FindLinks } from '../components/FindLinks'
 import { KeyPicker } from '../components/KeyPicker'
@@ -38,7 +41,7 @@ import { downloadText } from '../lib/download'
 import { useLocalState } from '../lib/storage'
 import type { SongMark } from '../lib/types'
 
-const VIEWER_DEFAULTS = { fontSize: 17, lineHeight: 1.45, speed: 3, showChords: true }
+const VIEWER_DEFAULTS = { fontSize: 17, lineHeight: 1.45, speed: 3, showChords: true, chordStrip: false }
 
 /** Contexto quando a música é tocada dentro de um repertório. */
 export interface SetlistContext {
@@ -82,6 +85,7 @@ export function SongViewer({ songId, setlist }: { songId: string; setlist?: Setl
   const [fullscreen, setFullscreen] = useState(false)
   const [markMode, setMarkMode] = useState(false)
   const [markLine, setMarkLine] = useState<number | null>(null)
+  const [chordOpen, setChordOpen] = useState<string | null>(null)
 
   // Tom inicial: o do repertório; fora dele, o tom pessoal do músico; senão, o original.
   const baseKey = setlist?.itemKey ?? song?.personalKey ?? null
@@ -121,6 +125,7 @@ export function SongViewer({ songId, setlist }: { songId: string; setlist?: Setl
   const isMinor = original ? (parseChord(original)?.suffix ?? '').startsWith('m') : false
   const lines = useSheet(song?.content ?? '', offset, currentKey)
   const sections = sectionsOf(lines)
+  const songChords = useMemo(() => chordsInSheet(lines), [lines])
 
   const shift = useCallback((d: number) => setOffset((o) => normalizeOffset(o + d)), [])
   const next = setlist?.next
@@ -318,6 +323,15 @@ export function SongViewer({ songId, setlist }: { songId: string; setlist?: Setl
           </p>
         )}
 
+        {songChords.length > 0 && prefs.showChords && (
+          <SongChords
+            chords={songChords}
+            open={prefs.chordStrip}
+            onToggle={() => setPrefs((p) => ({ ...p, chordStrip: !p.chordStrip }))}
+            onPick={setChordOpen}
+          />
+        )}
+
         {song.content.trim() ? (
           <ChordSheet
             lines={lines}
@@ -330,6 +344,7 @@ export function SongViewer({ songId, setlist }: { songId: string; setlist?: Setl
             markMode={markMode}
             onLineClick={setMarkLine}
             onMarkClick={onMarkClick}
+            onChordClick={setChordOpen}
           />
         ) : (
           <div className="flex flex-col items-center gap-3 py-10 text-center">
@@ -500,7 +515,51 @@ export function SongViewer({ songId, setlist }: { songId: string; setlist?: Setl
         canShare={song.canShareMarks}
         onClose={() => setMarkLine(null)}
       />
+
+      <ChordDialog symbol={chordOpen} onClose={() => setChordOpen(null)} related={songChords} onPick={setChordOpen} />
     </div>
+  )
+}
+
+/** "Acordes desta música": os desenhos de todos os acordes, no tom que está na tela. */
+function SongChords({
+  chords,
+  open,
+  onToggle,
+  onPick,
+}: {
+  chords: string[]
+  open: boolean
+  onToggle: () => void
+  onPick: (chord: string) => void
+}) {
+  return (
+    <section className="mb-4">
+      <button className="flex items-center gap-1.5 text-sm font-semibold text-muted hover:text-text" onClick={onToggle} aria-expanded={open}>
+        <ChevronDown className={clsx('size-4 transition', !open && '-rotate-90')} />
+        Acordes desta música <span className="font-normal">({chords.length})</span>
+      </button>
+      {open ? (
+        <div className="-mx-4 mt-2 flex gap-2 overflow-x-auto px-4 pb-2">
+          {chords.map((c) => {
+            const v = guitarVoicings(c, 1)[0]
+            return (
+              <button
+                key={c}
+                className="card flex w-24 shrink-0 flex-col items-center gap-1 px-2 py-2 transition hover:border-accent/50"
+                onClick={() => onPick(c)}
+                aria-label={`Como tocar ${c}`}
+              >
+                <span className="font-mono font-bold text-chord">{c}</span>
+                {v ? <GuitarDiagram voicing={v} showNotes={false} className="h-24 w-auto" /> : <span className="py-8 text-xs text-muted">—</span>}
+              </button>
+            )
+          })}
+        </div>
+      ) : (
+        <p className="mt-1 text-xs text-muted">Toque em qualquer acorde da cifra para ver como montar no violão e no teclado.</p>
+      )}
+    </section>
   )
 }
 

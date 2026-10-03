@@ -65,6 +65,8 @@ describe('linhas', () => {
   it('distingue linha de acordes de letra', () => {
     expect(isChordLine('G      D/F#     Em   C')).toBe(true)
     expect(isChordLine('| C  G | Am  F | (x2)')).toBe(true)
+    expect(isChordLine('| Gm7   | C7(9)  | F7M  | Bb7M |')).toBe(true) // tensão entre parênteses no fim
+    expect(isChordLine('Dm7(9)  (G7)  A7(b13)')).toBe(true)
     expect(isChordLine('E a vida segue assim')).toBe(false)
     expect(isChordLine('A')).toBe(true)
   })
