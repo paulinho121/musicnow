@@ -4,6 +4,7 @@ import { PageSpinner } from './components/ui'
 import { useSession } from './lib/auth'
 import { useMe } from './lib/queries'
 import { AuthPage } from './pages/AuthPage'
+import { ChordDetect } from './pages/ChordDetect'
 import { Dashboard } from './pages/Dashboard'
 import { Importer } from './pages/Importer'
 import { InviteAccept } from './pages/InviteAccept'
@@ -68,6 +69,7 @@ export const router = createBrowserRouter([
           { path: '/musicas', element: <Library /> },
           { path: '/musicas/nova', element: <SongEditor /> },
           { path: '/musicas/importar', element: <Importer /> },
+          { path: '/musicas/detectar', element: <ChordDetect /> },
           { path: '/musicas/:id/editar', element: <SongEditor /> },
           { path: '/repertorios', element: <Setlists /> },
           { path: '/repertorios/novo', element: <SetlistForm /> },

@@ -10,7 +10,7 @@ import {
   type Visibility,
 } from '@ensaio/shared'
 import clsx from 'clsx'
-import { AlertTriangle, ArrowLeft, CheckCircle2, ChevronDown, ClipboardPaste, FileUp, Trash2, Upload } from 'lucide-react'
+import { AlertTriangle, ArrowLeft, AudioLines, CheckCircle2, ChevronDown, ClipboardPaste, FileUp, Trash2, Upload } from 'lucide-react'
 import { useEffect, useRef, useState, type DragEvent } from 'react'
 import { Link } from 'react-router'
 import { ChordSheet, useSheet } from '../components/ChordSheet'
@@ -190,6 +190,19 @@ export function Importer() {
           <p className="text-sm text-muted">ChordPro, OnSong, OpenSong ou texto copiado de qualquer lugar.</p>
         </div>
       </div>
+
+      <Link
+        to="/musicas/detectar"
+        className="card flex items-center gap-3 border-accent/30 p-4 transition hover:border-accent/60"
+      >
+        <AudioLines className="size-6 shrink-0 text-accent" />
+        <span className="min-w-0 flex-1">
+          <span className="block font-semibold">
+            Tem só a gravação? Detectar acordes <span className="ml-1 rounded-md bg-accent/15 px-1.5 py-0.5 text-xs text-accent">beta</span>
+          </span>
+          <span className="block text-sm text-muted">O app ouve um áudio seu ou o microfone e sugere acordes, tom e BPM.</span>
+        </span>
+      </Link>
 
       <div className="grid gap-4 md:grid-cols-2">
         <button

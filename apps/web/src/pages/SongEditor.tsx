@@ -14,7 +14,7 @@ import {
 import clsx from 'clsx'
 import { ArrowLeft, Eye, HelpCircle, Save, Trash2 } from 'lucide-react'
 import { useEffect, useState, type FormEvent } from 'react'
-import { Link, useNavigate, useParams } from 'react-router'
+import { Link, useLocation, useNavigate, useParams } from 'react-router'
 import { ChordSheet, useSheet } from '../components/ChordSheet'
 import { MetadataLookup } from '../components/MetadataLookup'
 import { ErrorState, PageSpinner, useToast } from '../components/ui'
@@ -60,7 +60,9 @@ export function SongEditor() {
   const save = useSaveSong(id)
   const del = useDeleteSong()
 
-  const [form, setForm] = useState<SongInput>(EMPTY)
+  // Rascunho vindo da detecção de acordes (ou de outra tela): já começa preenchido.
+  const draft = (useLocation().state as { draft?: Partial<SongInput> } | null)?.draft
+  const [form, setForm] = useState<SongInput>(() => (draft && !id ? { ...EMPTY, ...draft } : EMPTY))
   const [tagsText, setTagsText] = useState('')
   const [tab, setTab] = useState<'edit' | 'preview'>('edit')
   const [fieldError, setFieldError] = useState<string | null>(null)
