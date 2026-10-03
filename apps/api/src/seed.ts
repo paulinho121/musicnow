@@ -56,7 +56,7 @@ const songs: SongSeed[] = [
     style: 'Hino',
     tags: ['hino', 'domínio público', 'ceia'],
     lyricsAuthorized: true,
-    visibility: 'public',
+    visibility: 'private',
     notes: 'Domínio público. Começar só com violão; banda entra na segunda estrofe.',
     content: `[Intro] G  C/G  G  D
 
@@ -92,7 +92,7 @@ The hour I first believed
     style: 'Louvor',
     tags: ['adoração', 'abertura', 'lenta'],
     lyricsAuthorized: true,
-    visibility: 'public',
+    visibility: 'private',
     notes: 'Primeiro verso só teclado e voz. Subir a dinâmica na ponte.',
     content: `[Intro] D  A/C#  Bm  G  (x2)
 
@@ -144,7 +144,7 @@ G       A
     style: 'Balada',
     tags: ['voz e violão', 'lenta'],
     lyricsAuthorized: true,
-    visibility: 'public',
+    visibility: 'private',
     content: `[Intro] C  G/B  Am7  F7M
 
 [Verso]
@@ -179,7 +179,7 @@ Até o dia clarear
     style: 'Forró',
     tags: ['bar', 'animada', 'xote'],
     lyricsAuthorized: true,
-    visibility: 'public',
+    visibility: 'private',
     notes: 'Sanfona puxa a intro. Parada seca antes do último refrão.',
     content: `[Intro] E  B7  E  B7  E
 
@@ -215,7 +215,7 @@ Eu vou com você, meu bem
     style: 'Pop rock',
     tags: ['bar', 'rock'],
     lyricsAuthorized: true,
-    visibility: 'public',
+    visibility: 'private',
     content: `[Intro] Am  F  C  G
 
 [Verso]
@@ -252,7 +252,7 @@ Ninguém quer ir embora
     style: 'Gospel',
     tags: ['domínio público', 'animada', 'metais'],
     lyricsAuthorized: true,
-    visibility: 'public',
+    visibility: 'private',
     content: `[Intro] F  C7  F
 
 [Verso]
@@ -274,7 +274,7 @@ When the saints go marching in`,
     timeSignature: '12/8',
     style: 'Blues',
     tags: ['instrumental', 'jam', 'bar'],
-    visibility: 'public',
+    visibility: 'private',
     notes: 'Shuffle. Cada acorde = 1 compasso. Solos em rodízio: guitarra, teclado, baixo.',
     content: `[Intro] E7
 
@@ -295,7 +295,7 @@ When the saints go marching in`,
     timeSignature: '4/4',
     style: 'Bossa nova',
     tags: ['instrumental', 'estudo', 'jazz'],
-    visibility: 'public',
+    visibility: 'private',
     content: `[Parte A]
 | Dm7(9)   | Dm7(9)   | Em7(b5)  A7(b13) | Dm7(9) |
 | Gm7      | C7(9)    | F7M              | Bb7M   |

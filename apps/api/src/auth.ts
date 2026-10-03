@@ -3,6 +3,7 @@ import { drizzleAdapter } from 'better-auth/adapters/drizzle'
 import { db, schema } from './db'
 import { env } from './env'
 import { sendPasswordChangedEmail, sendPasswordResetEmail } from './mail'
+import { createWelcomeSong } from './welcome-song'
 
 // Login social só é ativado quando as credenciais existem no ambiente.
 const socialProviders: Parameters<typeof betterAuth>[0]['socialProviders'] = {}
@@ -61,6 +62,16 @@ export const auth = betterAuth({
     },
   },
   socialProviders,
+  databaseHooks: {
+    user: {
+      create: {
+        // Conta nova começa com a música de exemplo (passo a passo). Se falhar, o cadastro segue.
+        after: async (created) => {
+          await createWelcomeSong(created.id).catch((e) => console.error('Falha ao criar música de exemplo', e))
+        },
+      },
+    },
+  },
   session: {
     // Músicos usam o app no palco: sessão longa, renovada a cada dia de uso.
     expiresIn: 60 * 60 * 24 * 60,
