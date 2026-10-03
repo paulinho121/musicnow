@@ -25,6 +25,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
 import { AddToSetlistButton } from '../components/AddToSetlist'
 import { ChordSheet, sectionsOf, useSheet } from '../components/ChordSheet'
+import { FindLinks } from '../components/FindLinks'
 import { KeyPicker } from '../components/KeyPicker'
 import { LiveStrip, type LiveControls } from '../components/LiveStrip'
 import { MarkDialog } from '../components/MarkDialog'
@@ -331,7 +332,15 @@ export function SongViewer({ songId, setlist }: { songId: string; setlist?: Setl
             onMarkClick={onMarkClick}
           />
         ) : (
-          <p className="py-10 text-center text-muted">Esta música ainda não tem cifra cadastrada.</p>
+          <div className="flex flex-col items-center gap-3 py-10 text-center">
+            <p className="text-muted">Esta música ainda não tem cifra cadastrada.</p>
+            <FindLinks song={{ title: song.title, artist: song.artist }} compact />
+            {song.canEdit && (
+              <Link to={`/musicas/${song.id}/editar`} className="btn-primary">
+                <Pencil className="size-4" /> Escrever a cifra
+              </Link>
+            )}
+          </div>
         )}
 
         {next && (

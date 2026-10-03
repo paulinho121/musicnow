@@ -93,6 +93,14 @@ interface MbWork {
   relations?: { type: string; artist?: { name: string } }[]
 }
 
+interface CatalogItem {
+  id: string
+  title: string
+  artist: string | null
+  year: number | null
+  album: string | null
+}
+
 const credit = (ac?: MbArtistCredit[]) => (ac ?? []).map((a) => a.name + (a.joinphrase ?? '')).join('').trim() || null
 const year = (d?: string) => (d && /^\d{4}/.test(d) ? Number(d.slice(0, 4)) : null)
 
@@ -113,20 +121,37 @@ export const catalogRoutes = new Hono<AppEnv>()
       const { title, artist } = c.req.valid('query')
       const q = `recording:"${lucene(title)}"` + (artist ? ` AND artist:"${lucene(artist)}"` : '')
       const data = await mbGet<{ recordings?: MbRecording[] }>(
-        `/recording?fmt=json&limit=15&query=${encodeURIComponent(q)}`,
+        `/recording?fmt=json&limit=60&query=${encodeURIComponent(q)}`,
       )
-      // Várias gravações da mesma música (ao vivo, remaster...): mostra uma por título + artista.
-      const seen = new Set<string>()
-      const results = []
+      // Várias gravações da mesma música (ao vivo, remaster, coletânea...) viram um resultado
+      // por título + artista. O MusicBrainz não tem "popularidade", mas sucessos aparecem em
+      // muitos discos: o total de lançamentos ordena os resultados (desempate pela relevância).
+      const groups = new Map<string, { item: CatalogItem; releases: number; score: number }>()
       for (const r of data.recordings ?? []) {
-        if ((r.score ?? 100) < 60) continue
+        const score = r.score ?? 100
+        if (score < 60) continue
         const a = credit(r['artist-credit'])
         const key = `${r.title.toLowerCase()}|${(a ?? '').toLowerCase()}`
-        if (seen.has(key)) continue
-        seen.add(key)
-        results.push({ id: r.id, title: r.title, artist: a, year: year(r['first-release-date']), album: r.releases?.[0]?.title ?? null })
-        if (results.length >= 8) break
+        const releases = r.releases?.length ?? 0
+        const g = groups.get(key)
+        if (g) {
+          g.releases += releases
+          g.score = Math.max(g.score, score)
+          // Fica com a gravação mais antiga (costuma ser a original).
+          const y = year(r['first-release-date'])
+          if (y && (!g.item.year || y < g.item.year)) g.item = { ...g.item, id: r.id, year: y, album: r.releases?.[0]?.title ?? g.item.album }
+        } else {
+          groups.set(key, {
+            item: { id: r.id, title: r.title, artist: a, year: year(r['first-release-date']), album: r.releases?.[0]?.title ?? null },
+            releases,
+            score,
+          })
+        }
       }
+      const results = [...groups.values()]
+        .sort((x, y) => Math.round(y.score / 10) - Math.round(x.score / 10) || y.releases - x.releases)
+        .slice(0, 8)
+        .map((g) => g.item)
       return c.json(results)
     },
   )

@@ -6,6 +6,7 @@ import { useMe } from './lib/queries'
 import { AuthPage } from './pages/AuthPage'
 import { ChordDetect } from './pages/ChordDetect'
 import { Dashboard } from './pages/Dashboard'
+import { FindSong } from './pages/FindSong'
 import { Importer } from './pages/Importer'
 import { InviteAccept } from './pages/InviteAccept'
 import { Library } from './pages/Library'
@@ -70,6 +71,7 @@ export const router = createBrowserRouter([
           { path: '/musicas/nova', element: <SongEditor /> },
           { path: '/musicas/importar', element: <Importer /> },
           { path: '/musicas/detectar', element: <ChordDetect /> },
+          { path: '/musicas/encontrar', element: <FindSong /> },
           { path: '/musicas/:id/editar', element: <SongEditor /> },
           { path: '/repertorios', element: <Setlists /> },
           { path: '/repertorios/novo', element: <SetlistForm /> },

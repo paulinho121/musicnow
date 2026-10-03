@@ -1,6 +1,6 @@
 import { MAJOR_KEYS, MINOR_KEYS } from '@ensaio/shared'
 import clsx from 'clsx'
-import { FileUp, Music2, Plus, Search, X } from 'lucide-react'
+import { FileUp, Globe, Music2, Plus, Search, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router'
 import { SongRow } from '../components/SongRow'
@@ -48,9 +48,12 @@ export function Library() {
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-bold">Músicas</h1>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
+          <Link to="/musicas/encontrar" className="btn-ghost">
+            <Globe className="size-4" /> Encontrar
+          </Link>
           <Link to="/musicas/importar" className="btn-ghost">
             <FileUp className="size-4" /> Importar
           </Link>
@@ -120,8 +123,20 @@ export function Library() {
           </div>
         </>
       ) : filtered ? (
-        <EmptyState icon={Search} title="Nada encontrado">
-          Tente outro termo ou limpe os filtros. A busca ignora acentos: “manha” encontra “Manhã”.
+        <EmptyState
+          icon={Search}
+          title="Nada encontrado na sua biblioteca"
+          action={
+            q && (
+              <Link to={`/musicas/encontrar?q=${encodeURIComponent(q)}`} className="btn-primary">
+                <Globe className="size-4" /> Encontrar “{q}” na internet
+              </Link>
+            )
+          }
+        >
+          {q
+            ? 'Ainda não tem essa música? Encontre a cifra no site de origem e monte a sua versão aqui.'
+            : 'Tente outro termo ou limpe os filtros. A busca ignora acentos: “manha” encontra “Manhã”.'}
         </EmptyState>
       ) : (
         <EmptyState

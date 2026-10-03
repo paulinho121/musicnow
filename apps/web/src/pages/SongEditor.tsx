@@ -16,6 +16,7 @@ import { ArrowLeft, Eye, HelpCircle, Save, Trash2 } from 'lucide-react'
 import { useEffect, useState, type FormEvent } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router'
 import { ChordSheet, useSheet } from '../components/ChordSheet'
+import { FindLinks } from '../components/FindLinks'
 import { MetadataLookup } from '../components/MetadataLookup'
 import { ErrorState, PageSpinner, useToast } from '../components/ui'
 import { useDeleteSong, useFacets, useSaveSong, useSong } from '../lib/queries'
@@ -279,6 +280,12 @@ export function SongEditor() {
               Escreva os acordes na linha de cima da letra. Seções entre colchetes: [Intro], [Verso], [Pré-refrão], [Refrão],
               [Ponte], [Solo], [Final]. Pode colar cifras de outros sites.
             </p>
+            {form.title.trim() && !form.content.trim() && (
+              <div className="mt-3 rounded-xl bg-surface-2 p-3">
+                <p className="mb-2 text-xs text-muted">Procurar a cifra desta música (abre o site em outra aba):</p>
+                <FindLinks song={{ title: form.title, artist: form.artist }} compact />
+              </div>
+            )}
           </>
         ) : form.content.trim() ? (
           <div className="rounded-xl bg-bg p-4">
