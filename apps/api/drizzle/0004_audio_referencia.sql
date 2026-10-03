@@ -1,0 +1,1 @@
+ALTER TABLE "song" ADD COLUMN "reference_url" text;

@@ -163,6 +163,7 @@ export function Importer() {
           visibility,
           license,
           importedFrom: song.format,
+          referenceUrl: null,
         })),
       },
       {

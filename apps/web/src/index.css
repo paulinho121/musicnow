@@ -108,3 +108,40 @@ body {
   white-space: pre;
   font-variant-ligatures: none;
 }
+
+/* Impressão / PDF: sempre em cores claras, sem barras do app, cada música numa página. */
+@media print {
+  :root,
+  [data-theme='dark'],
+  [data-theme='light'] {
+    --bg: #ffffff;
+    --surface: #ffffff;
+    --surface-2: #f1efe9;
+    --border: #d6d2c8;
+    --text: #111111;
+    --muted: #555a66;
+    --accent: #b85f00;
+    --chord: #9a4d00;
+    color-scheme: light;
+  }
+  @page {
+    margin: 14mm 12mm;
+  }
+  html,
+  body {
+    background: #fff !important;
+  }
+  .no-print {
+    display: none !important;
+  }
+  .print-break {
+    break-before: page;
+  }
+  .print-song .sheet {
+    overflow: visible;
+  }
+  /* Uma linha de acorde nunca fica separada da letra dela na troca de página. */
+  .print-song .sheet > div {
+    break-inside: avoid;
+  }
+}

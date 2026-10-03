@@ -1,4 +1,4 @@
-import { atLeast, guessKey, isChord, normalizeSearch, PUBLIC_LICENSES, stripLyrics } from '@ensaio/shared'
+import { atLeast, guessKey, isChord, normalizeSearch, PUBLIC_LICENSES, stripLyrics, youtubeId } from '@ensaio/shared'
 import { and, asc, desc, eq, exists, ilike, isNull, or, sql, type SQL } from 'drizzle-orm'
 import { Hono } from 'hono'
 import { HTTPException } from 'hono/http-exception'
@@ -31,6 +31,13 @@ const songFields = z.object({
   lyricsAuthorized: z.boolean().default(false),
   visibility: z.enum(['private', 'shared', 'public']).default('private'),
   license: z.enum(schema.songLicense.enumValues).default('unknown'),
+  // Só links do YouTube: são tocados no player oficial (forma permitida de ouvir a gravação).
+  referenceUrl: z
+    .string()
+    .trim()
+    .max(500)
+    .refine((u) => youtubeId(u) !== null, 'Use um link do YouTube (youtube.com ou youtu.be).')
+    .nullish(),
 })
 
 // Catálogo público só com direitos conhecidos (própria, domínio público ou licenciada).

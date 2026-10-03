@@ -137,6 +137,8 @@ export const song = pgTable(
     tags: text().array().notNull().default(sql`'{}'::text[]`),
     /** Cifra em texto: acordes sobre a letra, seções entre colchetes. */
     content: text().notNull().default(''),
+    /** Gravação de referência (link do YouTube), tocada no player oficial do YouTube. */
+    referenceUrl: text(),
     /** Letra liberada para exibição (direitos autorais). */
     lyricsAuthorized: boolean().notNull().default(false),
     visibility: visibility().notNull().default('private'),

@@ -11,10 +11,11 @@ __DOMAIN__ {
 		X-Content-Type-Options nosniff
 		X-Frame-Options DENY
 		Referrer-Policy strict-origin-when-cross-origin
-		Permissions-Policy "camera=(), microphone=(), geolocation=(), screen-wake-lock=(self), fullscreen=(self)"
+		Permissions-Policy "camera=(), microphone=(), geolocation=(), screen-wake-lock=(self), fullscreen=(self \"https://www.youtube-nocookie.com\"), encrypted-media=(self \"https://www.youtube-nocookie.com\"), picture-in-picture=(self \"https://www.youtube-nocookie.com\")"
 		# Só executa scripts vindos do próprio site: bloqueia scripts injetados (XSS).
+		# frame-src: só o player oficial do YouTube (gravação de referência).
 		# style 'unsafe-inline' é necessário para os estilos dinâmicos do React (tamanho da fonte da cifra).
-		Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self'; worker-src 'self'; manifest-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'"
+		Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self'; worker-src 'self'; manifest-src 'self'; frame-src https://www.youtube-nocookie.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'"
 		-Server
 	}
 

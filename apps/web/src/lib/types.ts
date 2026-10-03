@@ -46,6 +46,7 @@ export interface SongInput {
   lyricsAuthorized: boolean
   visibility: Visibility
   license: License
+  referenceUrl: string | null
 }
 
 export interface ImportSongInput extends SongInput {
@@ -216,4 +217,20 @@ export interface HistoryEntry {
   diff: Record<string, unknown> | null
   createdAt: string
   userName: string | null
+}
+
+export interface CatalogResult {
+  id: string
+  title: string
+  artist: string | null
+  year: number | null
+  album: string | null
+}
+
+export interface CatalogDetails {
+  title: string
+  artist: string | null
+  composer: string | null
+  year: number | null
+  source: string
 }

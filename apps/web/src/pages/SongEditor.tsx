@@ -7,6 +7,7 @@ import {
   PUBLIC_LICENSES,
   TIME_SIGNATURES,
   VISIBILITY,
+  youtubeId,
   type License,
   type Visibility,
 } from '@ensaio/shared'
@@ -15,6 +16,7 @@ import { ArrowLeft, Eye, HelpCircle, Save, Trash2 } from 'lucide-react'
 import { useEffect, useState, type FormEvent } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
 import { ChordSheet, useSheet } from '../components/ChordSheet'
+import { MetadataLookup } from '../components/MetadataLookup'
 import { ErrorState, PageSpinner, useToast } from '../components/ui'
 import { useDeleteSong, useFacets, useSaveSong, useSong } from '../lib/queries'
 import type { SongInput } from '../lib/types'
@@ -33,6 +35,7 @@ const EMPTY: SongInput = {
   lyricsAuthorized: true,
   visibility: 'private',
   license: 'unknown',
+  referenceUrl: null,
 }
 
 const PLACEHOLDER = `[Intro] G  D  Em  C
@@ -64,8 +67,8 @@ export function SongEditor() {
 
   useEffect(() => {
     if (!song) return
-    const { title, artist, composer, originalKey, bpm, timeSignature, style, notes, tags, content, lyricsAuthorized, visibility, license } = song
-    setForm({ title, artist, composer, originalKey, bpm, timeSignature, style, notes, tags, content, lyricsAuthorized, visibility, license })
+    const { title, artist, composer, originalKey, bpm, timeSignature, style, notes, tags, content, lyricsAuthorized, visibility, license, referenceUrl } = song
+    setForm({ title, artist, composer, originalKey, bpm, timeSignature, style, notes, tags, content, lyricsAuthorized, visibility, license, referenceUrl })
     setTagsText(tags.join(', '))
   }, [song])
 
@@ -139,9 +142,24 @@ export function SongEditor() {
       </div>
 
       <section className="card grid gap-4 p-4 md:grid-cols-2 md:p-5">
-        <Field label="Título *" className="md:col-span-2">
-          <input className="input" value={form.title} onChange={(e) => set('title', e.target.value)} autoFocus={!editing} maxLength={200} />
-        </Field>
+        <div className="md:col-span-2">
+          <Field label="Título *">
+            <input className="input" value={form.title} onChange={(e) => set('title', e.target.value)} autoFocus={!editing} maxLength={200} />
+          </Field>
+          <div className="mt-1.5">
+            <MetadataLookup
+              title={form.title}
+              artist={form.artist}
+              onPick={(d) =>
+                setForm((f) => ({
+                  ...f,
+                  artist: d.artist ?? f.artist,
+                  composer: d.composer ?? f.composer,
+                }))
+              }
+            />
+          </div>
+        </div>
         <Field label="Artista">
           <input className="input" value={form.artist ?? ''} onChange={(e) => set('artist', e.target.value)} maxLength={200} />
         </Field>
@@ -198,6 +216,19 @@ export function SongEditor() {
         </Field>
         <Field label="Tags (separadas por vírgula)">
           <input className="input" value={tagsText} onChange={(e) => setTagsText(e.target.value)} placeholder="abertura, lenta, ceia" />
+        </Field>
+        <Field label="Gravação de referência (link do YouTube)" className="md:col-span-2">
+          <input
+            className="input"
+            type="url"
+            inputMode="url"
+            value={form.referenceUrl ?? ''}
+            onChange={(e) => set('referenceUrl', e.target.value.trim() || null)}
+            placeholder="https://www.youtube.com/watch?v=..."
+          />
+          {form.referenceUrl && !youtubeId(form.referenceUrl) && (
+            <span className="mt-1 block text-xs text-danger">Use um link do YouTube (youtube.com ou youtu.be).</span>
+          )}
         </Field>
         <Field label="Observações de execução" className="md:col-span-2">
           <textarea

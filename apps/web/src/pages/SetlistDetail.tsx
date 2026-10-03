@@ -4,6 +4,7 @@ import { Archive, ArchiveRestore, ArrowLeft, CalendarDays, Copy, GitBranch, MapP
 import { useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
 import { BandPanel } from '../components/setlist/BandPanel'
+import { ExportButton } from '../components/setlist/ExportButton'
 import { HistoryPanel } from '../components/setlist/HistoryPanel'
 import { SongsPanel } from '../components/setlist/SongsPanel'
 import { Sheet } from '../components/Sheet'
@@ -128,6 +129,7 @@ export function SetlistDetail() {
         <button className="btn-primary" disabled={!s.items.length} onClick={() => navigate(`/repertorios/${s.id}/tocar/0`)}>
           <Play className="size-4" /> {s.status === 'ensaio' ? 'Ensaiar' : 'Tocar'}
         </button>
+        <ExportButton setlist={s} />
         {isAdmin && (
           <button className="btn-ghost" onClick={() => setParams({ aba: 'banda' }, { replace: true })}>
             <UserPlus className="size-4" /> Convidar

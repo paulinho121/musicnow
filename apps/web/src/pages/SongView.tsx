@@ -1,10 +1,11 @@
-import { atLeast, normalizeOffset, parseChord, semitonesBetween, transposeKey } from '@ensaio/shared'
+import { atLeast, fileNameFor, normalizeOffset, parseChord, semitonesBetween, songInKey, toChordPro, transposeKey } from '@ensaio/shared'
 import clsx from 'clsx'
 import {
   ArrowLeft,
   ChevronLeft,
   ChevronRight,
   Expand,
+  FileDown,
   ListMusic,
   Lock,
   Minus,
@@ -12,6 +13,7 @@ import {
   Pencil,
   Play,
   Plus,
+  Printer,
   RotateCcw,
   Shrink,
   Star,
@@ -26,10 +28,12 @@ import { ChordSheet, sectionsOf, useSheet } from '../components/ChordSheet'
 import { KeyPicker } from '../components/KeyPicker'
 import { LiveStrip, type LiveControls } from '../components/LiveStrip'
 import { MarkDialog } from '../components/MarkDialog'
+import { ReferencePlayer } from '../components/ReferencePlayer'
 import { ReportButton } from '../components/ReportDialog'
 import { ErrorState, PageSpinner, useToast } from '../components/ui'
 import { useSession } from '../lib/auth'
 import { useDeleteMark, useSavePersonalKey, useSong, useToggleFavorite } from '../lib/queries'
+import { downloadText } from '../lib/download'
 import { useLocalState } from '../lib/storage'
 import type { SongMark } from '../lib/types'
 
@@ -296,6 +300,11 @@ export function SongViewer({ songId, setlist }: { songId: string; setlist?: Setl
           {song.timeSignature && <span>{song.timeSignature}</span>}
           {song.style && <span>{song.style}</span>}
         </div>
+        {song.referenceUrl && (
+          <div className="-mt-1 mb-4">
+            <ReferencePlayer url={song.referenceUrl} title={song.title} />
+          </div>
+        )}
         {setlist?.itemNotes && (
           <p className="mb-3 rounded-xl border-l-4 border-sec-intro bg-sec-intro/10 px-3 py-2 text-sm">
             <b>Neste repertório:</b> {setlist.itemNotes}
@@ -374,6 +383,22 @@ export function SongViewer({ songId, setlist }: { songId: string; setlist?: Setl
             {fullscreen ? <Shrink className="size-4" /> : <Expand className="size-4" />}
             {fullscreen ? 'Sair da tela cheia' : 'Tela cheia'}
           </button>
+          <div className="mt-2 grid grid-cols-2 gap-2">
+            <button
+              className="btn-ghost"
+              onClick={() => {
+                const s = songInKey(song, offset, currentKey)
+                downloadText(fileNameFor(`${song.title}${currentKey ? ` (${currentKey})` : ''}`, 'cho'), toChordPro(s))
+                toast('Arquivo ChordPro baixado: abre em OnSong, SongbookPro e outros apps.')
+              }}
+              title="Baixar no formato ChordPro, no tom atual"
+            >
+              <FileDown className="size-4" /> ChordPro
+            </button>
+            <Link className="btn-ghost" to={`/musicas/${song.id}/imprimir${offset ? `?st=${offset}` : ''}`} title="Imprimir ou salvar em PDF, no tom atual">
+              <Printer className="size-4" /> Imprimir/PDF
+            </Link>
+          </div>
         </div>
       )}
 

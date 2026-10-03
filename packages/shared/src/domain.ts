@@ -93,3 +93,29 @@ export const REPORT_REASONS = {
   other: 'Outro motivo',
 } as const
 export type ReportReason = keyof typeof REPORT_REASONS
+
+/**
+ * Extrai o ID de um vídeo do YouTube (youtube.com/watch, youtu.be, shorts, embed,
+ * music.youtube.com). Devolve null para qualquer outro endereço.
+ */
+export function youtubeId(url: string | null | undefined): string | null {
+  if (!url) return null
+  let u: URL
+  try {
+    u = new URL(url.trim())
+  } catch {
+    return null
+  }
+  if (u.protocol !== 'https:' && u.protocol !== 'http:') return null
+  const host = u.hostname.replace(/^www\.|^m\./, '')
+  let id: string | null = null
+  if (host === 'youtu.be') id = u.pathname.slice(1).split('/')[0]
+  else if (host === 'youtube.com' || host === 'music.youtube.com' || host === 'youtube-nocookie.com') {
+    if (u.pathname === '/watch') id = u.searchParams.get('v')
+    else {
+      const m = /^\/(?:shorts|embed|live|v)\/([^/?#]+)/.exec(u.pathname)
+      id = m?.[1] ?? null
+    }
+  }
+  return id && /^[A-Za-z0-9_-]{11}$/.test(id) ? id : null
+}

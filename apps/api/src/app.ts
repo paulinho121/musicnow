@@ -7,6 +7,7 @@ import { auth, enabledProviders } from './auth'
 import { client } from './db'
 import { mailEnabled } from './mail'
 import type { AppEnv } from './http'
+import { catalogRoutes } from './routes/catalog'
 import { meRoutes } from './routes/me'
 import { invitesRoutes, setlistsRoutes } from './routes/setlists'
 import { songsRoutes } from './routes/songs'
@@ -23,6 +24,7 @@ const api = new Hono<AppEnv>()
   .route('/songs', songsRoutes)
   .route('/setlists', setlistsRoutes)
   .route('/invites', invitesRoutes)
+  .route('/catalog', catalogRoutes)
 
 const KB = 1024
 const tooLarge = (c: Context) => c.json({ error: 'Conteúdo grande demais para enviar de uma vez.' }, 413)

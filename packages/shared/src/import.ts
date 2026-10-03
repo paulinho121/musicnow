@@ -101,7 +101,38 @@ export function inlineToChordsOverLyrics(line: string): string[] {
   lyric += line.slice(last)
   const lyricTrim = lyric.replace(/\s+$/, '')
   if (!lyricTrim.trim()) return [chords]
+  // Sobrou só "(x2)", "|" etc.: isso faz parte da linha de acordes, não é letra.
+  if (lyricTrim.trim().split(/\s+/).every((t) => NOISE_TOKEN.test(t))) {
+    let merged = chords
+    const re = /\S+/g
+    let m: RegExpExecArray | null
+    while ((m = re.exec(lyricTrim))) {
+      const col = Math.max(m.index, merged.length === 0 ? 0 : merged.length + 1)
+      merged = merged.padEnd(col, ' ') + m[0]
+    }
+    return [merged]
+  }
   return [chords, lyricTrim]
+}
+
+const NOISE_TOKEN = /^(\||\|\||\(?x\d+\)?|\(?\d+x\)?|%|-+|\.+|:)$/i
+
+/** "[Intro]" seguido de uma linha só de acordes (sem letra embaixo) vira "[Intro] G  D  Em". */
+function joinSectionChords(lines: string[]): string[] {
+  const out: string[] = []
+  for (let i = 0; i < lines.length; i++) {
+    const cur = lines[i]
+    const next = lines[i + 1]
+    const after = lines[i + 2]
+    const isLabel = /^\[[^\]]+\]$/.test(cur.trim())
+    const nextIsChords = next !== undefined && next.trim() !== '' && isChordLine(next)
+    const nothingBelow = after === undefined || after.trim() === '' || /^\[[^\]]+\]/.test(after.trim())
+    if (isLabel && nextIsChords && nothingBelow) {
+      out.push(`${cur.trim()} ${next.trim()}`)
+      i++
+    } else out.push(cur)
+  }
+  return out
 }
 
 // ---------------------------------------------------------------------------
@@ -217,7 +248,7 @@ function parseChordProLike(text: string, format: 'chordpro' | 'onsong', fileName
     else out.push(line)
   }
 
-  const content = tidy(out.join('\n'))
+  const content = tidy(joinSectionChords(out).join('\n'))
   return finish({ meta, content, format, warnings, fileName })
 }
 
