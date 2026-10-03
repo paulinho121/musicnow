@@ -293,6 +293,27 @@ export const setlist = pgTable(
   (t) => [index().on(t.ownerId), index().on(t.eventDate)],
 )
 
+/**
+ * Bloco do repertório (barzinho, baile): "Bloco 2 · Marília · 130 BPM".
+ * Opcional: repertório sem blocos continua uma lista simples.
+ */
+export const setlistBlock = pgTable(
+  'setlist_block',
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    setlistId: uuid()
+      .notNull()
+      .references(() => setlist.id, { onDelete: 'cascade' }),
+    position: integer().notNull(),
+    name: text().notNull(),
+    /** Estilo, ritmo ou artista de referência do bloco ("Sertanejo", "Xote", "Marília"). */
+    style: text(),
+    bpm: integer(),
+    notes: text(),
+  },
+  (t) => [index().on(t.setlistId, t.position)],
+)
+
 export const setlistItem = pgTable(
   'setlist_item',
   {
@@ -305,6 +326,8 @@ export const setlistItem = pgTable(
       // 'no action' (verificado no fim do comando): apagar uma conta leva junto os repertórios
       // e as músicas dela sem travar; apagar só a música continua bloqueado se ela estiver em uso.
       .references(() => song.id, { onDelete: 'no action' }),
+    /** Bloco da música (null = sem bloco). Apagar o bloco não tira as músicas do repertório. */
+    blockId: uuid().references(() => setlistBlock.id, { onDelete: 'set null' }),
     position: integer().notNull(),
     key: text(),
     bpm: integer(),

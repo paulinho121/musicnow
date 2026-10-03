@@ -1,6 +1,6 @@
 import { fileNameFor, normalizeOffset, semitonesBetween, songInKey, toChordProBook } from '@ensaio/shared'
 import { useQueryClient } from '@tanstack/react-query'
-import { FileDown, Printer, Share } from 'lucide-react'
+import { FileDown, ListOrdered, Printer, Share } from 'lucide-react'
 import { useState } from 'react'
 import { Link } from 'react-router'
 import { api } from '../../lib/api'
@@ -54,6 +54,13 @@ export function ExportButton({ setlist }: { setlist: SetlistDetail }) {
       <Sheet open={open} onClose={() => setOpen(false)} title="Exportar repertório">
         <p className="mb-4 text-sm text-muted">Cada música sai no tom definido para este repertório.</p>
         <div className="space-y-2">
+          <Link to={`/repertorios/${setlist.id}/folha`} className="btn-ghost h-auto w-full justify-start py-3 text-left">
+            <ListOrdered className="size-5 shrink-0" />
+            <span>
+              Folha de palco
+              <span className="block text-xs font-normal text-muted">Só a ordem, os blocos e os tons, em letra grande. Para o chão do palco.</span>
+            </span>
+          </Link>
           <Link to={`/repertorios/${setlist.id}/imprimir`} className="btn-ghost h-auto w-full justify-start py-3 text-left">
             <Printer className="size-5 shrink-0" />
             <span>

@@ -101,7 +101,7 @@ export const useDuplicateSetlist = (id: string) =>
   )
 
 export const useAddItem = (id: string) =>
-  useSetlistMutation(id, (body: { songId: string; key?: string | null }) =>
+  useSetlistMutation(id, (body: { songId: string; key?: string | null; blockId?: string | null }) =>
     api<{ id: string }>(`/setlists/${id}/items`, { method: 'POST', json: body }),
   )
 
@@ -136,6 +136,56 @@ export function useReorder(id: string) {
     onSettled: () => qc.invalidateQueries({ queryKey: setlistKeys.detail(id) }),
   })
 }
+
+/** Ordem com blocos: cada grupo (bloco ou "sem bloco") com as suas músicas, na ordem da tela. */
+export type BlockLayout = { blockId: string | null; itemIds: string[] }[]
+
+/** Reordenar com blocos também é otimista. */
+export function useReorderLayout(id: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (layout: BlockLayout) => api(`/setlists/${id}/order`, { method: 'PUT', json: { layout } }),
+    onMutate: async (layout) => {
+      await qc.cancelQueries({ queryKey: setlistKeys.detail(id) })
+      const prev = qc.getQueryData<SetlistDetail>(setlistKeys.detail(id))
+      if (prev) {
+        const byId = new Map(prev.items.map((i) => [i.id, i]))
+        const blocksById = new Map(prev.blocks.map((b) => [b.id, b]))
+        const ordered = [...layout.filter((g) => !g.blockId), ...layout.filter((g) => g.blockId)]
+        qc.setQueryData<SetlistDetail>(setlistKeys.detail(id), {
+          ...prev,
+          blocks: layout.flatMap((g) => (g.blockId ? [blocksById.get(g.blockId)!] : [])),
+          items: ordered.flatMap((g) => g.itemIds.map((iid) => ({ ...byId.get(iid)!, blockId: g.blockId }))).map((it, position) => ({ ...it, position })),
+        })
+      }
+      return { prev }
+    },
+    onError: (_e, _v, ctx) => ctx?.prev && qc.setQueryData(setlistKeys.detail(id), ctx.prev),
+    onSettled: () => qc.invalidateQueries({ queryKey: setlistKeys.detail(id) }),
+  })
+}
+
+export type BlockInput = { name: string; style: string | null; bpm: number | null; notes: string | null }
+
+export const useSaveBlock = (id: string) =>
+  useSetlistMutation(id, ({ blockId, ...body }: BlockInput & { blockId?: string }) =>
+    blockId
+      ? api(`/setlists/${id}/blocks/${blockId}`, { method: 'PUT', json: body })
+      : api<{ id: string }>(`/setlists/${id}/blocks`, { method: 'POST', json: body }),
+  )
+
+export const useDeleteBlock = (id: string) =>
+  useSetlistMutation(id, (blockId: string) => api(`/setlists/${id}/blocks/${blockId}`, { method: 'DELETE' }))
+
+export interface ImportTextResult {
+  songs: number
+  blocks: number
+  found: number
+  created: string[]
+}
+
+export const useImportText = (id: string) =>
+  useSetlistMutation(id, (text: string) => api<ImportTextResult>(`/setlists/${id}/import-text`, { method: 'POST', json: { text } }))
 
 export const useUpdateMember = (id: string) =>
   useSetlistMutation(id, ({ userId, ...body }: { userId: string; permission?: Permission; instrument?: string | null }) =>

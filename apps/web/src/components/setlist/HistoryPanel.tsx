@@ -21,6 +21,10 @@ function describe(e: HistoryEntry, setlist: SetlistDetail): string {
     case 'remove_song': return 'tirou uma música'
     case 'update_song': return `alterou ${song ? `"${song}"` : 'uma música'}${d.key ? ` (tom ${d.key})` : ''}`
     case 'reorder': return 'mudou a ordem das músicas'
+    case 'add_block': return `criou o bloco ${d.name ? `"${d.name}"` : ''}`.trim()
+    case 'update_block': return `editou o bloco ${d.name ? `"${d.name}"` : ''}`.trim()
+    case 'remove_block': return `apagou o bloco ${d.name ? `"${d.name}"` : ''}`.trim()
+    case 'import_text': return `colou uma lista com ${d.songs ?? 'várias'} músicas${Number(d.blocks) ? ` em ${d.blocks} blocos` : ''}`
     case 'join': return `entrou no repertório${d.permission ? ` (${PERMISSIONS[d.permission as Permission]?.toLowerCase()})` : ''}`
     case 'leave': return 'saiu do repertório'
     case 'remove_member': return `removeu ${member ?? 'um músico'}`

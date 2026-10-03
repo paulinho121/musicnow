@@ -47,6 +47,13 @@ import type { SongMark } from '../lib/types'
 
 const VIEWER_DEFAULTS = { fontSize: 17, lineHeight: 1.45, speed: 3, showChords: true, chordStrip: false, wrap: true }
 
+export interface BlockInfo {
+  name: string
+  /** "Marília · 130 BPM" */
+  subtitle: string
+  color: string
+}
+
 /** Contexto quando a música é tocada dentro de um repertório. */
 export interface SetlistContext {
   id: string
@@ -57,7 +64,10 @@ export interface SetlistContext {
   itemKey: string | null
   itemNotes: string | null
   prev?: { title: string; go: () => void }
-  next?: { title: string; go: () => void }
+  /** `block` vem preenchido quando a próxima música abre outro bloco. */
+  next?: { title: string; go: () => void; block?: BlockInfo }
+  /** Bloco desta música (repertório de barzinho/baile). */
+  block?: BlockInfo & { song: number; songs: number }
   onExit: () => void
   /** Modo Palco (tempo real). */
   live?: LiveControls
@@ -323,7 +333,17 @@ export function SongViewer({ songId, setlist }: { songId: string; setlist?: Setl
               className={clsx('rounded-2xl shadow-2xl shadow-black/50', setlist ? 'size-20 sm:size-28' : 'size-24 sm:size-36')}
             />
             <div className="min-w-0 flex-1">
-              <p className="text-[11px] font-bold tracking-widest text-muted uppercase">{song.style ?? 'Música'}</p>
+              {setlist?.block ? (
+                // No show: em que bloco a banda está (com a cor do bloco)
+                <p className="flex flex-wrap items-center gap-x-1.5 text-[11px] font-bold tracking-widest uppercase" style={{ color: setlist.block.color }}>
+                  {setlist.block.name}
+                  <span className="font-semibold tracking-normal text-muted normal-case">
+                    {[setlist.block.subtitle, `${setlist.block.song} de ${setlist.block.songs}`].filter(Boolean).join(' · ')}
+                  </span>
+                </p>
+              ) : (
+                <p className="text-[11px] font-bold tracking-widest text-muted uppercase">{song.style ?? 'Música'}</p>
+              )}
               <h2 className="mt-0.5 line-clamp-2 text-xl leading-tight font-extrabold tracking-tight break-words sm:text-3xl">{song.title}</h2>
               <p className="mt-0.5 truncate text-sm text-muted">{[song.artist, song.composer && song.composer !== song.artist ? song.composer : null].filter(Boolean).join(' · ')}</p>
               <div className="mt-3 flex flex-wrap gap-1.5 text-xs">
@@ -401,15 +421,33 @@ export function SongViewer({ songId, setlist }: { songId: string; setlist?: Setl
           </div>
         )}
 
-        {next && (
-          <button className="card mt-10 flex w-full items-center gap-3 p-4 text-left transition hover:border-accent/50" onClick={next.go}>
-            <span className="min-w-0 flex-1">
-              <span className="block text-xs text-muted">Próxima música</span>
-              <span className="block truncate font-semibold">{next.title}</span>
-            </span>
-            <ChevronRight className="size-5 text-accent" />
-          </button>
-        )}
+        {next &&
+          (next.block ? (
+            // Virada de bloco: aviso bem visível, com estilo e BPM do próximo bloco
+            <button
+              className="card mt-10 flex w-full items-center gap-4 overflow-hidden p-4 text-left transition hover:brightness-110"
+              style={{ borderColor: `${next.block.color}88`, background: `linear-gradient(90deg, ${next.block.color}26, transparent 75%)` }}
+              onClick={next.go}
+            >
+              <span className="h-12 w-1.5 shrink-0 rounded-full" style={{ background: next.block.color }} />
+              <span className="min-w-0 flex-1">
+                <span className="block text-xs font-semibold text-muted uppercase">Próximo bloco</span>
+                <span className="block truncate text-lg font-extrabold uppercase" style={{ color: next.block.color }}>
+                  {next.block.name}
+                </span>
+                <span className="block truncate text-sm text-muted">{[next.block.subtitle, next.title].filter(Boolean).join(' · ')}</span>
+              </span>
+              <ChevronRight className="size-5 shrink-0" style={{ color: next.block.color }} />
+            </button>
+          ) : (
+            <button className="card mt-10 flex w-full items-center gap-3 p-4 text-left transition hover:border-accent/50" onClick={next.go}>
+              <span className="min-w-0 flex-1">
+                <span className="block text-xs text-muted">Próxima música</span>
+                <span className="block truncate font-semibold">{next.title}</span>
+              </span>
+              <ChevronRight className="size-5 text-accent" />
+            </button>
+          ))}
         {!song.canEdit && !setlist && (
           <div className="mt-8 flex justify-center">
             <ReportButton songId={song.id} />

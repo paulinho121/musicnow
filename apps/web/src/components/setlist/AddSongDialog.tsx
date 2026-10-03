@@ -7,8 +7,20 @@ import type { SetlistDetail } from '../../lib/types'
 import { Sheet } from '../Sheet'
 import { KeyBadge, Spinner, useToast } from '../ui'
 
-/** Busca na biblioteca e adiciona ao fim do repertório. Pode adicionar várias em sequência. */
-export function AddSongDialog({ open, onClose, setlist }: { open: boolean; onClose: () => void; setlist: SetlistDetail }) {
+/** Busca na biblioteca e adiciona ao fim do repertório (ou do bloco). Pode adicionar várias em sequência. */
+export function AddSongDialog({
+  open,
+  onClose,
+  setlist,
+  blockId = null,
+  blockName = null,
+}: {
+  open: boolean
+  onClose: () => void
+  setlist: SetlistDetail
+  blockId?: string | null
+  blockName?: string | null
+}) {
   const [text, setText] = useState('')
   const [q, setQ] = useState('')
   const add = useAddItem(setlist.id)
@@ -25,7 +37,7 @@ export function AddSongDialog({ open, onClose, setlist }: { open: boolean; onClo
   const addSong = (songId: string, title: string) => {
     setBusy(songId)
     add.mutate(
-      { songId },
+      { songId, blockId },
       {
         onSuccess: () => toast(`"${title}" adicionada.`),
         onError: (e) => toast(e.message, 'error'),
@@ -35,7 +47,7 @@ export function AddSongDialog({ open, onClose, setlist }: { open: boolean; onClo
   }
 
   return (
-    <Sheet open={open} onClose={onClose} title="Adicionar músicas" wide>
+    <Sheet open={open} onClose={onClose} title={blockName ? `Adicionar no ${blockName}` : 'Adicionar músicas'} wide>
       <div className="relative mb-3">
         <Search className="pointer-events-none absolute top-1/2 left-3 size-5 -translate-y-1/2 text-muted" />
         <input className="input pl-10" autoFocus placeholder="Buscar na sua biblioteca" value={text} onChange={(e) => setText(e.target.value)} />

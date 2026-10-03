@@ -1,6 +1,7 @@
 import { atLeast } from '@ensaio/shared'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Navigate, useNavigate, useParams } from 'react-router'
+import { blockColor, blockSubtitle } from '../components/setlist/Blocks'
 import { ErrorState, PageSpinner, useToast } from '../components/ui'
 import { useSession } from '../lib/auth'
 import { useSetlistLive } from '../lib/live'
@@ -92,6 +93,14 @@ export function SetlistPlay() {
     goTo(i)
   }
 
+  const blockInfo = (blockId: string) => {
+    const bi = s.blocks.findIndex((b) => b.id === blockId)
+    if (bi < 0) return undefined
+    const b = s.blocks[bi]
+    return { name: b.name, subtitle: blockSubtitle(b), color: blockColor(bi) }
+  }
+  const blockItems = item.blockId ? s.items.filter((i) => i.blockId === item.blockId) : []
+
   return (
     <SongViewer
       key={item.id}
@@ -104,7 +113,20 @@ export function SetlistPlay() {
         itemKey: item.key,
         itemNotes: item.notes,
         prev: prevItem ? { title: prevItem.song.title, go: () => move(index - 1) } : undefined,
-        next: nextItem ? { title: nextItem.song.title, go: () => move(index + 1) } : undefined,
+        next: nextItem
+          ? {
+              title: nextItem.song.title,
+              go: () => move(index + 1),
+              block: nextItem.blockId && nextItem.blockId !== item.blockId ? blockInfo(nextItem.blockId) : undefined,
+            }
+          : undefined,
+        block: item.blockId
+          ? {
+              ...blockInfo(item.blockId)!,
+              song: blockItems.indexOf(item) + 1,
+              songs: blockItems.length,
+            }
+          : undefined,
         onExit: () => navigate(`/repertorios/${s.id}`),
         scrollTarget,
         live: {

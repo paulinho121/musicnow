@@ -126,8 +126,19 @@ export interface SetlistSummary {
   memberCount: number
 }
 
+/** Bloco do repertório (barzinho, baile): "Bloco 2 · Marília · 130 BPM". */
+export interface SetlistBlock {
+  id: string
+  name: string
+  style: string | null
+  bpm: number | null
+  notes: string | null
+}
+
 export interface SetlistItem {
   id: string
+  /** Bloco da música (null = sem bloco). */
+  blockId: string | null
   position: number
   key: string | null
   bpm: number | null
@@ -141,6 +152,8 @@ export interface SetlistItem {
     bpm: number | null
     timeSignature: string | null
     coverUrl: string | null
+    /** false = música só com nome e tom (ainda sem cifra). */
+    hasContent: boolean
   }
 }
 
@@ -190,6 +203,7 @@ export interface SetlistDetail {
   archived: boolean
   revision: number
   role: SetlistRole
+  blocks: SetlistBlock[]
   items: SetlistItem[]
   members: SetlistMember[]
   suggestions: SetlistSuggestion[]

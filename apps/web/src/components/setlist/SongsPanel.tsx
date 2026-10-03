@@ -1,14 +1,33 @@
 import { atLeast, MAJOR_KEYS, MINOR_KEYS, parseChord } from '@ensaio/shared'
 import clsx from 'clsx'
-import { ArrowDown, ArrowUp, Check, Lightbulb, MessageSquarePlus, Music2, Play, Plus, StickyNote, Trash2, X } from 'lucide-react'
-import { useState } from 'react'
+import {
+  ArrowDown,
+  ArrowUp,
+  ArrowUpDown,
+  Check,
+  ChevronsDown,
+  ChevronsUp,
+  ClipboardPaste,
+  Layers,
+  Lightbulb,
+  MessageSquarePlus,
+  Music2,
+  Pencil,
+  Play,
+  Plus,
+  StickyNote,
+  Trash2,
+  X,
+} from 'lucide-react'
+import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router'
-import { useRemoveItem, useReorder, useResolveSuggestion, useSuggest, useUpdateItem } from '../../lib/setlists'
-import type { SetlistDetail, SetlistItem } from '../../lib/types'
+import { type BlockLayout, useRemoveItem, useReorderLayout, useResolveSuggestion, useSuggest, useUpdateItem } from '../../lib/setlists'
+import type { SetlistBlock, SetlistDetail, SetlistItem } from '../../lib/types'
 import { Sheet } from '../Sheet'
 import { SongCover } from '../SongCover'
 import { EmptyState, KeyBadge, useToast } from '../ui'
 import { AddSongDialog } from './AddSongDialog'
+import { BlockDialog, blockColor, blockSubtitle, ImportTextDialog } from './Blocks'
 
 export function keyOptions(original: string | null) {
   const minor = original ? (parseChord(original)?.suffix ?? '').startsWith('m') : false
@@ -20,63 +39,216 @@ export function SongsPanel({ setlist }: { setlist: SetlistDetail }) {
   const canSuggest = atLeast(setlist.role, 'suggest') && !isAdmin
   const navigate = useNavigate()
   const toast = useToast()
-  const reorder = useReorder(setlist.id)
-  const [adding, setAdding] = useState(false)
+  const reorder = useReorderLayout(setlist.id)
+  const [adding, setAdding] = useState<{ blockId: string | null } | null>(null)
+  const [pasting, setPasting] = useState(false)
+  const [editingBlock, setEditingBlock] = useState<SetlistBlock | null | 'new'>(null)
   const [suggestFor, setSuggestFor] = useState<SetlistItem | null | 'general'>(null)
+  // Lista limpa por padrão (como a folha de papel); "Organizar" mostra os controles.
+  const [organizing, setOrganizing] = useState(false)
 
-  const move = (index: number, delta: number) => {
-    const ids = setlist.items.map((i) => i.id)
-    const target = index + delta
-    if (target < 0 || target >= ids.length) return
-    ;[ids[index], ids[target]] = [ids[target], ids[index]]
-    reorder.mutate(ids, { onError: (e) => toast(e.message, 'error') })
+  // Grupos na ordem da tela (e de tocar): primeiro as músicas sem bloco, depois cada bloco.
+  const groups = useMemo(() => {
+    const loose = setlist.items.filter((i) => !i.blockId)
+    return [
+      { block: null as SetlistBlock | null, items: loose },
+      ...setlist.blocks.map((b) => ({ block: b as SetlistBlock | null, items: setlist.items.filter((i) => i.blockId === b.id) })),
+    ]
+  }, [setlist.items, setlist.blocks])
+  const indexOf = new Map(setlist.items.map((it, i) => [it.id, i]))
+  const hasBlocks = setlist.blocks.length > 0
+
+  const send = (layout: BlockLayout) => reorder.mutate(layout, { onError: (e) => toast(e.message, 'error') })
+  const layoutOf = (gs: typeof groups) => gs.map((g) => ({ blockId: g.block?.id ?? null, itemIds: g.items.map((i) => i.id) }))
+
+  /** Sobe/desce a música; no começo ou fim do bloco, passa para o bloco vizinho. */
+  const moveItem = (item: SetlistItem, delta: number) => {
+    const layout = layoutOf(groups)
+    const g = layout.findIndex((x) => x.itemIds.includes(item.id))
+    const ids = layout[g].itemIds
+    const i = ids.indexOf(item.id)
+    const j = i + delta
+    if (j >= 0 && j < ids.length) {
+      ;[ids[i], ids[j]] = [ids[j], ids[i]]
+    } else {
+      // Procura o grupo vizinho (pula grupos que não existem na tela, como "sem bloco" vazio).
+      const ng = g + delta
+      if (ng < 0 || ng >= layout.length) return
+      ids.splice(i, 1)
+      if (delta < 0) layout[ng].itemIds.push(item.id)
+      else layout[ng].itemIds.unshift(item.id)
+    }
+    send(layout)
+  }
+
+  const moveBlock = (blockId: string, delta: number) => {
+    const layout = layoutOf(groups)
+    const loose = layout[0]
+    const blocks = layout.slice(1)
+    const i = blocks.findIndex((b) => b.blockId === blockId)
+    const j = i + delta
+    if (j < 0 || j >= blocks.length) return
+    ;[blocks[i], blocks[j]] = [blocks[j], blocks[i]]
+    send([loose, ...blocks])
   }
 
   const openSuggestions = setlist.suggestions.filter((s) => s.status === 'open')
+  const row = (item: SetlistItem) => {
+    const index = indexOf.get(item.id)!
+    return (
+      <ItemRow
+        key={item.id}
+        setlistId={setlist.id}
+        item={item}
+        index={index}
+        count={setlist.items.length}
+        isAdmin={isAdmin}
+        organizing={organizing}
+        canSuggest={canSuggest}
+        onPlay={() => navigate(`/repertorios/${setlist.id}/tocar/${index}`)}
+        onMove={(d) => moveItem(item, d)}
+        onSuggest={() => setSuggestFor(item)}
+      />
+    )
+  }
 
   return (
     <div className="space-y-4">
       {isAdmin && openSuggestions.length > 0 && <SuggestionsBox setlist={setlist} />}
       {!isAdmin && setlist.suggestions.length > 0 && <MySuggestions setlist={setlist} />}
 
-      {setlist.items.length === 0 ? (
+      {(setlist.items.length > 0 || hasBlocks) && (
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-sm text-muted">
+            {setlist.items.length} {setlist.items.length === 1 ? 'música' : 'músicas'}
+            {hasBlocks && ` · ${setlist.blocks.length} ${setlist.blocks.length === 1 ? 'bloco' : 'blocos'}`}
+          </p>
+          {isAdmin && (
+            <button
+              className={clsx('chip h-9', organizing && 'chip-on')}
+              onClick={() => setOrganizing((o) => !o)}
+              aria-pressed={organizing}
+            >
+              {organizing ? <Check className="size-4" /> : <ArrowUpDown className="size-4" />}
+              {organizing ? 'Concluir' : 'Organizar'}
+            </button>
+          )}
+        </div>
+      )}
+
+      {setlist.items.length === 0 && !hasBlocks ? (
         <EmptyState
           icon={Music2}
           title="Nenhuma música ainda"
           action={
             isAdmin && (
-              <button className="btn-primary" onClick={() => setAdding(true)}>
-                <Plus className="size-4" /> Adicionar músicas
-              </button>
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <button className="btn-primary" onClick={() => setAdding({ blockId: null })}>
+                  <Plus className="size-4" /> Adicionar músicas
+                </button>
+                <button className="btn-ghost" onClick={() => setPasting(true)}>
+                  <ClipboardPaste className="size-4" /> Colar lista pronta
+                </button>
+              </div>
             )
           }
         >
-          {isAdmin ? 'Adicione as músicas na ordem em que vão ser tocadas.' : 'Quem administra ainda não adicionou músicas.'}
+          {isAdmin
+            ? 'Adicione as músicas na ordem do show, ou cole a lista que você já tem (com blocos, se quiser).'
+            : 'Quem administra ainda não adicionou músicas.'}
         </EmptyState>
+      ) : !hasBlocks ? (
+        <ol className="card divide-y divide-border">{setlist.items.map(row)}</ol>
       ) : (
-        <ol className="card divide-y divide-border">
-          {setlist.items.map((item, index) => (
-            <ItemRow
-              key={item.id}
-              setlistId={setlist.id}
-              item={item}
-              index={index}
-              count={setlist.items.length}
-              isAdmin={isAdmin}
-              canSuggest={canSuggest}
-              onPlay={() => navigate(`/repertorios/${setlist.id}/tocar/${index}`)}
-              onMove={(d) => move(index, d)}
-              onSuggest={() => setSuggestFor(item)}
-            />
-          ))}
-        </ol>
+        <div className="space-y-4">
+          {groups[0].items.length > 0 && (
+            <section>
+              <p className="mb-2 px-1 text-xs font-bold tracking-widest text-muted uppercase">Sem bloco</p>
+              <ol className="card divide-y divide-border">{groups[0].items.map(row)}</ol>
+            </section>
+          )}
+          {groups.slice(1).map(({ block, items }, bi) => {
+            const b = block!
+            const color = blockColor(bi)
+            return (
+              <section key={b.id} className="card overflow-hidden" style={{ borderColor: `${color}55` }}>
+                {/* Cabeçalho do bloco: grande e colorido, como na folha de papel */}
+                <header
+                  className="flex items-center gap-3 border-b border-border px-4 py-3"
+                  style={{ background: `linear-gradient(90deg, ${color}26, transparent 70%)` }}
+                >
+                  <span className="h-10 w-1.5 shrink-0 rounded-full" style={{ background: color }} />
+                  <div className="min-w-0 flex-1">
+                    <h3 className="truncate text-lg leading-tight font-extrabold tracking-tight uppercase" style={{ color }}>
+                      {b.name}
+                    </h3>
+                    <p className="truncate text-sm text-muted">
+                      {[blockSubtitle(b), `${items.length} ${items.length === 1 ? 'música' : 'músicas'}`].filter(Boolean).join(' · ')}
+                    </p>
+                    {b.notes && <p className="mt-0.5 truncate text-xs text-muted italic">{b.notes}</p>}
+                  </div>
+                  {isAdmin && organizing && (
+                    <div className="flex shrink-0 items-center">
+                      <button
+                        className="grid size-8 place-items-center rounded-lg text-muted hover:bg-surface-2 hover:text-text disabled:opacity-30"
+                        onClick={() => moveBlock(b.id, -1)}
+                        disabled={bi === 0}
+                        aria-label={`Subir o ${b.name}`}
+                      >
+                        <ChevronsUp className="size-4" />
+                      </button>
+                      <button
+                        className="grid size-8 place-items-center rounded-lg text-muted hover:bg-surface-2 hover:text-text disabled:opacity-30"
+                        onClick={() => moveBlock(b.id, 1)}
+                        disabled={bi === setlist.blocks.length - 1}
+                        aria-label={`Descer o ${b.name}`}
+                      >
+                        <ChevronsDown className="size-4" />
+                      </button>
+                      <button
+                        className="grid size-8 place-items-center rounded-lg text-muted hover:bg-surface-2 hover:text-text"
+                        onClick={() => setEditingBlock(b)}
+                        aria-label={`Editar o ${b.name}`}
+                      >
+                        <Pencil className="size-4" />
+                      </button>
+                    </div>
+                  )}
+                </header>
+                {items.length > 0 ? (
+                  <ol className="divide-y divide-border">{items.map(row)}</ol>
+                ) : (
+                  <p className="px-4 py-4 text-sm text-muted">Nenhuma música neste bloco ainda.</p>
+                )}
+                {isAdmin && (
+                  <button
+                    className="flex w-full items-center gap-2 border-t border-border px-4 py-2.5 text-sm font-medium text-muted transition hover:bg-surface-2 hover:text-text"
+                    onClick={() => setAdding({ blockId: b.id })}
+                  >
+                    <Plus className="size-4" /> Adicionar música no {b.name}
+                  </button>
+                )}
+              </section>
+            )
+          })}
+        </div>
       )}
 
       <div className="flex flex-wrap gap-2">
-        {isAdmin && setlist.items.length > 0 && (
-          <button className="btn-ghost" onClick={() => setAdding(true)}>
-            <Plus className="size-4" /> Adicionar música
-          </button>
+        {isAdmin && (setlist.items.length > 0 || hasBlocks) && (
+          <>
+            {!hasBlocks && (
+              <button className="btn-ghost" onClick={() => setAdding({ blockId: null })}>
+                <Plus className="size-4" /> Adicionar música
+              </button>
+            )}
+            <button className="btn-ghost" onClick={() => setEditingBlock('new')}>
+              <Layers className="size-4" /> Novo bloco
+            </button>
+            <button className="btn-ghost" onClick={() => setPasting(true)}>
+              <ClipboardPaste className="size-4" /> Colar lista
+            </button>
+          </>
         )}
         {canSuggest && (
           <button className="btn-ghost" onClick={() => setSuggestFor('general')}>
@@ -85,7 +257,25 @@ export function SongsPanel({ setlist }: { setlist: SetlistDetail }) {
         )}
       </div>
 
-      {isAdmin && <AddSongDialog open={adding} onClose={() => setAdding(false)} setlist={setlist} />}
+      {isAdmin && (
+        <>
+          <AddSongDialog
+            open={adding !== null}
+            onClose={() => setAdding(null)}
+            setlist={setlist}
+            blockId={adding?.blockId ?? null}
+            blockName={setlist.blocks.find((b) => b.id === adding?.blockId)?.name ?? null}
+          />
+          <ImportTextDialog setlistId={setlist.id} open={pasting} onClose={() => setPasting(false)} />
+          <BlockDialog
+            setlistId={setlist.id}
+            open={editingBlock !== null}
+            block={editingBlock === 'new' ? null : editingBlock}
+            onClose={() => setEditingBlock(null)}
+            suggestedName={`Bloco ${setlist.blocks.length + 1}`}
+          />
+        </>
+      )}
       <SuggestDialog setlist={setlist} target={suggestFor} onClose={() => setSuggestFor(null)} />
     </div>
   )
@@ -97,6 +287,7 @@ function ItemRow({
   index,
   count,
   isAdmin,
+  organizing,
   canSuggest,
   onPlay,
   onMove,
@@ -107,6 +298,8 @@ function ItemRow({
   index: number
   count: number
   isAdmin: boolean
+  /** Mostra os controles (ordem, tom, observação, tirar). Sem isso, a lista fica limpa. */
+  organizing: boolean
   canSuggest: boolean
   onPlay: () => void
   onMove: (delta: number) => void
@@ -125,7 +318,8 @@ function ItemRow({
       { onError: (e) => toast(e.message, 'error') },
     )
 
-  const keyControl = isAdmin ? (
+  const editing = isAdmin && organizing
+  const keyControl = editing ? (
     <select
       className="h-9 max-w-28 min-w-0 rounded-lg border border-border bg-surface-2 px-2 font-mono text-sm font-bold text-chord"
       value={item.key ?? ''}
@@ -138,6 +332,14 @@ function ItemRow({
         <option key={k}>{k}</option>
       ))}
     </select>
+  ) : key ? (
+    // Tom em destaque, para ler de longe
+    <span
+      className="grid h-9 min-w-11 place-items-center rounded-lg bg-accent/12 px-2 font-mono text-base font-black text-chord"
+      title="Tom"
+    >
+      {key}
+    </span>
   ) : (
     <KeyBadge value={key} />
   )
@@ -150,13 +352,29 @@ function ItemRow({
           <SongCover song={item.song} className="size-12 rounded-lg shadow-md shadow-black/30" />
         </button>
         <button className="min-w-0 flex-1 text-left" onClick={onPlay}>
-          <p className="line-clamp-2 leading-snug font-semibold break-words sm:truncate">{item.song.title}</p>
+          <p className="line-clamp-2 leading-snug font-semibold break-words sm:truncate">
+            {item.song.title}
+            {!item.song.hasContent && (
+              <span className="ml-1.5 inline-block rounded bg-surface-2 px-1.5 py-px align-[1px] text-[10px] font-semibold tracking-wide text-muted uppercase">
+                sem cifra
+              </span>
+            )}
+          </p>
           <p className="truncate text-sm text-muted">
-            {[item.song.artist, item.bpm ?? item.song.bpm ? `${item.bpm ?? item.song.bpm} BPM` : null].filter(Boolean).join(' · ')}
+            {[item.song.artist, (item.bpm ?? item.song.bpm) ? `${item.bpm ?? item.song.bpm} BPM` : null].filter(Boolean).join(' · ')}
           </p>
         </button>
         {/* No celular o tom desce para a linha de ações: o nome da música fica legível. */}
-        <div className="hidden sm:block">{keyControl}</div>
+        {canSuggest && (
+          <button
+            className="grid size-9 shrink-0 place-items-center rounded-lg text-muted hover:bg-surface-2 hover:text-text"
+            onClick={onSuggest}
+            aria-label={`Sugerir algo sobre ${item.song.title}`}
+          >
+            <Lightbulb className="size-4" />
+          </button>
+        )}
+        <div className={editing ? 'hidden sm:block' : ''}>{keyControl}</div>
       </div>
 
       {item.personalKey && item.personalKey !== key && (
@@ -193,44 +411,52 @@ function ItemRow({
       )}
 
       {/* Celular: sem recuo e sem "Abrir" (tocar no nome já abre); o tom vem para esta linha. */}
-      <div className="mt-2 flex items-center gap-1 sm:pl-[5.5rem]">
-        <div className="mr-1 sm:hidden">{keyControl}</div>
-        <button className="hidden h-8 items-center gap-1.5 rounded-lg px-2 text-xs font-medium text-accent hover:bg-accent/10 sm:inline-flex" onClick={onPlay}>
-          <Play className="size-3.5" /> Abrir
-        </button>
-        {isAdmin && (
-          <>
-            <button className="grid size-8 shrink-0 place-items-center rounded-lg text-muted hover:bg-surface-2 hover:text-text disabled:opacity-30" onClick={() => onMove(-1)} disabled={index === 0} aria-label="Subir na ordem">
-              <ArrowUp className="size-4" />
-            </button>
-            <button className="grid size-8 shrink-0 place-items-center rounded-lg text-muted hover:bg-surface-2 hover:text-text disabled:opacity-30" onClick={() => onMove(1)} disabled={index === count - 1} aria-label="Descer na ordem">
-              <ArrowDown className="size-4" />
-            </button>
-            <button
-              className="grid size-8 shrink-0 place-items-center rounded-lg text-muted hover:bg-surface-2 hover:text-text"
-              onClick={() => {
-                setNotes(item.notes ?? '')
-                setEditingNotes(true)
-              }}
-              aria-label="Observação desta música no repertório"
-            >
-              <StickyNote className="size-4" />
-            </button>
-            <button
-              className="ml-auto grid size-8 shrink-0 place-items-center rounded-lg text-muted hover:bg-danger/10 hover:text-danger"
-              onClick={() => confirm(`Tirar "${item.song.title}" do repertório?`) && remove.mutate(item.id, { onError: (e) => toast(e.message, 'error') })}
-              aria-label="Tirar do repertório"
-            >
-              <Trash2 className="size-4" />
-            </button>
-          </>
-        )}
-        {canSuggest && (
-          <button className="inline-flex h-8 items-center gap-1.5 rounded-lg px-2 text-xs text-muted hover:bg-surface-2 hover:text-text" onClick={onSuggest}>
-            <Lightbulb className="size-3.5" /> Sugerir
+      {editing && (
+        <div className="mt-2 flex items-center gap-1 sm:pl-[5.5rem]">
+          <div className="mr-1 sm:hidden">{keyControl}</div>
+          <button
+            className="hidden h-8 items-center gap-1.5 rounded-lg px-2 text-xs font-medium text-accent hover:bg-accent/10 sm:inline-flex"
+            onClick={onPlay}
+          >
+            <Play className="size-3.5" /> Abrir
           </button>
-        )}
-      </div>
+          <button
+            className="grid size-8 shrink-0 place-items-center rounded-lg text-muted hover:bg-surface-2 hover:text-text disabled:opacity-30"
+            onClick={() => onMove(-1)}
+            disabled={index === 0}
+            aria-label="Subir na ordem"
+          >
+            <ArrowUp className="size-4" />
+          </button>
+          <button
+            className="grid size-8 shrink-0 place-items-center rounded-lg text-muted hover:bg-surface-2 hover:text-text disabled:opacity-30"
+            onClick={() => onMove(1)}
+            disabled={index === count - 1}
+            aria-label="Descer na ordem"
+          >
+            <ArrowDown className="size-4" />
+          </button>
+          <button
+            className="grid size-8 shrink-0 place-items-center rounded-lg text-muted hover:bg-surface-2 hover:text-text"
+            onClick={() => {
+              setNotes(item.notes ?? '')
+              setEditingNotes(true)
+            }}
+            aria-label="Observação desta música no repertório"
+          >
+            <StickyNote className="size-4" />
+          </button>
+          <button
+            className="ml-auto grid size-8 shrink-0 place-items-center rounded-lg text-muted hover:bg-danger/10 hover:text-danger"
+            onClick={() =>
+              confirm(`Tirar "${item.song.title}" do repertório?`) && remove.mutate(item.id, { onError: (e) => toast(e.message, 'error') })
+            }
+            aria-label="Tirar do repertório"
+          >
+            <Trash2 className="size-4" />
+          </button>
+        </div>
+      )}
     </li>
   )
 }
@@ -251,7 +477,12 @@ function SuggestionsBox({ setlist }: { setlist: SetlistDetail }) {
             <li key={s.id} className="rounded-xl bg-surface-2 p-3 text-sm">
               <p>
                 <b>{s.authorName}</b>
-                {itemTitle(s.itemId) && <> sobre <b>{itemTitle(s.itemId)}</b></>}
+                {itemTitle(s.itemId) && (
+                  <>
+                    {' '}
+                    sobre <b>{itemTitle(s.itemId)}</b>
+                  </>
+                )}
                 {s.proposedKey && (
                   <>
                     : tocar em <b className="font-mono text-chord">{s.proposedKey}</b>
@@ -265,7 +496,10 @@ function SuggestionsBox({ setlist }: { setlist: SetlistDetail }) {
                   onClick={() =>
                     resolve.mutate(
                       { sid: s.id, status: 'accepted' },
-                      { onSuccess: () => toast(s.proposedKey ? `Tom trocado para ${s.proposedKey}.` : 'Sugestão aceita.'), onError: (e) => toast(e.message, 'error') },
+                      {
+                        onSuccess: () => toast(s.proposedKey ? `Tom trocado para ${s.proposedKey}.` : 'Sugestão aceita.'),
+                        onError: (e) => toast(e.message, 'error'),
+                      },
                     )
                   }
                 >
@@ -295,7 +529,12 @@ function MySuggestions({ setlist }: { setlist: SetlistDetail }) {
               {s.proposedKey && ` → ${s.proposedKey}`}
               {s.message && ` · “${s.message}”`}
             </span>
-            <span className={clsx('shrink-0 text-xs font-semibold', s.status === 'accepted' ? 'text-ok' : s.status === 'rejected' ? 'text-danger' : 'text-muted')}>
+            <span
+              className={clsx(
+                'shrink-0 text-xs font-semibold',
+                s.status === 'accepted' ? 'text-ok' : s.status === 'rejected' ? 'text-danger' : 'text-muted',
+              )}
+            >
               {label[s.status]}
             </span>
           </li>
@@ -305,7 +544,15 @@ function MySuggestions({ setlist }: { setlist: SetlistDetail }) {
   )
 }
 
-function SuggestDialog({ setlist, target, onClose }: { setlist: SetlistDetail; target: SetlistItem | null | 'general'; onClose: () => void }) {
+function SuggestDialog({
+  setlist,
+  target,
+  onClose,
+}: {
+  setlist: SetlistDetail
+  target: SetlistItem | null | 'general'
+  onClose: () => void
+}) {
   const suggest = useSuggest(setlist.id)
   const toast = useToast()
   const [key, setKey] = useState('')

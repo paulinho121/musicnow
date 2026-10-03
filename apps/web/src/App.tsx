@@ -12,7 +12,7 @@ import { Importer } from './pages/Importer'
 import { InviteAccept } from './pages/InviteAccept'
 import { Library } from './pages/Library'
 import { ForgotPassword, ResetPassword } from './pages/PasswordReset'
-import { PrintSetlist, PrintSong } from './pages/PrintView'
+import { PrintSetlist, PrintSong, PrintStageSheet } from './pages/PrintView'
 import { Profile } from './pages/Profile'
 import { SetlistDetail } from './pages/SetlistDetail'
 import { SetlistForm } from './pages/SetlistForm'
@@ -64,6 +64,7 @@ export const router = createBrowserRouter([
       { path: '/repertorios/:id/tocar/:pos', element: <SetlistPlay /> },
       { path: '/musicas/:id/imprimir', element: <PrintSong /> },
       { path: '/repertorios/:id/imprimir', element: <PrintSetlist /> },
+      { path: '/repertorios/:id/folha', element: <PrintStageSheet /> },
       {
         element: <Layout />,
         children: [

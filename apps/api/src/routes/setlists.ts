@@ -1,5 +1,5 @@
-import { atLeast, isChord, type SetlistRole } from '@ensaio/shared'
-import { and, asc, desc, eq, gt, isNull, or, sql } from 'drizzle-orm'
+import { atLeast, isChord, normalizeSearch, parseSetlistText, type SetlistRole } from '@ensaio/shared'
+import { and, asc, desc, eq, gt, ilike, isNull, or, sql } from 'drizzle-orm'
 import { Hono } from 'hono'
 import { createMiddleware } from 'hono/factory'
 import { streamSSE } from 'hono/streaming'
@@ -27,7 +27,7 @@ import {
 } from '../realtime'
 import { canViewSong } from './songs'
 
-const { setlist, setlistItem, setlistMember, setlistSuggestion, invite, song, user, userInstrument, songUserState, changeLog } =
+const { setlist, setlistItem, setlistBlock, setlistMember, setlistSuggestion, invite, song, user, userInstrument, songUserState, changeLog } =
   schema
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0]
@@ -56,6 +56,34 @@ async function touch(tx: Tx, setlistId: string, userId: string, action: string, 
     .set({ revision: sql`${setlist.revision} + 1`, updatedAt: new Date() })
     .where(eq(setlist.id, setlistId))
   await tx.insert(changeLog).values({ entityType: 'setlist', entityId: setlistId, userId, action, diff: diff ?? null })
+}
+
+/**
+ * Deixa as posições contínuas na ordem de tocar: primeiro as músicas sem bloco,
+ * depois cada bloco na sua ordem (e, dentro dele, na ordem das músicas).
+ */
+async function renumber(tx: Tx, setlistId: string) {
+  await tx.execute(sql`
+    update ${setlistBlock} b set position = r.rn - 1
+    from (select id, row_number() over (order by position, id) as rn from ${setlistBlock} where setlist_id = ${setlistId}) r
+    where b.id = r.id`)
+  await tx.execute(sql`
+    update ${setlistItem} si set position = r.rn - 1
+    from (
+      select i.id, row_number() over (order by (b.id is not null), b.position, i.position, i.id) as rn
+      from ${setlistItem} i left join ${setlistBlock} b on b.id = i.block_id
+      where i.setlist_id = ${setlistId}
+    ) r
+    where si.id = r.id`)
+}
+
+async function requireBlock(tx: Tx, setlistId: string, blockId: string) {
+  const [b] = await tx
+    .select({ id: setlistBlock.id, name: setlistBlock.name })
+    .from(setlistBlock)
+    .where(and(eq(setlistBlock.id, blockId), eq(setlistBlock.setlistId, setlistId)))
+  if (!b) notFound('Bloco')
+  return b
 }
 
 /**
@@ -105,6 +133,13 @@ const setlistInput = z.object({
   groupName: z.string().trim().max(120).nullish(),
   notes: z.string().trim().max(5000).nullish(),
   status: z.enum(schema.setlistStatus.enumValues).default('rascunho'),
+})
+
+const blockInput = z.object({
+  name: z.string().trim().min(1, 'Dê um nome ao bloco').max(80),
+  style: z.string().trim().max(80).nullish(),
+  bpm: z.number().int().min(20).max(320).nullish(),
+  notes: z.string().trim().max(500).nullish(),
 })
 
 const itemInput = z.object({
@@ -170,10 +205,11 @@ export const setlistsRoutes = new Hono<AppEnv>()
       .innerJoin(user, eq(user.id, setlist.ownerId))
       .where(eq(setlist.id, id))
 
-    const [items, members, suggestions, invites, parent] = await Promise.all([
+    const [items, members, suggestions, invites, parent, blocks] = await Promise.all([
       db
         .select({
           id: setlistItem.id,
+          blockId: setlistItem.blockId,
           position: setlistItem.position,
           key: setlistItem.key,
           bpm: setlistItem.bpm,
@@ -186,6 +222,7 @@ export const setlistsRoutes = new Hono<AppEnv>()
             bpm: song.bpm,
             timeSignature: song.timeSignature,
             coverUrl: song.coverUrl,
+            hasContent: sql<boolean>`length(${song.content}) > 0`,
           },
           personalKey: songUserState.personalKey,
         })
@@ -258,6 +295,11 @@ export const setlistsRoutes = new Hono<AppEnv>()
             .where(and(eq(setlist.id, s.setlist.parentId), or(eq(setlist.ownerId, uid), eq(setlistMember.userId, uid))))
             .then((r) => r[0] ?? null)
         : Promise.resolve(null),
+      db
+        .select({ id: setlistBlock.id, name: setlistBlock.name, style: setlistBlock.style, bpm: setlistBlock.bpm, notes: setlistBlock.notes })
+        .from(setlistBlock)
+        .where(eq(setlistBlock.setlistId, id))
+        .orderBy(asc(setlistBlock.position)),
     ])
 
     const [ownerInstrument] = await db
@@ -270,6 +312,7 @@ export const setlistsRoutes = new Hono<AppEnv>()
       ownerName: s.ownerName,
       role,
       parent,
+      blocks,
       items,
       members: [
         {
@@ -447,10 +490,20 @@ export const setlistsRoutes = new Hono<AppEnv>()
             status: 'rascunho',
           })
           .returning({ id: setlist.id })
+        const blocks = await tx.select().from(setlistBlock).where(eq(setlistBlock.setlistId, id))
+        const blockMap = new Map<string, string>()
+        for (const { id: oldId, setlistId: _s, ...b } of blocks) {
+          const [nb] = await tx.insert(setlistBlock).values({ ...b, setlistId: copy.id }).returning({ id: setlistBlock.id })
+          blockMap.set(oldId, nb.id)
+        }
         const items = await tx.select().from(setlistItem).where(eq(setlistItem.setlistId, id)).orderBy(asc(setlistItem.position))
         if (items.length) {
           await tx.insert(setlistItem).values(
-            items.map(({ id: _id, setlistId: _s, ...it }) => ({ ...it, setlistId: copy.id })),
+            items.map(({ id: _id, setlistId: _s, blockId, ...it }) => ({
+              ...it,
+              setlistId: copy.id,
+              blockId: blockId ? (blockMap.get(blockId) ?? null) : null,
+            })),
           )
         }
         await tx.insert(changeLog).values({
@@ -471,23 +524,26 @@ export const setlistsRoutes = new Hono<AppEnv>()
   .post(
     '/:id/items',
     validate('param', idParam),
-    validate('json', itemInput.extend({ songId: z.string().uuid() })),
+    validate('json', itemInput.extend({ songId: z.string().uuid(), blockId: z.string().uuid().nullish() })),
     async (c) => {
       const uid = c.var.user.id
       const { id } = c.req.valid('param')
-      const { songId, ...input } = c.req.valid('json')
+      const { songId, blockId, ...input } = c.req.valid('json')
       await requireRole(id, uid, 'admin')
       const [visible] = await db.select({ id: song.id, title: song.title }).from(song).where(and(eq(song.id, songId), canViewSong(uid)))
       if (!visible) notFound('Música')
       const item = await db.transaction(async (tx) => {
+        if (blockId) await requireBlock(tx, id, blockId)
         const [{ next }] = await tx
           .select({ next: sql<number>`coalesce(max(${setlistItem.position}) + 1, 0)::int` })
           .from(setlistItem)
           .where(eq(setlistItem.setlistId, id))
         const [row] = await tx
           .insert(setlistItem)
-          .values({ ...input, setlistId: id, songId, position: next })
+          .values({ ...input, setlistId: id, songId, blockId: blockId ?? null, position: next })
           .returning({ id: setlistItem.id })
+        // Entra no fim do bloco escolhido.
+        if (blockId) await renumber(tx, id)
         await touch(tx, id, uid, 'add_song', { songId, title: visible.title })
         return row
       })
@@ -528,10 +584,7 @@ export const setlistsRoutes = new Hono<AppEnv>()
         .returning({ songId: setlistItem.songId })
       if (!deleted.length) notFound('Música do repertório')
       // Mantém as posições contínuas (0, 1, 2...).
-      await tx.execute(sql`
-        update ${setlistItem} si set position = r.rn - 1
-        from (select id, row_number() over (order by position) as rn from ${setlistItem} where setlist_id = ${id}) r
-        where si.id = r.id`)
+      await renumber(tx, id)
       await touch(tx, id, uid, 'remove_song', { songId: deleted[0].songId })
     })
     return c.body(null, 204)
@@ -540,23 +593,207 @@ export const setlistsRoutes = new Hono<AppEnv>()
   .put(
     '/:id/order',
     validate('param', idParam),
-    validate('json', z.object({ itemIds: z.array(z.string().uuid()).max(300) })),
+    validate(
+      'json',
+      z.union([
+        z.object({ itemIds: z.array(z.string().uuid()).max(300) }),
+        // Com blocos: a ordem dos blocos e das músicas dentro de cada um (blockId null = sem bloco).
+        z.object({
+          layout: z.array(z.object({ blockId: z.string().uuid().nullable(), itemIds: z.array(z.string().uuid()).max(300) })).max(61),
+        }),
+      ]),
+    ),
     async (c) => {
       const uid = c.var.user.id
       const { id } = c.req.valid('param')
-      const { itemIds } = c.req.valid('json')
+      const body = c.req.valid('json')
       await requireRole(id, uid, 'admin')
+      const layout = 'layout' in body ? body.layout : null
+      const itemIds = 'layout' in body ? body.layout.flatMap((g) => g.itemIds) : body.itemIds
+      const conflict = () => {
+        throw new HTTPException(409, { message: 'O repertório mudou enquanto você reordenava. Atualize e tente de novo.' })
+      }
       await db.transaction(async (tx) => {
         const current = await tx.select({ id: setlistItem.id }).from(setlistItem).where(eq(setlistItem.setlistId, id))
         const same =
           current.length === itemIds.length && new Set(itemIds).size === itemIds.length && current.every((r) => itemIds.includes(r.id))
-        if (!same) throw new HTTPException(409, { message: 'O repertório mudou enquanto você reordenava. Atualize e tente de novo.' })
-        for (const [position, itemId] of itemIds.entries()) {
-          await tx.update(setlistItem).set({ position }).where(eq(setlistItem.id, itemId))
+        if (!same) conflict()
+        if (layout) {
+          const blocks = await tx.select({ id: setlistBlock.id }).from(setlistBlock).where(eq(setlistBlock.setlistId, id))
+          const listed = layout.flatMap((g) => (g.blockId ? [g.blockId] : []))
+          if (listed.length !== blocks.length || new Set(listed).size !== listed.length || !blocks.every((b) => listed.includes(b.id)))
+            conflict()
+          for (const [position, blockId] of listed.entries()) {
+            await tx.update(setlistBlock).set({ position }).where(eq(setlistBlock.id, blockId))
+          }
+          let position = 0
+          // Sem bloco primeiro, como na tela.
+          for (const g of [...layout.filter((g) => !g.blockId), ...layout.filter((g) => g.blockId)]) {
+            for (const itemId of g.itemIds) {
+              await tx.update(setlistItem).set({ position: position++, blockId: g.blockId }).where(eq(setlistItem.id, itemId))
+            }
+          }
+        } else {
+          for (const [position, itemId] of itemIds.entries()) {
+            await tx.update(setlistItem).set({ position }).where(eq(setlistItem.id, itemId))
+          }
+          await renumber(tx, id)
         }
         await touch(tx, id, uid, 'reorder')
       })
       return c.json({ ok: true })
+    },
+  )
+
+  // ---------------------------------------------------------------- blocos
+
+  .post('/:id/blocks', validate('param', idParam), validate('json', blockInput), async (c) => {
+    const uid = c.var.user.id
+    const { id } = c.req.valid('param')
+    const input = c.req.valid('json')
+    await requireRole(id, uid, 'admin')
+    const block = await db.transaction(async (tx) => {
+      const [{ count }] = await tx
+        .select({ count: sql<number>`count(*)::int` })
+        .from(setlistBlock)
+        .where(eq(setlistBlock.setlistId, id))
+      if (count >= 60) throw new HTTPException(400, { message: 'Limite de 60 blocos por repertório.' })
+      const [row] = await tx
+        .insert(setlistBlock)
+        .values({ ...input, setlistId: id, position: count })
+        .returning({ id: setlistBlock.id })
+      await touch(tx, id, uid, 'add_block', { name: input.name })
+      return row
+    })
+    return c.json(block, 201)
+  })
+
+  .put(
+    '/:id/blocks/:blockId',
+    validate('param', idParam.extend({ blockId: z.string().uuid() })),
+    validate('json', blockInput),
+    async (c) => {
+      const uid = c.var.user.id
+      const { id, blockId } = c.req.valid('param')
+      const input = c.req.valid('json')
+      await requireRole(id, uid, 'admin')
+      await db.transaction(async (tx) => {
+        await requireBlock(tx, id, blockId)
+        await tx
+          .update(setlistBlock)
+          .set({ name: input.name, style: input.style ?? null, bpm: input.bpm ?? null, notes: input.notes ?? null })
+          .where(eq(setlistBlock.id, blockId))
+        await touch(tx, id, uid, 'update_block', { name: input.name })
+      })
+      return c.json({ id: blockId })
+    },
+  )
+
+  // Apagar o bloco não tira as músicas do repertório: elas ficam "sem bloco".
+  .delete('/:id/blocks/:blockId', validate('param', idParam.extend({ blockId: z.string().uuid() })), async (c) => {
+    const uid = c.var.user.id
+    const { id, blockId } = c.req.valid('param')
+    await requireRole(id, uid, 'admin')
+    await db.transaction(async (tx) => {
+      const b = await requireBlock(tx, id, blockId)
+      await tx.delete(setlistBlock).where(eq(setlistBlock.id, blockId))
+      await renumber(tx, id)
+      await touch(tx, id, uid, 'remove_block', { name: b.name })
+    })
+    return c.body(null, 204)
+  })
+
+  // Colar o repertório em texto ("BLOCO 2 (Marília - 130)" / "Fada - A"): cria os blocos e
+  // procura cada música na biblioteca. A que não existe vira uma música só com nome e tom.
+  .post(
+    '/:id/import-text',
+    validate('param', idParam),
+    validate('json', z.object({ text: z.string().max(20_000) })),
+    async (c) => {
+      const uid = c.var.user.id
+      const { id } = c.req.valid('param')
+      const { text } = c.req.valid('json')
+      await requireRole(id, uid, 'admin')
+      const parsed = parseSetlistText(text)
+      const total = parsed.loose.length + parsed.blocks.reduce((n, b) => n + b.songs.length, 0)
+      if (total === 0 && parsed.blocks.length === 0)
+        throw new HTTPException(400, { message: 'Não encontramos músicas no texto. Use uma música por linha, como "Fada - A".' })
+
+      const result = await db.transaction(async (tx) => {
+        const [counts] = await tx
+          .select({
+            items: sql<number>`(select count(*)::int from ${setlistItem} where setlist_id = ${id})`,
+            blocks: sql<number>`(select count(*)::int from ${setlistBlock} where setlist_id = ${id})`,
+          })
+          .from(setlist)
+          .where(eq(setlist.id, id))
+        if (counts.items + total > 300) throw new HTTPException(400, { message: 'Limite de 300 músicas por repertório.' })
+        if (counts.blocks + parsed.blocks.length > 60) throw new HTTPException(400, { message: 'Limite de 60 blocos por repertório.' })
+
+        let found = 0
+        const created: string[] = []
+        const cache = new Map<string, { id: string; originalKey: string | null }>()
+        // Procura pelo título (sem acento nem maiúscula). Prefere as músicas da própria pessoa.
+        const resolve = async (title: string, key: string | null) => {
+          const norm = normalizeSearch(title)
+          const hit = cache.get(norm)
+          if (hit) return hit
+          const candidates = await tx
+            .select({ id: song.id, title: song.title, originalKey: song.originalKey, ownerId: song.ownerId })
+            .from(song)
+            .where(and(canViewSong(uid), ilike(song.searchText, `%${norm.replace(/[%_\\]/g, '\\$&')}%`)))
+            .limit(30)
+          const match = candidates
+            .filter((s) => normalizeSearch(s.title) === norm)
+            .sort((a, b) => Number(b.ownerId === uid) - Number(a.ownerId === uid))[0]
+          if (match) {
+            found++
+            cache.set(norm, match)
+            return match
+          }
+          const [row] = await tx
+            .insert(song)
+            .values({
+              ownerId: uid,
+              title: title.slice(0, 200),
+              originalKey: key,
+              content: '',
+              visibility: 'private',
+              lyricsAuthorized: true,
+              tags: ['sem cifra'],
+              searchText: normalizeSearch([title, key, 'sem cifra'].filter(Boolean).join(' ')),
+            })
+            .returning({ id: song.id, originalKey: song.originalKey })
+          created.push(title)
+          cache.set(norm, row)
+          return row
+        }
+
+        let position = 100_000 // entra no fim; o renumber acerta as posições
+        const add = async (t: { title: string; key: string | null }, blockId: string | null) => {
+          const s = await resolve(t.title, t.key)
+          await tx.insert(setlistItem).values({
+            setlistId: id,
+            songId: s.id,
+            blockId,
+            position: position++,
+            // O tom da lista vale para este repertório (quando é diferente do original da música).
+            key: t.key && t.key !== s.originalKey ? t.key : null,
+          })
+        }
+        for (const t of parsed.loose) await add(t, null)
+        for (const [i, b] of parsed.blocks.entries()) {
+          const [nb] = await tx
+            .insert(setlistBlock)
+            .values({ setlistId: id, position: counts.blocks + i, name: b.name.slice(0, 80), style: b.style?.slice(0, 80) ?? null, bpm: b.bpm })
+            .returning({ id: setlistBlock.id })
+          for (const t of b.songs) await add(t, nb.id)
+        }
+        await renumber(tx, id)
+        await touch(tx, id, uid, 'import_text', { songs: total, blocks: parsed.blocks.length, created: created.length })
+        return { songs: total, blocks: parsed.blocks.length, found, created }
+      })
+      return c.json(result, 201)
     },
   )
 
