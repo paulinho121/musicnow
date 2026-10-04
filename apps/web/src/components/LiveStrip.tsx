@@ -109,22 +109,39 @@ export function LiveStrip({ live }: { live: LiveControls }) {
   return (
     <>
       <div className="flex min-h-11 items-center gap-2 border-b border-border px-3 py-1.5">{body}</div>
-      <Sheet open={open} onClose={() => setOpen(false)} title="Quem está conectado">
+      <Sheet open={open} onClose={() => setOpen(false)} title="Músicos Conectados no Modo Ao Vivo">
         <ul className="divide-y divide-border">
           {live.presence.map((p) => (
-            <li key={p.userId} className="flex items-center gap-3 py-2.5 text-sm">
-              <span className="grid size-9 shrink-0 place-items-center rounded-full bg-surface-2 font-semibold">{p.name.slice(0, 1).toUpperCase()}</span>
-              <span className="min-w-0 flex-1 truncate">{p.name}</span>
-              <span className="shrink-0 text-xs text-muted">
-                {p.leading ? '👑 comandando' : p.following ? 'seguindo' : 'livre'}
-                {p.devices > 1 && ` · ${p.devices} aparelhos`}
+            <li key={p.userId} className="flex items-center gap-3 py-3 text-sm">
+              <div className="relative grid size-9 shrink-0 place-items-center rounded-full bg-surface-2 font-bold text-xs uppercase text-text border border-border">
+                {p.name.slice(0, 1).toUpperCase()}
+                <span className="absolute -bottom-0.5 -right-0.5 size-2.5 rounded-full bg-emerald-500 ring-2 ring-surface" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="truncate font-semibold text-text">{p.name}</p>
+                <p className="text-xs text-muted">
+                  {p.devices > 1 ? `${p.devices} aparelhos conectados` : '1 aparelho'}
+                </p>
+              </div>
+              <span
+                className={clsx(
+                  'shrink-0 rounded-lg px-2.5 py-1 text-xs font-semibold',
+                  p.leading
+                    ? 'border border-amber-500/30 bg-amber-500/10 text-amber-300'
+                    : p.following
+                      ? 'border border-emerald-500/30 bg-emerald-500/10 text-emerald-400'
+                      : 'border border-border bg-surface-2 text-muted',
+                )}
+              >
+                {p.leading ? '👑 Mestre / Comandando' : p.following ? '🔗 Seguindo ao vivo' : 'Navegação livre'}
               </span>
             </li>
           ))}
         </ul>
-        <p className="mt-3 text-xs text-muted">
-          “Seguindo” muda de música junto com quem comanda. “Livre” navega por conta própria.
-        </p>
+        <div className="mt-4 rounded-xl bg-surface-2 p-3 text-xs text-muted space-y-1">
+          <p className="font-semibold text-text">Como funciona a sincronização:</p>
+          <p>• Quem está <b className="text-emerald-400">Seguindo</b> tem a cifra/música trocada automaticamente sempre que o <b className="text-amber-300">Mestre</b> seleciona outra música no repertório.</p>
+        </div>
       </Sheet>
     </>
   )

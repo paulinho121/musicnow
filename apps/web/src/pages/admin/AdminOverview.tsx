@@ -17,10 +17,69 @@ export function AdminOverview() {
   if (isLoading) return <PageSpinner />
   if (error || !data) return <ErrorState error={error} onRetry={() => refetch()} />
 
-  const { users, songs, setlists, scores, reports, visits, activeUsers } = data
+  const { users, songs, setlists, scores, reports, visits, activeUsers, online } = data
+  const onlineList = online?.users ?? []
+  const onlineCount = online?.count ?? 0
 
   return (
     <div className="space-y-6">
+      {/* Card de Usuários Online em Tempo Real */}
+      <div className="card border-emerald-500/30 bg-emerald-950/20 p-4 sm:p-5">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-3">
+            <span className="relative flex size-3.5 shrink-0">
+              <span className="absolute inline-flex size-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+              <span className="relative inline-flex size-3.5 rounded-full bg-emerald-500" />
+            </span>
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="text-base font-bold text-text">Usuários Online em Tempo Real</h2>
+                <span className="rounded-full bg-emerald-500/20 px-2.5 py-0.5 text-xs font-bold text-emerald-400 border border-emerald-500/30">
+                  {onlineCount} {onlineCount === 1 ? 'músico conectado' : 'músicos conectados'}
+                </span>
+              </div>
+              <p className="text-xs text-muted">Atualizado ao vivo a cada poucos segundos</p>
+            </div>
+          </div>
+
+          <Link
+            to="/admin/usuarios"
+            className="flex items-center gap-1 text-xs font-semibold text-emerald-400 hover:underline"
+          >
+            Ver todos os usuários &rarr;
+          </Link>
+        </div>
+
+        {onlineList.length > 0 ? (
+          <div className="mt-4 grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
+            {onlineList.map((u) => (
+              <div
+                key={u.userId}
+                className="flex items-center gap-3 rounded-xl border border-emerald-500/20 bg-surface/80 p-2.5 backdrop-blur shadow-xs"
+              >
+                <div className="relative grid size-9 shrink-0 place-items-center rounded-full bg-surface-2 font-bold text-xs uppercase text-emerald-300 border border-emerald-500/30">
+                  {u.image ? (
+                    <img src={u.image} alt={u.name} className="size-full rounded-full object-cover" />
+                  ) : (
+                    u.name.slice(0, 2)
+                  )}
+                  <span className="absolute bottom-0 right-0 size-2.5 rounded-full bg-emerald-500 ring-2 ring-surface" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-xs font-bold text-text">{u.name}</p>
+                  <p className="truncate text-[10px] text-muted">{u.email}</p>
+                  <p className="truncate font-mono text-[10px] text-emerald-400/90 mt-0.5">
+                    Navegando: {u.path}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="mt-3 text-xs text-muted italic">Nenhum outro usuário ativo no momento.</p>
+        )}
+      </div>
+
       {/* Alerta de moderação se houver denúncias abertas */}
       {reports.open > 0 && (
         <div className="flex items-center justify-between rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-amber-300">

@@ -3,6 +3,7 @@ import { Hono } from 'hono'
 import { z } from 'zod'
 import { db, schema } from '../db'
 import { notFound, requireAdmin, validate, type AppEnv } from '../http'
+import { getGlobalOnlineUsers } from '../realtime'
 
 const { user, profile, song, setlist, songScore, songReport, pageVisit, session } = schema
 
@@ -27,15 +28,17 @@ function parseUserAgent(ua: string | null): { device: string; browser: string } 
 export const adminRoutes = new Hono<AppEnv>()
   .use(requireAdmin)
 
-  // 1. Visão Geral / KPIs
+  // 1. Visão Geral / KPIs com Usuários Online em Tempo Real
   .get('/overview', async (c) => {
+    const onlineUsers = getGlobalOnlineUsers()
+
     const [
       userStats,
       songStats,
       setlistStats,
       scoreStats,
       reportStats,
-      visitStats,
+      visitsStats,
       activeToday,
     ] = await Promise.all([
       db
@@ -100,9 +103,18 @@ export const adminRoutes = new Hono<AppEnv>()
       setlists: setlistStats[0],
       scores: scoreStats[0],
       reports: reportStats[0],
-      visits: visitStats[0],
+      visits: visitsStats[0],
       activeUsers: activeToday[0],
+      online: {
+        count: onlineUsers.length,
+        users: onlineUsers,
+      },
     })
+  })
+
+  // Lista de Usuários Online em Tempo Real
+  .get('/online', (c) => {
+    return c.json({ online: getGlobalOnlineUsers() })
   })
 
   // 2. Tráfego e Fluxo de Visitas
@@ -231,8 +243,19 @@ export const adminRoutes = new Hono<AppEnv>()
           .offset(offset),
       ])
 
+      const onlineMap = new Map(getGlobalOnlineUsers().map((u) => [u.userId, u]))
+
+      const enrichedUsers = rows.map((u) => {
+        const active = onlineMap.get(u.id)
+        return {
+          ...u,
+          isOnline: Boolean(active),
+          currentPath: active?.path ?? null,
+        }
+      })
+
       return c.json({
-        users: rows,
+        users: enrichedUsers,
         total: totalCount[0]?.count ?? 0,
         page,
         totalPages: Math.ceil((totalCount[0]?.count ?? 0) / limit),

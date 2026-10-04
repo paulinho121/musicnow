@@ -113,20 +113,31 @@ export function AdminUsers() {
                 {data.users.map((u) => {
                   const isAdmin = u.role === 'admin'
                   const isBanned = u.banned
+                  const isOnline = u.isOnline
 
                   return (
                     <tr key={u.id} className="hover:bg-surface-2/50 transition">
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-3">
-                          <div className="grid size-8 place-items-center rounded-full bg-surface-2 text-muted font-bold text-xs uppercase overflow-hidden border border-border shrink-0">
+                          <div className="relative grid size-8 place-items-center rounded-full bg-surface-2 text-muted font-bold text-xs uppercase overflow-visible border border-border shrink-0">
                             {u.image ? (
-                              <img src={u.image} alt={u.name} className="size-full object-cover" />
+                              <img src={u.image} alt={u.name} className="size-full rounded-full object-cover" />
                             ) : (
                               u.name.slice(0, 2)
                             )}
+                            {isOnline && (
+                              <span className="absolute -bottom-0.5 -right-0.5 size-2.5 rounded-full bg-emerald-500 ring-2 ring-surface" title={`Online agora (${u.currentPath ?? ''})`} />
+                            )}
                           </div>
                           <div className="min-w-0">
-                            <div className="font-semibold text-text truncate">{u.name}</div>
+                            <div className="flex items-center gap-1.5 font-semibold text-text truncate">
+                              <span>{u.name}</span>
+                              {isOnline && (
+                                <span className="rounded-full bg-emerald-500/15 px-1.5 py-0.2 text-[9px] font-bold text-emerald-400 border border-emerald-500/30">
+                                  Online
+                                </span>
+                              )}
+                            </div>
                             <div className="text-muted text-[11px] truncate">{u.email}</div>
                             {u.city && <div className="text-muted/80 text-[10px] truncate">{u.city}</div>}
                           </div>

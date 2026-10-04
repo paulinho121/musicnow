@@ -4,6 +4,7 @@ import type { AdminOverview, AdminReport, AdminTraffic, AdminUsersResponse } fro
 
 export const adminKeys = {
   overview: ['admin', 'overview'] as const,
+  online: ['admin', 'online'] as const,
   traffic: (days: number) => ['admin', 'traffic', days] as const,
   users: (params: { q?: string; role?: string; page?: number; limit?: number }) => ['admin', 'users', params] as const,
   reports: ['admin', 'reports'] as const,
@@ -13,7 +14,15 @@ export function useAdminOverview() {
   return useQuery({
     queryKey: adminKeys.overview,
     queryFn: () => api<AdminOverview>('/admin/overview'),
-    refetchInterval: 30_000,
+    refetchInterval: 10_000,
+  })
+}
+
+export function useAdminOnlineUsers() {
+  return useQuery({
+    queryKey: adminKeys.online,
+    queryFn: () => api<{ online: AdminOverview['online']['users'] }>('/admin/online'),
+    refetchInterval: 8_000,
   })
 }
 

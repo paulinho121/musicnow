@@ -1,6 +1,6 @@
 import { atLeast } from '@ensaio/shared'
 import clsx from 'clsx'
-import { Archive, ArchiveRestore, ArrowLeft, CalendarDays, Copy, GitBranch, MapPin, MoreVertical, Pencil, Play, Trash2, UserPlus, Users } from 'lucide-react'
+import { Archive, ArchiveRestore, ArrowLeft, CalendarDays, Copy, GitBranch, MapPin, MoreVertical, Pencil, Play, Radio, Trash2, UserPlus, Users } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
 import { BandPanel } from '../components/setlist/BandPanel'
@@ -121,19 +121,27 @@ export function SetlistDetail() {
               Tocando: {s.items[live.stage.position].song.title} · {live.presence.length} conectados
             </span>
           </span>
-          <span className="btn-primary h-9 shrink-0 px-3">Entrar</span>
+          <span className="btn-primary h-9 shrink-0 px-3">Entrar no Modo Ao Vivo</span>
         </button>
       )}
 
       {/* Celular: o botão principal ocupa a linha toda; os outros dividem a de baixo. */}
       <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
-        <button className="btn-primary col-span-2" disabled={!s.items.length} onClick={() => navigate(`/repertorios/${s.id}/tocar/0`)}>
+        {isAdmin && !live.stage && s.items.length > 0 && (
+          <button
+            className="btn-primary col-span-2 sm:col-auto border-red-500/30 bg-red-600 hover:bg-red-700 text-white font-semibold"
+            onClick={() => navigate(`/repertorios/${s.id}/tocar/0?lead=1`)}
+          >
+            <Radio className="size-4 animate-pulse" /> Comandar Banda ao Vivo
+          </button>
+        )}
+        <button className="btn-primary col-span-2 sm:col-auto" disabled={!s.items.length} onClick={() => navigate(`/repertorios/${s.id}/tocar/0`)}>
           <Play className="size-4" /> {s.status === 'ensaio' ? 'Ensaiar' : 'Tocar'}
         </button>
         <ExportButton setlist={s} />
         {isAdmin && (
           <button className="btn-ghost" onClick={() => setParams({ aba: 'banda' }, { replace: true })}>
-            <UserPlus className="size-4" /> Convidar
+            <UserPlus className="size-4" /> Convidar Músicos
           </button>
         )}
       </div>

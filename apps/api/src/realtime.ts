@@ -187,3 +187,47 @@ export function kick(setlistId: string, userId: string) {
       .finally(() => c.close())
   }
 }
+
+// ---------------------------------------------------------------------------
+// Monitoramento Global de Usuários Online em Tempo Real (Super Admin)
+
+export interface GlobalOnlineUser {
+  userId: string
+  name: string
+  email: string
+  image?: string | null
+  path: string
+  userAgent?: string | null
+  lastSeen: number
+}
+
+const onlineUsersMap = new Map<string, GlobalOnlineUser>()
+const ONLINE_TTL_MS = 60 * 1000 // 60 segundos de tolerância para usuário ativo
+
+export function recordUserPresence(info: {
+  userId: string
+  name: string
+  email: string
+  image?: string | null
+  path: string
+  userAgent?: string | null
+}) {
+  onlineUsersMap.set(info.userId, {
+    ...info,
+    lastSeen: Date.now(),
+  })
+}
+
+export function getGlobalOnlineUsers(): GlobalOnlineUser[] {
+  const now = Date.now()
+  const active: GlobalOnlineUser[] = []
+  for (const [id, user] of onlineUsersMap.entries()) {
+    if (now - user.lastSeen > ONLINE_TTL_MS) {
+      onlineUsersMap.delete(id)
+    } else {
+      active.push(user)
+    }
+  }
+  return active.sort((a, b) => b.lastSeen - a.lastSeen)
+}
+

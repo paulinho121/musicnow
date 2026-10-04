@@ -67,13 +67,25 @@ export function SetlistPlay() {
     }
   }, [stage, isLeader, following, index, goTo])
 
+  // Inicia liderança automática quando entra pelo botão "Comandar Banda ao Vivo"
+  const leadInitRef = useRef(false)
+  useEffect(() => {
+    const isParamLead = new URLSearchParams(window.location.search).get('lead') === '1'
+    if (isParamLead && id && canLead && !leadInitRef.current && live.status === 'live') {
+      leadInitRef.current = true
+      writeLeading(id, true)
+      live.command({ action: 'go', position: index })
+      toast('Você iniciou o Modo Mestre: qualquer música que você abrir será aberta para todos da banda!')
+    }
+  }, [id, canLead, live.status, index, live, toast])
+
   // Quem estava no comando e a API reiniciou (ou a conexão caiu): retoma de onde parou.
   useEffect(() => {
     if (!id || live.status !== 'live' || !canLead) return
     if (!stage && readLeading(id)) live.command({ action: 'go', position: index })
     if (stage && stage.leaderId !== uid) writeLeading(id, false)
     // Reage só a (re)conexões e mudanças de palco; índice e comando são lidos no momento.
-  }, [id, live.status, stage, canLead, uid])
+  }, [id, live.status, stage, canLead, uid, index, live])
 
   if (isLoading) return <PageSpinner />
   if (error || !s) return <ErrorState error={error ?? new Error('Repertório não encontrado.')} onRetry={() => refetch()} />

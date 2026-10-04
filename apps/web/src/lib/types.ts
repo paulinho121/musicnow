@@ -304,6 +304,18 @@ export interface AdminOverview {
     dau: number
     mau: number
   }
+  online: {
+    count: number
+    users: {
+      userId: string
+      name: string
+      email: string
+      image?: string | null
+      path: string
+      userAgent?: string | null
+      lastSeen: number
+    }[]
+  }
 }
 
 export interface AdminTraffic {
@@ -341,6 +353,8 @@ export interface AdminUser {
   songCount: number
   setlistCount: number
   lastSession: string | null
+  isOnline?: boolean
+  currentPath?: string | null
 }
 
 export interface AdminUsersResponse {
