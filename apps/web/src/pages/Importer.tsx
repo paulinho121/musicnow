@@ -10,7 +10,7 @@ import {
   type Visibility,
 } from '@ensaio/shared'
 import clsx from 'clsx'
-import { AlertTriangle, ArrowLeft, AudioLines, CheckCircle2, ChevronDown, ClipboardPaste, FileUp, Trash2, Upload } from 'lucide-react'
+import { AlertTriangle, ArrowLeft, AudioLines, CheckCircle2, ChevronDown, ClipboardPaste, FileUp, Loader2, Trash2, Upload } from 'lucide-react'
 import { useEffect, useRef, useState, type DragEvent } from 'react'
 import { Link } from 'react-router'
 import { ChordSheet, useSheet } from '../components/ChordSheet'
@@ -36,6 +36,7 @@ interface Item {
   song: ImportedSong
   include: boolean
   duplicateOf: string | null
+  file?: File
 }
 
 let nextUid = 1
@@ -61,6 +62,7 @@ export function Importer() {
   const [extraTags, setExtraTags] = useState('importada')
   const [result, setResult] = useState<ImportResult | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [attachingScores, setAttachingScores] = useState(false)
 
   // Marca as que já existem na biblioteca sempre que a lista (ou um título) muda.
   const dupSignature = items.map((i) => `${i.song.title}|${i.song.artist ?? ''}`).join('\n')
@@ -106,7 +108,7 @@ export function Importer() {
         try {
           const { parseGuitarProSong } = await import('../lib/guitarPro')
           const song = await parseGuitarProSong(f)
-          parsed.push({ uid: nextUid++, source: f.name, song, include: true, duplicateOf: null })
+          parsed.push({ uid: nextUid++, source: f.name, song, include: true, duplicateOf: null, file: f })
         } catch (e) {
           bad.push(`${f.name}: ${(e as Error).message || 'não foi possível ler o arquivo Guitar Pro'}`)
         }
@@ -180,10 +182,43 @@ export function Importer() {
         })),
       },
       {
-        onSuccess: (res) => {
+        onSuccess: async (res) => {
+          const gpItems = selected.filter((it) => it.file && /\.(gp|gp3|gp4|gp5|gpx)$/i.test(it.file.name))
+          if (gpItems.length > 0) {
+            setAttachingScores(true)
+            for (const it of gpItems) {
+              const match = res.created.find((c) => c.title.toLowerCase() === it.song.title.trim().toLowerCase())
+              if (match && it.file) {
+                try {
+                  const { readGuitarProScorePages } = await import('../lib/guitarPro')
+                  const { processPage } = await import('../lib/scoreProcess')
+                  const { uploadScore } = await import('../lib/scores')
+                  const sources = await readGuitarProScorePages(it.file)
+                  const pages = []
+                  for (const s of sources) {
+                    const p = await processPage(s, 0)
+                    pages.push(p)
+                  }
+                  await uploadScore(
+                    {
+                      songId: match.id,
+                      label: 'Grade / Tablatura',
+                      instrument: null,
+                      pages,
+                    },
+                    () => {},
+                  )
+                  pages.forEach((p) => URL.revokeObjectURL(p.url))
+                } catch {
+                  // Se a renderização falhar, a música continua salva com a cifra
+                }
+              }
+            }
+            setAttachingScores(false)
+          }
           setResult(res)
           setItems([])
-          toast(`${res.created.length} música(s) importada(s).`)
+          toast(`${res.created.length} música(s) importada(s)${gpItems.length > 0 ? ' com partitura(s) anexa(s)' : ''}.`)
         },
         onError: (err) => setError(err.message),
       },
@@ -364,9 +399,18 @@ export function Importer() {
           )}
 
           <div className="flex justify-end">
-            <button type="button" className="btn-primary w-full sm:w-auto sm:min-w-56" onClick={submit} disabled={!selected.length || importer.isPending}>
-              <Upload className="size-4" />
-              {importer.isPending ? 'Importando...' : `Importar ${selected.length} ${selected.length === 1 ? 'música' : 'músicas'}`}
+            <button
+              type="button"
+              className="btn-primary w-full sm:w-auto sm:min-w-56"
+              onClick={submit}
+              disabled={!selected.length || importer.isPending || attachingScores}
+            >
+              {importer.isPending || attachingScores ? <Loader2 className="size-4 animate-spin" /> : <Upload className="size-4" />}
+              {attachingScores
+                ? 'Gerando partituras...'
+                : importer.isPending
+                  ? 'Importando...'
+                  : `Importar ${selected.length} ${selected.length === 1 ? 'música' : 'músicas'}`}
             </button>
           </div>
         </>
