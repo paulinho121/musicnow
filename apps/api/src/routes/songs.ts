@@ -58,7 +58,7 @@ const importInput = z.object({
   songs: z
     .array(
       songFields
-        .extend({ importedFrom: z.enum(['chordpro', 'onsong', 'opensong', 'text']).nullish() })
+        .extend({ importedFrom: z.enum(['chordpro', 'onsong', 'opensong', 'text', 'guitarpro']).nullish() })
         .refine(publicNeedsLicense, PUBLIC_LICENSE_MSG),
     )
     .min(1, 'Nenhuma música para importar')
