@@ -94,26 +94,21 @@ function parseGuitarProBinaryFallback(buffer: ArrayBuffer, fileName: string): Im
   for (let i = 0; i < 30; i++) version += String.fromCharCode(readByte())
 
   let title = ''
-  let subtitle = ''
   let artist = ''
-  let album = ''
   let words = ''
   let music = ''
-  let copyright = ''
-  let tab = ''
-  let instructions = ''
   const notices: string[] = []
 
   if (/FICHIER GUITAR PRO/i.test(version)) {
     title = readLenString()
-    subtitle = readLenString()
+    readLenString() // subtitle
     artist = readLenString()
-    album = readLenString()
+    readLenString() // album
     words = readLenString()
     music = readLenString()
-    copyright = readLenString()
-    tab = readLenString()
-    instructions = readLenString()
+    readLenString() // copyright
+    readLenString() // tab
+    readLenString() // instructions
 
     const noticeCount = readInt()
     for (let i = 0; i < Math.min(noticeCount, 10); i++) {
