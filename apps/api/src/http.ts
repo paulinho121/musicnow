@@ -4,6 +4,7 @@ import { createMiddleware } from 'hono/factory'
 import { HTTPException } from 'hono/http-exception'
 import type { ZodType } from 'zod'
 import { auth, type Session } from './auth'
+import { env } from './env'
 
 /** zValidator com erro legível: `{ error: "Informe o título" }` em vez do objeto do Zod. */
 export function validate<T extends ZodType, Target extends keyof ValidationTargets>(target: Target, schema: T) {
@@ -32,8 +33,6 @@ export const requireUser = createMiddleware<AppEnv>(async (c, next) => {
   c.set('session', s.session)
   await next()
 })
-
-import { env } from './env'
 
 export function isAdminUser(u?: { email?: string | null; role?: string | null } | null): boolean {
   if (!u || !u.email) return false
