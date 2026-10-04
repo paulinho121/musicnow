@@ -6,3 +6,9 @@ dist
 *.log
 .DS_Store
 uploads
+
+# Arquivos de teste locais (tabs com direitos autorais: nunca no repositório público)
+/*.gp
+/*.gp5
+/*.gpx
+/test-gp.mjs

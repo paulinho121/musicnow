@@ -33,6 +33,28 @@ export const requireUser = createMiddleware<AppEnv>(async (c, next) => {
   await next()
 })
 
+import { env } from './env'
+
+export function isAdminUser(u?: { email?: string | null; role?: string | null } | null): boolean {
+  if (!u || !u.email) return false
+  const email = u.email.trim().toLowerCase()
+  if (env.ADMIN_EMAILS.includes(email)) return true
+  if (u.role === 'admin') return true
+  return false
+}
+
+/** Exige sessão de Super Administrador. */
+export const requireAdmin = createMiddleware<AppEnv>(async (c, next) => {
+  const s = await auth.api.getSession({ headers: c.req.raw.headers })
+  if (!s) throw new HTTPException(401, { message: 'Faça login para continuar.' })
+  c.set('user', s.user)
+  c.set('session', s.session)
+  if (!isAdminUser(s.user)) {
+    throw new HTTPException(403, { message: 'Acesso restrito a Super Administradores.' })
+  }
+  await next()
+})
+
 export function notFound(what = 'Registro'): never {
   throw new HTTPException(404, { message: `${what} não encontrado.` })
 }

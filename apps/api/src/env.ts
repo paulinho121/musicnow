@@ -23,4 +23,9 @@ export const env = {
   GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET,
   APPLE_CLIENT_ID: process.env.APPLE_CLIENT_ID,
   APPLE_CLIENT_SECRET: process.env.APPLE_CLIENT_SECRET,
+  /** E-mails com acesso de Super Admin (separados por vírgula no .env). */
+  ADMIN_EMAILS: (process.env.ADMIN_EMAILS ?? 'paulofernandoautomacao@gmail.com')
+    .split(',')
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean),
 }

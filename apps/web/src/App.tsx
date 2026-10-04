@@ -22,6 +22,12 @@ import { SongEditor } from './pages/SongEditor'
 import { SongView } from './pages/SongView'
 import { Welcome } from './pages/Welcome'
 
+import { AdminLayout } from './pages/admin/AdminLayout'
+import { AdminOverview } from './pages/admin/AdminOverview'
+import { AdminReports } from './pages/admin/AdminReports'
+import { AdminTraffic } from './pages/admin/AdminTraffic'
+import { AdminUsers } from './pages/admin/AdminUsers'
+
 /** Exige login; quem ainda não preencheu o perfil vai para o onboarding. */
 function RequireAuth() {
   const { data: session, isPending } = useSession()
@@ -31,6 +37,15 @@ function RequireAuth() {
   if (!session) return <Navigate to="/entrar" replace state={{ from: location.pathname + location.search }} />
   if (me.data && !me.data.onboarded && location.pathname !== '/perfil')
     return <Navigate to="/perfil" replace state={{ from: location.pathname + location.search }} />
+  return <Outlet />
+}
+
+/** Exige privilégios de Super Admin. */
+function RequireAdmin() {
+  const { data: session, isPending } = useSession()
+  const me = useMe(Boolean(session))
+  if (isPending || me.isLoading) return <PageSpinner />
+  if (!session || !me.data?.isAdmin) return <Navigate to="/inicio" replace />
   return <Outlet />
 }
 
@@ -82,6 +97,21 @@ export const router = createBrowserRouter([
           { path: '/repertorios/:id/editar', element: <SetlistForm /> },
           { path: '/convite/:code', element: <InviteAccept /> },
           { path: '/perfil', element: <Profile /> },
+          {
+            element: <RequireAdmin />,
+            children: [
+              {
+                path: '/admin',
+                element: <AdminLayout />,
+                children: [
+                  { index: true, element: <AdminOverview /> },
+                  { path: 'visitas', element: <AdminTraffic /> },
+                  { path: 'usuarios', element: <AdminUsers /> },
+                  { path: 'denuncias', element: <AdminReports /> },
+                ],
+              },
+            ],
+          },
         ],
       },
     ],

@@ -1,9 +1,11 @@
 import clsx from 'clsx'
-import { Home, ListMusic, Music2, UserRound } from 'lucide-react'
+import { Home, ListMusic, Music2, ShieldCheck, UserRound } from 'lucide-react'
 import { NavLink, Outlet } from 'react-router'
+import { useMe } from '../lib/queries'
+import { usePageTracking } from '../lib/usePageTracking'
 import { Logo } from './Logo'
 
-const NAV = [
+const BASE_NAV = [
   { to: '/inicio', label: 'Início', icon: Home },
   { to: '/musicas', label: 'Músicas', icon: Music2 },
   { to: '/repertorios', label: 'Repertórios', icon: ListMusic },
@@ -12,13 +14,20 @@ const NAV = [
 
 /** Casca do app: barra lateral no computador, barra inferior no celular (uso com uma mão). */
 export function Layout() {
+  usePageTracking()
+  const { data: me } = useMe()
+
+  const navItems = me?.isAdmin
+    ? [...BASE_NAV, { to: '/admin', label: 'Gestão', icon: ShieldCheck }]
+    : BASE_NAV
+
   return (
     <div className="min-h-dvh md:flex">
       <aside className="sticky top-0 hidden h-dvh w-60 shrink-0 flex-col gap-1 border-r border-border p-4 md:flex">
         <div className="mb-6 px-2 pt-2">
           <Logo />
         </div>
-        {NAV.map(({ to, label, icon: Icon }) => (
+        {navItems.map(({ to, label, icon: Icon }) => (
           <NavLink
             key={to}
             to={to}
@@ -39,8 +48,13 @@ export function Layout() {
         <Outlet />
       </main>
 
-      <nav className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-4 border-t border-border bg-bg/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden">
-        {NAV.map(({ to, label, icon: Icon }) => (
+      <nav
+        className={clsx(
+          'fixed inset-x-0 bottom-0 z-40 grid border-t border-border bg-bg/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden',
+          me?.isAdmin ? 'grid-cols-5' : 'grid-cols-4',
+        )}
+      >
+        {navItems.map(({ to, label, icon: Icon }) => (
           <NavLink
             key={to}
             to={to}

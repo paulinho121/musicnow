@@ -30,6 +30,8 @@ export const user = pgTable('user', {
   email: text().notNull().unique(),
   emailVerified: boolean().notNull().default(false),
   image: text(),
+  role: text().notNull().default('user'),
+  banned: boolean().notNull().default(false),
   ...timestamps,
 })
 
@@ -440,6 +442,21 @@ export const changeLog = pgTable(
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index().on(t.entityType, t.entityId, t.createdAt)],
+)
+
+/** Registro de visitas / telemetria de tráfego interno. */
+export const pageVisit = pgTable(
+  'page_visit',
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    path: text().notNull(),
+    userId: text().references(() => user.id, { onDelete: 'set null' }),
+    ip: text(),
+    userAgent: text(),
+    referrer: text(),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index().on(t.createdAt), index().on(t.path), index().on(t.userId)],
 )
 
 // ---------------------------------------------------------------------------

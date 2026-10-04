@@ -12,6 +12,8 @@ import { meRoutes } from './routes/me'
 import { scoresRoutes } from './routes/scores'
 import { invitesRoutes, setlistsRoutes } from './routes/setlists'
 import { songsRoutes } from './routes/songs'
+import { analyticsRoutes } from './routes/analytics'
+import { adminRoutes } from './routes/admin'
 
 const api = new Hono<AppEnv>()
   .get('/health', async (c) => {
@@ -27,6 +29,8 @@ const api = new Hono<AppEnv>()
   .route('/invites', invitesRoutes)
   .route('/catalog', catalogRoutes)
   .route('/scores', scoresRoutes)
+  .route('/analytics', analyticsRoutes)
+  .route('/admin', adminRoutes)
 
 const KB = 1024
 const tooLarge = (c: Context) => c.json({ error: 'Conteúdo grande demais para enviar de uma vez.' }, 413)

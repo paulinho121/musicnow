@@ -2,7 +2,7 @@ import { and, asc, desc, eq, gte, inArray, isNotNull, or, sql } from 'drizzle-or
 import { Hono } from 'hono'
 import { z } from 'zod'
 import { db, schema } from '../db'
-import { requireUser, validate, type AppEnv } from '../http'
+import { isAdminUser, requireUser, validate, type AppEnv } from '../http'
 import { canViewSong, isFavoriteExpr, songListColumns } from './songs'
 
 const { user, profile, userInstrument, song, songUserState, favorite, setlist, setlistMember, setlistItem } = schema
@@ -39,6 +39,7 @@ async function loadMe(uid: string) {
     instruments,
     /** Perfil ainda não preenchido: o app leva a pessoa ao onboarding. */
     onboarded: Boolean(p?.role) && instruments.length > 0,
+    isAdmin: isAdminUser(u),
   }
 }
 

@@ -102,6 +102,7 @@ export interface Me {
   viewerPrefs: Record<string, unknown>
   instruments: { instrument: Instrument; primary: boolean }[]
   onboarded: boolean
+  isAdmin?: boolean
 }
 
 export interface Dashboard {
@@ -266,4 +267,100 @@ export interface CatalogDetails {
   composer: string | null
   year: number | null
   source: string
+}
+
+export interface AdminOverview {
+  users: {
+    total: number
+    newToday: number
+    new7d: number
+    new30d: number
+    admins: number
+  }
+  songs: {
+    total: number
+    public: number
+    private: number
+    shared: number
+  }
+  setlists: {
+    total: number
+    active: number
+  }
+  scores: {
+    totalParts: number
+    totalBytes: number
+  }
+  reports: {
+    open: number
+    total: number
+  }
+  visits: {
+    today: number
+    last7d: number
+    last30d: number
+  }
+  activeUsers: {
+    dau: number
+    mau: number
+  }
+}
+
+export interface AdminTraffic {
+  daily: {
+    date: string
+    visits: number
+    uniqueIps: number
+    registeredUsers: number
+  }[]
+  topPages: {
+    path: string
+    count: number
+  }[]
+  devices: {
+    name: string
+    count: number
+  }[]
+  browsers: {
+    name: string
+    count: number
+  }[]
+}
+
+export interface AdminUser {
+  id: string
+  name: string
+  email: string
+  emailVerified: boolean
+  image: string | null
+  role: string
+  banned: boolean
+  createdAt: string
+  city: string | null
+  musicianRole: string | null
+  songCount: number
+  setlistCount: number
+  lastSession: string | null
+}
+
+export interface AdminUsersResponse {
+  users: AdminUser[]
+  total: number
+  page: number
+  totalPages: number
+}
+
+export interface AdminReport {
+  id: string
+  reason: string
+  details: string | null
+  status: 'open' | 'resolved' | 'dismissed'
+  createdAt: string
+  songId: string
+  songTitle: string
+  songArtist: string | null
+  songVisibility: string
+  reporterId: string
+  reporterName: string
+  reporterEmail: string
 }
