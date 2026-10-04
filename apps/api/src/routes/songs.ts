@@ -5,6 +5,7 @@ import { HTTPException } from 'hono/http-exception'
 import { z } from 'zod'
 import { getRole } from '../access'
 import { COVER_URL_RE } from '../covers'
+import { removeScoreFiles, scoresOfSong } from './scores'
 import { publish } from '../realtime'
 import { db, schema } from '../db'
 import { forbidden, notFound, requireUser, validate, type AppEnv } from '../http'
@@ -300,6 +301,7 @@ export const songsRoutes = new Hono<AppEnv>()
         ),
       )
       .orderBy(asc(songMark.lineIndex), asc(songMark.createdAt))
+    const scores = await scoresOfSong(id)
 
     const { searchText: _omit, ...data } = row.song
     const isOwner = row.song.ownerId === uid
@@ -314,6 +316,7 @@ export const songsRoutes = new Hono<AppEnv>()
       canEdit: isOwner,
       personalKey: state?.personalKey ?? null,
       marks: marks.map((m) => ({ ...m.mark, authorName: m.authorName })),
+      scores,
       setlistRole: access?.role ?? null,
       // Fora de repertório só a dona compartilha marcações; dentro, quem tem permissão de marcar.
       canShareMarks: access ? atLeast(access.role, 'mark') : isOwner,
@@ -375,7 +378,9 @@ export const songsRoutes = new Hono<AppEnv>()
     if (used) {
       throw new HTTPException(409, { message: 'Esta música está em um repertório. Remova-a de lá antes de excluir.' })
     }
+    const scoreIds = (await scoresOfSong(id)).map((s) => s.id)
     await db.delete(song).where(eq(song.id, id))
+    await removeScoreFiles(scoreIds)
     await db.insert(changeLog).values({ entityType: 'song', entityId: id, userId: uid, action: 'delete' })
     return c.body(null, 204)
   })

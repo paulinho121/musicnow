@@ -2,7 +2,7 @@
 // para o formato do Ensaio Fácil (acordes sobre a letra, seções entre colchetes).
 import { guessKey, isChord, isChordLine, parseChord, sectionTypeFromLabel, transposeKey } from './chords'
 
-export type ImportFormat = 'chordpro' | 'onsong' | 'opensong' | 'text'
+export type ImportFormat = 'chordpro' | 'onsong' | 'opensong' | 'text' | 'guitarpro'
 
 export interface ImportedSong {
   title: string
@@ -390,6 +390,7 @@ export function detectFormat(text: string, fileName = ''): ImportFormat {
   const ext = fileName.toLowerCase().split('.').pop() ?? ''
   if (/<song[\s>]/i.test(text) && /<lyrics[\s>]/i.test(text)) return 'opensong'
   if (['cho', 'chopro', 'chordpro', 'crd', 'pro'].includes(ext)) return 'chordpro'
+  if (['gp', 'gp3', 'gp4', 'gp5', 'gpx'].includes(ext)) return 'guitarpro'
   if (/^\s*\{\s*(title|t|start_of_|soc|sov|key|artist|subtitle|st)\b/im.test(text)) return 'chordpro'
   if (ext === 'onsong') return 'onsong'
   const lines = text.split(/\r?\n/)

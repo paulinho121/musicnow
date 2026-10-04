@@ -62,6 +62,11 @@ describe('ChordPro', () => {
     expect(s.content).toContain('[Refrão]\nC      G\nRefrão aqui')
     expect(s.content).toContain('(Repetir 2x)')
   })
+
+  it('detecta extensões do Guitar Pro', () => {
+    expect(detectFormat('', 'musica.gp')).toBe('guitarpro')
+    expect(detectFormat('', 'musica.gp5')).toBe('guitarpro')
+  })
 })
 
 describe('OnSong', () => {

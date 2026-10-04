@@ -62,6 +62,15 @@ export interface ImportResult {
   skipped: { title: string; reason: string }[]
 }
 
+/** Uma parte da partitura (grade, piano, sax alto...): páginas WebP servidas pela API. */
+export interface ScorePart {
+  id: string
+  label: string
+  instrument: Instrument | null
+  pages: { w: number; h: number; bytes: number }[]
+  totalBytes: number
+}
+
 export interface SongDetail extends SongInput {
   id: string
   ownerId: string
@@ -76,6 +85,8 @@ export interface SongDetail extends SongInput {
   /** Papel no repertório quando a música é aberta dentro de um. */
   setlistRole: SetlistRole | null
   canShareMarks: boolean
+  /** Partituras anexadas (vazio = só cifra). */
+  scores: ScorePart[]
   createdAt: string
   updatedAt: string
 }

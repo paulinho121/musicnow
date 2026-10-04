@@ -9,6 +9,7 @@ import { mailEnabled } from './mail'
 import type { AppEnv } from './http'
 import { catalogRoutes } from './routes/catalog'
 import { meRoutes } from './routes/me'
+import { scoresRoutes } from './routes/scores'
 import { invitesRoutes, setlistsRoutes } from './routes/setlists'
 import { songsRoutes } from './routes/songs'
 
@@ -25,6 +26,7 @@ const api = new Hono<AppEnv>()
   .route('/setlists', setlistsRoutes)
   .route('/invites', invitesRoutes)
   .route('/catalog', catalogRoutes)
+  .route('/scores', scoresRoutes)
 
 const KB = 1024
 const tooLarge = (c: Context) => c.json({ error: 'Conteúdo grande demais para enviar de uma vez.' }, 413)
@@ -35,8 +37,12 @@ export const app = new Hono()
   // A VM tem 1 GB: recusa corpos grandes antes de ler tudo para a memória.
   // A importação em lote (até 100 cifras) tem um limite maior que o resto.
   .use('/api/songs/import', bodyLimit({ maxSize: 8 * KB * KB, onError: tooLarge }))
+  // Partitura: páginas já comprimidas no aparelho (até 30 páginas, ~16 MB no máximo).
+  .use('/api/scores', bodyLimit({ maxSize: 16 * KB * KB, onError: tooLarge }))
   .use('/api/*', async (c, next) =>
-    c.req.path === '/api/songs/import' ? next() : bodyLimit({ maxSize: 1 * KB * KB, onError: tooLarge })(c, next),
+    c.req.path === '/api/songs/import' || c.req.path === '/api/scores'
+      ? next()
+      : bodyLimit({ maxSize: 1 * KB * KB, onError: tooLarge })(c, next),
   )
   .route('/api', api)
 

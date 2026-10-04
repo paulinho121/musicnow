@@ -20,13 +20,14 @@ import type { ImportResult } from '../lib/types'
 
 const MAX_FILES = 100
 const MAX_BYTES = 512 * 1024
-const ACCEPT = '.cho,.chopro,.chordpro,.crd,.pro,.txt,.onsong,.xml,text/plain'
+const ACCEPT = '.cho,.chopro,.chordpro,.crd,.pro,.txt,.onsong,.xml,.gp,.gp3,.gp4,.gp5,.gpx,text/plain'
 
 const FORMAT_LABEL: Record<ImportedSong['format'], string> = {
   chordpro: 'ChordPro',
   onsong: 'OnSong',
   opensong: 'OpenSong',
   text: 'Texto',
+  guitarpro: 'Guitar Pro',
 }
 
 interface Item {
@@ -91,12 +92,24 @@ export function Importer() {
     if (list.length > room) bad.push(`${list.length - room} arquivo(s) além do limite de ${MAX_FILES} por importação`)
     const parsed: Item[] = []
     for (const f of list.slice(0, Math.max(0, room))) {
-      if (f.size > MAX_BYTES) {
-        bad.push(`${f.name}: maior que 512 KB`)
+      const isGp = /\.(gp|gp3|gp4|gp5|gpx)$/i.test(f.name)
+      const maxSize = isGp ? 10 * 1024 * 1024 : MAX_BYTES
+      if (f.size > maxSize) {
+        bad.push(`${f.name}: maior que ${isGp ? '10 MB' : '512 KB'}`)
         continue
       }
       if (/\.(pdf|docx?|jpe?g|png)$/i.test(f.name)) {
         bad.push(`${f.name}: formato não suportado (PDF e imagens entram como anexo na próxima etapa)`)
+        continue
+      }
+      if (isGp) {
+        try {
+          const { parseGuitarProSong } = await import('../lib/guitarPro')
+          const song = await parseGuitarProSong(f)
+          parsed.push({ uid: nextUid++, source: f.name, song, include: true, duplicateOf: null })
+        } catch (e) {
+          bad.push(`${f.name}: ${(e as Error).message || 'não foi possível ler o arquivo Guitar Pro'}`)
+        }
         continue
       }
       try {
@@ -221,7 +234,7 @@ export function Importer() {
         >
           <FileUp className="size-8 text-accent" />
           <span className="font-semibold">Arraste arquivos ou toque para escolher</span>
-          <span className="text-xs text-muted">.cho, .pro, .crd, .onsong, .txt e arquivos do OpenSong · até {MAX_FILES} por vez</span>
+          <span className="text-xs text-muted">.cho, .pro, .crd, .onsong, .txt, .gp, .gp5 e arquivos do OpenSong · até {MAX_FILES} por vez</span>
         </button>
         <input
           ref={fileRef}

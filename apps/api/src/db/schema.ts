@@ -183,7 +183,35 @@ export const songReport = pgTable(
   (t) => [index().on(t.songId), index().on(t.status), uniqueIndex().on(t.songId, t.reporterId)],
 )
 
-/** Partituras e PDFs anexados a uma música. */
+/**
+ * Partitura de uma música (uma "parte": grade, piano, sax alto em Mi♭...).
+ * O PDF/foto original NUNCA chega ao servidor: o aparelho converte cada página numa
+ * imagem WebP leve e limpa, e só ela é guardada em disco (UPLOAD_DIR/scores/<id>/<n>.webp).
+ * O banco guarda só os dados.
+ */
+export const songScore = pgTable(
+  'song_score',
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    songId: uuid()
+      .notNull()
+      .references(() => song.id, { onDelete: 'cascade' }),
+    uploadedBy: text()
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    /** Nome da parte ("Sax alto em Mi♭", "Grade", "Piano"). */
+    label: text().notNull(),
+    /** Instrumento do perfil que abre esta parte automaticamente. */
+    instrument: instrument(),
+    /** Largura e altura de cada página (para o leitor já reservar o espaço certo). */
+    pages: jsonb().$type<{ w: number; h: number; bytes: number }[]>().notNull(),
+    totalBytes: integer().notNull(),
+    ...timestamps,
+  },
+  (t) => [index().on(t.songId), index().on(t.uploadedBy)],
+)
+
+/** Partituras e PDFs anexados a uma música (reservado; as partituras usam song_score). */
 export const songFile = pgTable(
   'song_file',
   {
