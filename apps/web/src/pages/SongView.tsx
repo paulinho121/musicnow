@@ -8,6 +8,8 @@ import {
   EllipsisVertical,
   Expand,
   FileDown,
+  FileText,
+  FileUp,
   ListMusic,
   ListPlus,
   Lock,
@@ -36,6 +38,8 @@ import { LiveStrip, type LiveControls } from '../components/LiveStrip'
 import { MarkDialog } from '../components/MarkDialog'
 import { ReferencePlayer } from '../components/ReferencePlayer'
 import { ReportButton } from '../components/ReportDialog'
+import { ScoreUploadDialog } from '../components/score/ScoreUploadDialog'
+import { ScoreViewer } from '../components/score/ScoreViewer'
 import { Sheet } from '../components/Sheet'
 import { CoverGlow, SongCover } from '../components/SongCover'
 import { ErrorState, PageSpinner, useToast } from '../components/ui'
@@ -102,6 +106,8 @@ export function SongViewer({ songId, setlist }: { songId: string; setlist?: Setl
   const [chordOpen, setChordOpen] = useState<string | null>(null)
   const [addOpen, setAddOpen] = useState(false)
   const [moreOpen, setMoreOpen] = useState(false)
+  const [viewMode, setViewMode] = useState<'chord' | 'score'>('chord')
+  const [uploadScoreOpen, setUploadScoreOpen] = useState(false)
 
   // Tom inicial: o do repertório; fora dele, o tom pessoal do músico; senão, o original.
   const baseKey = setlist?.itemKey ?? song?.personalKey ?? null
@@ -289,6 +295,19 @@ export function SongViewer({ songId, setlist }: { songId: string; setlist?: Setl
               <Pencil className="size-5" />
             </Link>
           )}
+          {song.scores && song.scores.length > 0 && (
+            <button
+              className={clsx(
+                'btn-icon shrink-0',
+                viewMode === 'score' ? 'border-accent bg-accent/15 text-accent' : 'border-transparent bg-transparent',
+              )}
+              aria-label={viewMode === 'score' ? 'Ver cifra' : 'Ver partitura'}
+              title={viewMode === 'score' ? 'Ver cifra' : 'Ver partitura'}
+              onClick={() => setViewMode((m) => (m === 'score' ? 'chord' : 'score'))}
+            >
+              <FileText className="size-5" />
+            </button>
+          )}
           {/* Celular: as ações menos usadas ficam num menu, para o título ter espaço. */}
           {!setlist && (
             <button className="btn-icon shrink-0 border-transparent bg-transparent sm:hidden" aria-label="Mais opções" onClick={() => setMoreOpen(true)}>
@@ -385,40 +404,91 @@ export function SongViewer({ songId, setlist }: { songId: string; setlist?: Setl
           </p>
         )}
 
-        {songChords.length > 0 && prefs.showChords && (
-          <SongChords
-            chords={songChords}
-            open={prefs.chordStrip}
-            onToggle={() => setPrefs((p) => ({ ...p, chordStrip: !p.chordStrip }))}
-            onPick={setChordOpen}
-          />
-        )}
+        {/* Alternador de visualização e ação de partitura */}
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+          {song.scores && song.scores.length > 0 ? (
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                className={clsx(
+                  'chip h-9 px-4 text-xs font-semibold sm:text-sm flex items-center gap-1.5 transition',
+                  viewMode === 'chord' ? 'chip-on' : 'hover:border-accent/40',
+                )}
+                onClick={() => setViewMode('chord')}
+              >
+                Cifra
+              </button>
+              <button
+                type="button"
+                className={clsx(
+                  'chip h-9 px-4 text-xs font-semibold sm:text-sm flex items-center gap-1.5 transition',
+                  viewMode === 'score' ? 'chip-on' : 'hover:border-accent/40',
+                )}
+                onClick={() => setViewMode('score')}
+              >
+                <FileText className="size-4" />
+                Ver partitura {song.scores.length > 1 ? `(${song.scores.length})` : ''}
+              </button>
+            </div>
+          ) : null}
 
-        {song.content.trim() ? (
-          <ChordSheet
-            lines={lines}
-            marks={song.marks}
-            fontSize={prefs.fontSize}
-            lineHeight={prefs.lineHeight}
-            showChords={prefs.showChords}
-            wrap={prefs.wrap}
-            hideLyrics={hideLyrics}
-            currentUserId={uid}
-            markMode={markMode}
-            onLineClick={setMarkLine}
-            onMarkClick={onMarkClick}
-            onChordClick={setChordOpen}
-          />
-        ) : (
-          <div className="flex flex-col items-center gap-3 py-10 text-center">
-            <p className="text-muted">Esta música ainda não tem cifra cadastrada.</p>
-            <FindLinks song={{ title: song.title, artist: song.artist }} compact />
-            {song.canEdit && (
-              <Link to={`/musicas/${song.id}/editar`} className="btn-primary">
-                <Pencil className="size-4" /> Escrever a cifra
-              </Link>
-            )}
+          {song.canEdit && !setlist && (
+            <button
+              type="button"
+              className={clsx(
+                'btn-ghost h-8 px-2.5 text-xs text-muted hover:text-text flex items-center gap-1.5',
+                song.scores?.length ? 'ml-auto' : '',
+              )}
+              onClick={() => setUploadScoreOpen(true)}
+            >
+              <FileUp className="size-3.5 text-accent" />
+              {song.scores?.length ? 'Adicionar outra parte' : 'Anexar partitura (.gp, .gp5 ou PDF)'}
+            </button>
+          )}
+        </div>
+
+        {viewMode === 'score' && song.scores && song.scores.length > 0 ? (
+          <div className="py-2">
+            <ScoreViewer songId={song.id} parts={song.scores} />
           </div>
+        ) : (
+          <>
+            {songChords.length > 0 && prefs.showChords && (
+              <SongChords
+                chords={songChords}
+                open={prefs.chordStrip}
+                onToggle={() => setPrefs((p) => ({ ...p, chordStrip: !p.chordStrip }))}
+                onPick={setChordOpen}
+              />
+            )}
+
+            {song.content.trim() ? (
+              <ChordSheet
+                lines={lines}
+                marks={song.marks}
+                fontSize={prefs.fontSize}
+                lineHeight={prefs.lineHeight}
+                showChords={prefs.showChords}
+                wrap={prefs.wrap}
+                hideLyrics={hideLyrics}
+                currentUserId={uid}
+                markMode={markMode}
+                onLineClick={setMarkLine}
+                onMarkClick={onMarkClick}
+                onChordClick={setChordOpen}
+              />
+            ) : (
+              <div className="flex flex-col items-center gap-3 py-10 text-center">
+                <p className="text-muted">Esta música ainda não tem cifra cadastrada.</p>
+                <FindLinks song={{ title: song.title, artist: song.artist }} compact />
+                {song.canEdit && (
+                  <Link to={`/musicas/${song.id}/editar`} className="btn-primary">
+                    <Pencil className="size-4" /> Escrever a cifra
+                  </Link>
+                )}
+              </div>
+            )}
+          </>
         )}
 
         {next &&
@@ -519,7 +589,7 @@ export function SongViewer({ songId, setlist }: { songId: string; setlist?: Setl
         </div>
       )}
 
-      {!locked && (
+      {!locked && viewMode === 'chord' && (
         <div className="fixed inset-x-0 bottom-0 z-30 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
           <div className="mx-auto flex w-fit max-w-[calc(100%-1rem)] items-center gap-1.5 rounded-2xl border border-border bg-surface/95 p-1.5 shadow-2xl shadow-black/40 backdrop-blur">
             <button className="btn-icon" aria-label="Descer meio tom" onClick={() => shift(-1)} disabled={!song.content}>
@@ -625,11 +695,43 @@ export function SongViewer({ songId, setlist }: { songId: string; setlist?: Setl
               <Pencil className="size-5 text-muted" /> Editar música
             </Link>
           )}
+          {song.scores && song.scores.length > 0 && (
+            <button
+              className="flex h-12 items-center gap-3 rounded-xl px-2 text-left hover:bg-surface-2"
+              onClick={() => {
+                setMoreOpen(false)
+                setViewMode((m) => (m === 'score' ? 'chord' : 'score'))
+              }}
+            >
+              <FileText className="size-5 text-muted" /> {viewMode === 'score' ? 'Ver cifra' : 'Ver partitura'}
+            </button>
+          )}
+          {song.canEdit && !setlist && (
+            <button
+              className="flex h-12 items-center gap-3 rounded-xl px-2 text-left hover:bg-surface-2"
+              onClick={() => {
+                setMoreOpen(false)
+                setUploadScoreOpen(true)
+              }}
+            >
+              <FileUp className="size-5 text-muted" /> Anexar partitura
+            </button>
+          )}
           <Link to={`/musicas/${song.id}/imprimir${offset ? `?st=${offset}` : ''}`} className="flex h-12 items-center gap-3 rounded-xl px-2 hover:bg-surface-2">
             <Printer className="size-5 text-muted" /> Imprimir ou salvar PDF
           </Link>
         </div>
       </Sheet>
+
+      <ScoreUploadDialog
+        songId={song.id}
+        open={uploadScoreOpen}
+        onClose={() => setUploadScoreOpen(false)}
+        onDone={() => {
+          refetch()
+          setViewMode('score')
+        }}
+      />
 
       <ChordDialog symbol={chordOpen} onClose={() => setChordOpen(null)} related={songChords} onPick={setChordOpen} />
     </div>
