@@ -6,6 +6,7 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { RouterProvider } from 'react-router'
 import { router } from './App'
+import { IntroSplash } from './components/IntroSplash'
 import { ToastProvider } from './components/ui'
 import { UpdateBanner } from './components/UpdateBanner'
 import { ApiError } from './lib/api'
@@ -46,6 +47,7 @@ createRoot(document.getElementById('root')!).render(
       <ToastProvider>
         <RouterProvider router={router} />
         <UpdateBanner />
+        <IntroSplash />
       </ToastProvider>
     </QueryClientProvider>
   </StrictMode>,
