@@ -16,7 +16,11 @@ export function AuthPage({ mode }: { mode: 'login' | 'signup' }) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [show, setShow] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(() =>
+    new URLSearchParams(window.location.search).get('motivo') === 'bloqueada'
+      ? 'Esta conta está bloqueada. Fale com o suporte do Ensaio Fácil.'
+      : null,
+  )
   const [busy, setBusy] = useState(false)
 
   const { data: meta } = useQuery({ queryKey: ['meta'], queryFn: () => api<{ providers: string[] }>('/meta'), staleTime: Infinity })

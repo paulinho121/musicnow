@@ -22,9 +22,11 @@ let signingOut = false
 function onApiError(err: unknown) {
   if (!(err instanceof ApiError) || err.status !== 401 || signingOut) return
   signingOut = true
+  // Conta bloqueada pelo suporte: a tela de entrada mostra o motivo.
+  const blocked = /bloquead/i.test(err.message)
   logout().finally(() => {
     queryClient.clear()
-    window.location.assign(`/entrar`)
+    window.location.assign(blocked ? '/entrar?motivo=bloqueada' : '/entrar')
   })
 }
 

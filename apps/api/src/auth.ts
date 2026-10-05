@@ -1,5 +1,7 @@
 import { betterAuth } from 'better-auth'
+import { APIError } from 'better-auth/api'
 import { drizzleAdapter } from 'better-auth/adapters/drizzle'
+import { eq } from 'drizzle-orm'
 import { db, schema } from './db'
 import { env } from './env'
 import { sendPasswordChangedEmail, sendPasswordResetEmail } from './mail'
@@ -62,7 +64,23 @@ export const auth = betterAuth({
     },
   },
   socialProviders,
+  user: {
+    // Papel e bloqueio vêm do banco para a sessão; input: false = ninguém altera pela própria conta.
+    additionalFields: {
+      role: { type: 'string', input: false, defaultValue: 'user' },
+      banned: { type: 'boolean', input: false, defaultValue: false },
+    },
+  },
   databaseHooks: {
+    session: {
+      create: {
+        // Conta bloqueada não entra (nem por senha, nem por Google).
+        before: async (session) => {
+          const [u] = await db.select({ banned: schema.user.banned }).from(schema.user).where(eq(schema.user.id, session.userId))
+          if (u?.banned) throw new APIError('FORBIDDEN', { message: 'Esta conta está bloqueada. Fale com o suporte do Ensaio Fácil.' })
+        },
+      },
+    },
     user: {
       create: {
         // Conta nova começa com a música de exemplo (passo a passo). Se falhar, o cadastro segue.

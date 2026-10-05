@@ -1,5 +1,6 @@
 import { and, desc, eq, gte, ilike, or, sql } from 'drizzle-orm'
 import { Hono } from 'hono'
+import { HTTPException } from 'hono/http-exception'
 import { z } from 'zod'
 import { db, schema } from '../db'
 import { notFound, requireAdmin, validate, type AppEnv } from '../http'
@@ -271,7 +272,9 @@ export const adminRoutes = new Hono<AppEnv>()
     async (c) => {
       const { id } = c.req.valid('param')
       const { role } = c.req.valid('json')
-      const [u] = await db.update(user).set({ role }).where(eq(user.id, id)).returning()
+      // Não deixa o admin se rebaixar sem querer (ficaria trancado fora do painel).
+      if (id === c.var.user.id && role !== 'admin') throw new HTTPException(400, { message: 'Você não pode tirar o seu próprio acesso de admin.' })
+      const [u] = await db.update(user).set({ role }).where(eq(user.id, id)).returning({ id: user.id, role: user.role, banned: user.banned })
       if (!u) notFound('Usuário')
       return c.json({ ok: true, user: u })
     },
@@ -285,8 +288,11 @@ export const adminRoutes = new Hono<AppEnv>()
     async (c) => {
       const { id } = c.req.valid('param')
       const { banned } = c.req.valid('json')
-      const [u] = await db.update(user).set({ banned }).where(eq(user.id, id)).returning()
+      if (id === c.var.user.id && banned) throw new HTTPException(400, { message: 'Você não pode bloquear a sua própria conta.' })
+      const [u] = await db.update(user).set({ banned }).where(eq(user.id, id)).returning({ id: user.id, role: user.role, banned: user.banned })
       if (!u) notFound('Usuário')
+      // Bloqueou: encerra todas as sessões (a pessoa sai de todos os aparelhos).
+      if (banned) await db.delete(schema.session).where(eq(schema.session.userId, id))
       return c.json({ ok: true, user: u })
     },
   )
