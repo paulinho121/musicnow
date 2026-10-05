@@ -5,8 +5,11 @@ import {
   ArrowUp,
   ArrowUpDown,
   Check,
+  ChevronDown,
   ChevronsDown,
+  ChevronsDownUp,
   ChevronsUp,
+  ChevronsUpDown,
   CirclePlay,
   ClipboardPaste,
   Layers,
@@ -32,6 +35,29 @@ import { AddSongDialog } from './AddSongDialog'
 import { BlockDialog, blockColor, blockSubtitle, ImportTextDialog } from './Blocks'
 import { ItemMenu, listenUrl } from './ItemMenu'
 
+/** Blocos recolhidos neste repertório, lembrados neste aparelho. */
+function useCollapsedBlocks(setlistId: string) {
+  const storageKey = `ef-blocos-recolhidos:${setlistId}`
+  const [collapsed, setCollapsedState] = useState<Set<string>>(() => {
+    try {
+      return new Set(JSON.parse(localStorage.getItem(storageKey) ?? '[]') as string[])
+    } catch {
+      return new Set()
+    }
+  })
+  const setCollapsed = (next: Set<string> | ((c: Set<string>) => Set<string>)) =>
+    setCollapsedState((c) => {
+      const value = typeof next === 'function' ? next(c) : next
+      try {
+        localStorage.setItem(storageKey, JSON.stringify([...value]))
+      } catch {
+        // navegação privada: fica só nesta visita
+      }
+      return value
+    })
+  return [collapsed, setCollapsed] as const
+}
+
 export function keyOptions(original: string | null) {
   const minor = original ? (parseChord(original)?.suffix ?? '').startsWith('m') : false
   return minor ? MINOR_KEYS : MAJOR_KEYS
@@ -49,6 +75,16 @@ export function SongsPanel({ setlist }: { setlist: SetlistDetail }) {
   const [suggestFor, setSuggestFor] = useState<SetlistItem | null | 'general'>(null)
   // Lista limpa por padrão (como a folha de papel); "Organizar" mostra os controles.
   const [organizing, setOrganizing] = useState(false)
+  // Blocos recolhidos: cada pessoa recolhe do seu jeito, lembrado neste aparelho.
+  const [collapsed, setCollapsed] = useCollapsedBlocks(setlist.id)
+  const toggleBlock = (id: string) =>
+    setCollapsed((c) => {
+      const next = new Set(c)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  const allCollapsed = setlist.blocks.length > 0 && setlist.blocks.every((b) => collapsed.has(b.id))
 
   // Grupos na ordem da tela (e de tocar): primeiro as músicas sem bloco, depois cada bloco.
   const groups = useMemo(() => {
@@ -137,16 +173,28 @@ export function SongsPanel({ setlist }: { setlist: SetlistDetail }) {
             {setlist.items.length} {setlist.items.length === 1 ? 'música' : 'músicas'}
             {hasBlocks && ` · ${setlist.blocks.length} ${setlist.blocks.length === 1 ? 'bloco' : 'blocos'}`}
           </p>
-          {isAdmin && (
-            <button
-              className={clsx('chip h-9', organizing && 'chip-on')}
-              onClick={() => setOrganizing((o) => !o)}
-              aria-pressed={organizing}
-            >
-              {organizing ? <Check className="size-4" /> : <ArrowUpDown className="size-4" />}
-              {organizing ? 'Concluir' : 'Organizar'}
-            </button>
-          )}
+          <div className="flex items-center gap-2">
+            {hasBlocks && (
+              <button
+                className="chip h-9"
+                onClick={() => setCollapsed(allCollapsed ? new Set() : new Set(setlist.blocks.map((b) => b.id)))}
+                aria-label={allCollapsed ? 'Expandir todos os blocos' : 'Recolher todos os blocos'}
+              >
+                {allCollapsed ? <ChevronsUpDown className="size-4" /> : <ChevronsDownUp className="size-4" />}
+                <span className="max-sm:sr-only">{allCollapsed ? 'Expandir tudo' : 'Recolher tudo'}</span>
+              </button>
+            )}
+            {isAdmin && (
+              <button
+                className={clsx('chip h-9', organizing && 'chip-on')}
+                onClick={() => setOrganizing((o) => !o)}
+                aria-pressed={organizing}
+              >
+                {organizing ? <Check className="size-4" /> : <ArrowUpDown className="size-4" />}
+                {organizing ? 'Concluir' : 'Organizar'}
+              </button>
+            )}
+          </div>
         </div>
       )}
 
@@ -184,23 +232,39 @@ export function SongsPanel({ setlist }: { setlist: SetlistDetail }) {
           {groups.slice(1).map(({ block, items }, bi) => {
             const b = block!
             const color = blockColor(bi)
+            const isCollapsed = collapsed.has(b.id)
             return (
               <section key={b.id} className="card overflow-hidden" style={{ borderColor: `${color}55` }}>
                 {/* Cabeçalho do bloco: grande e colorido, como na folha de papel */}
                 <header
-                  className="flex items-center gap-3 border-b border-border px-4 py-3"
+                  className={clsx('flex items-center gap-3 px-4 py-3', !isCollapsed && 'border-b border-border')}
                   style={{ background: `linear-gradient(90deg, ${color}26, transparent 70%)` }}
                 >
-                  <span className="h-10 w-1.5 shrink-0 rounded-full" style={{ background: color }} />
-                  <div className="min-w-0 flex-1">
-                    <h3 className="truncate text-lg leading-tight font-extrabold tracking-tight uppercase" style={{ color }}>
-                      {b.name}
-                    </h3>
-                    <p className="truncate text-sm text-muted">
-                      {[blockSubtitle(b), `${items.length} ${items.length === 1 ? 'música' : 'músicas'}`].filter(Boolean).join(' · ')}
-                    </p>
-                    {b.notes && <p className="mt-0.5 truncate text-xs text-muted italic">{b.notes}</p>}
-                  </div>
+                  {/* Tocar no nome recolhe/expande o bloco */}
+                  <button
+                    className="flex min-w-0 flex-1 items-center gap-3 text-left"
+                    onClick={() => toggleBlock(b.id)}
+                    aria-expanded={!isCollapsed}
+                    aria-label={`${isCollapsed ? 'Expandir' : 'Recolher'} o ${b.name}`}
+                  >
+                    <span className="h-10 w-1.5 shrink-0 rounded-full" style={{ background: color }} />
+                    <span className="min-w-0 flex-1">
+                      <span className="flex items-center gap-1.5">
+                        <span className="truncate text-lg leading-tight font-extrabold tracking-tight uppercase" style={{ color }}>
+                          {b.name}
+                        </span>
+                        <ChevronDown className={clsx('size-4 shrink-0 text-muted transition', isCollapsed && '-rotate-90')} />
+                      </span>
+                      <span className="block truncate text-sm text-muted">
+                        {[blockSubtitle(b), `${items.length} ${items.length === 1 ? 'música' : 'músicas'}`].filter(Boolean).join(' · ')}
+                      </span>
+                      {/* Recolhido: os nomes numa linha só, para conferir de relance */}
+                      {isCollapsed && items.length > 0 && (
+                        <span className="mt-0.5 block truncate text-xs text-text/80">{items.map((i) => i.song.title).join(' · ')}</span>
+                      )}
+                      {!isCollapsed && b.notes && <span className="mt-0.5 block truncate text-xs text-muted italic">{b.notes}</span>}
+                    </span>
+                  </button>
                   {isAdmin && (
                     <div className="flex shrink-0 items-center">
                       {organizing && (
@@ -233,18 +297,22 @@ export function SongsPanel({ setlist }: { setlist: SetlistDetail }) {
                     </div>
                   )}
                 </header>
-                {items.length > 0 ? (
-                  <ol className="divide-y divide-border">{items.map(row)}</ol>
-                ) : (
-                  <p className="px-4 py-4 text-sm text-muted">Nenhuma música neste bloco ainda.</p>
-                )}
-                {isAdmin && (
-                  <button
-                    className="flex w-full items-center gap-2 border-t border-border px-4 py-2.5 text-sm font-medium text-muted transition hover:bg-surface-2 hover:text-text"
-                    onClick={() => setAdding({ blockId: b.id })}
-                  >
-                    <Plus className="size-4" /> Adicionar música no {b.name}
-                  </button>
+                {!isCollapsed && (
+                  <>
+                    {items.length > 0 ? (
+                      <ol className="divide-y divide-border">{items.map(row)}</ol>
+                    ) : (
+                      <p className="px-4 py-4 text-sm text-muted">Nenhuma música neste bloco ainda.</p>
+                    )}
+                    {isAdmin && (
+                      <button
+                        className="flex w-full items-center gap-2 border-t border-border px-4 py-2.5 text-sm font-medium text-muted transition hover:bg-surface-2 hover:text-text"
+                        onClick={() => setAdding({ blockId: b.id })}
+                      >
+                        <Plus className="size-4" /> Adicionar música no {b.name}
+                      </button>
+                    )}
+                  </>
                 )}
               </section>
             )
