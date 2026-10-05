@@ -7,10 +7,12 @@ import {
   Check,
   ChevronsDown,
   ChevronsUp,
+  CirclePlay,
   ClipboardPaste,
   Layers,
   Lightbulb,
   MessageSquarePlus,
+  MoreVertical,
   Music2,
   Pencil,
   Play,
@@ -28,6 +30,7 @@ import { SongCover } from '../SongCover'
 import { EmptyState, KeyBadge, useToast } from '../ui'
 import { AddSongDialog } from './AddSongDialog'
 import { BlockDialog, blockColor, blockSubtitle, ImportTextDialog } from './Blocks'
+import { ItemMenu, listenUrl } from './ItemMenu'
 
 export function keyOptions(original: string | null) {
   const minor = original ? (parseChord(original)?.suffix ?? '').startsWith('m') : false
@@ -81,6 +84,15 @@ export function SongsPanel({ setlist }: { setlist: SetlistDetail }) {
     send(layout)
   }
 
+  /** Pelo menu da música: vai para o fim do bloco escolhido (ou para "sem bloco"). */
+  const moveToBlock = (item: SetlistItem, blockId: string | null) => {
+    if ((item.blockId ?? null) === blockId) return
+    const layout = layoutOf(groups)
+    for (const g of layout) g.itemIds = g.itemIds.filter((id) => id !== item.id)
+    layout.find((g) => g.blockId === blockId)?.itemIds.push(item.id)
+    send(layout)
+  }
+
   const moveBlock = (blockId: string, delta: number) => {
     const layout = layoutOf(groups)
     const loose = layout[0]
@@ -107,6 +119,8 @@ export function SongsPanel({ setlist }: { setlist: SetlistDetail }) {
         canSuggest={canSuggest}
         onPlay={() => navigate(`/repertorios/${setlist.id}/tocar/${index}`)}
         onMove={(d) => moveItem(item, d)}
+        blocks={setlist.blocks}
+        onMoveToBlock={(b) => moveToBlock(item, b)}
         onSuggest={() => setSuggestFor(item)}
       />
     )
@@ -187,30 +201,34 @@ export function SongsPanel({ setlist }: { setlist: SetlistDetail }) {
                     </p>
                     {b.notes && <p className="mt-0.5 truncate text-xs text-muted italic">{b.notes}</p>}
                   </div>
-                  {isAdmin && organizing && (
+                  {isAdmin && (
                     <div className="flex shrink-0 items-center">
+                      {organizing && (
+                        <>
+                          <button
+                            className="grid size-8 place-items-center rounded-lg text-muted hover:bg-surface-2 hover:text-text disabled:opacity-30"
+                            onClick={() => moveBlock(b.id, -1)}
+                            disabled={bi === 0}
+                            aria-label={`Subir o ${b.name}`}
+                          >
+                            <ChevronsUp className="size-4" />
+                          </button>
+                          <button
+                            className="grid size-8 place-items-center rounded-lg text-muted hover:bg-surface-2 hover:text-text disabled:opacity-30"
+                            onClick={() => moveBlock(b.id, 1)}
+                            disabled={bi === setlist.blocks.length - 1}
+                            aria-label={`Descer o ${b.name}`}
+                          >
+                            <ChevronsDown className="size-4" />
+                          </button>
+                        </>
+                      )}
                       <button
-                        className="grid size-8 place-items-center rounded-lg text-muted hover:bg-surface-2 hover:text-text disabled:opacity-30"
-                        onClick={() => moveBlock(b.id, -1)}
-                        disabled={bi === 0}
-                        aria-label={`Subir o ${b.name}`}
-                      >
-                        <ChevronsUp className="size-4" />
-                      </button>
-                      <button
-                        className="grid size-8 place-items-center rounded-lg text-muted hover:bg-surface-2 hover:text-text disabled:opacity-30"
-                        onClick={() => moveBlock(b.id, 1)}
-                        disabled={bi === setlist.blocks.length - 1}
-                        aria-label={`Descer o ${b.name}`}
-                      >
-                        <ChevronsDown className="size-4" />
-                      </button>
-                      <button
-                        className="grid size-8 place-items-center rounded-lg text-muted hover:bg-surface-2 hover:text-text"
+                        className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border px-2.5 text-xs font-medium text-muted hover:bg-surface-2 hover:text-text"
                         onClick={() => setEditingBlock(b)}
                         aria-label={`Editar o ${b.name}`}
                       >
-                        <Pencil className="size-4" />
+                        <Pencil className="size-3.5" /> Editar
                       </button>
                     </div>
                   )}
@@ -292,6 +310,8 @@ function ItemRow({
   onPlay,
   onMove,
   onSuggest,
+  blocks,
+  onMoveToBlock,
 }: {
   setlistId: string
   item: SetlistItem
@@ -304,7 +324,10 @@ function ItemRow({
   onPlay: () => void
   onMove: (delta: number) => void
   onSuggest: () => void
+  blocks: SetlistBlock[]
+  onMoveToBlock: (blockId: string | null) => void
 }) {
+  const [menuOpen, setMenuOpen] = useState(false)
   const update = useUpdateItem(setlistId)
   const remove = useRemoveItem(setlistId)
   const toast = useToast()
@@ -335,7 +358,7 @@ function ItemRow({
   ) : key ? (
     // Tom em destaque, para ler de longe
     <span
-      className="grid h-9 min-w-11 place-items-center rounded-lg bg-accent/12 px-2 font-mono text-base font-black text-chord"
+      className="grid h-9 min-w-9 place-items-center rounded-lg bg-accent/12 px-1.5 font-mono text-base font-black text-chord sm:min-w-11 sm:px-2"
       title="Tom"
     >
       {key}
@@ -346,10 +369,11 @@ function ItemRow({
 
   return (
     <li className="p-3">
-      <div className="flex items-center gap-3">
-        <span className="w-5 shrink-0 text-center font-mono text-sm text-muted">{index + 1}</span>
+      {/* Celular: sem o número da ordem e com capa/botões menores, para o nome caber. */}
+      <div className="flex items-center gap-2 sm:gap-3">
+        <span className="hidden w-5 shrink-0 text-center font-mono text-sm text-muted sm:block">{index + 1}</span>
         <button className="shrink-0" onClick={onPlay} aria-hidden tabIndex={-1}>
-          <SongCover song={item.song} className="size-12 rounded-lg shadow-md shadow-black/30" />
+          <SongCover song={item.song} className="size-10 rounded-lg shadow-md shadow-black/30 sm:size-12" />
         </button>
         <button className="min-w-0 flex-1 text-left" onClick={onPlay}>
           <p className="line-clamp-2 leading-snug font-semibold break-words sm:truncate">
@@ -374,8 +398,39 @@ function ItemRow({
             <Lightbulb className="size-4" />
           </button>
         )}
+        {/* Ouvir a música: gravação de referência ou busca no YouTube (para toda a banda) */}
+        <a
+          href={listenUrl(item.song)}
+          target="_blank"
+          rel="noreferrer"
+          className="grid size-8 shrink-0 place-items-center rounded-lg text-[#ff4e45] hover:bg-[#ff4e45]/10 sm:size-9"
+          aria-label={`Ouvir ${item.song.title} no YouTube`}
+          title={item.song.referenceUrl ? 'Ouvir a gravação de referência' : 'Procurar no YouTube'}
+        >
+          <CirclePlay className="size-5" />
+        </a>
         <div className={editing ? 'hidden sm:block' : ''}>{keyControl}</div>
+        {isAdmin && !editing && (
+          <button
+            className="grid size-8 shrink-0 place-items-center rounded-lg text-muted hover:bg-surface-2 hover:text-text sm:size-9"
+            onClick={() => setMenuOpen(true)}
+            aria-label={`Opções de ${item.song.title}`}
+          >
+            <MoreVertical className="size-4" />
+          </button>
+        )}
       </div>
+      {isAdmin && (
+        <ItemMenu
+          setlistId={setlistId}
+          item={item}
+          blocks={blocks}
+          open={menuOpen}
+          onClose={() => setMenuOpen(false)}
+          onOpenSong={onPlay}
+          onMoveToBlock={onMoveToBlock}
+        />
+      )}
 
       {item.personalKey && item.personalKey !== key && (
         <p className="mt-1 sm:pl-[5.75rem] text-xs text-muted">

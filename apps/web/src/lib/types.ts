@@ -201,6 +201,8 @@ export interface SetlistItem {
     coverUrl: string | null
     /** false = música só com nome e tom (ainda sem cifra). */
     hasContent: boolean
+    /** Gravação de referência (YouTube), se cadastrada. */
+    referenceUrl: string | null
   }
 }
 

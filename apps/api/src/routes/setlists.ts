@@ -243,6 +243,7 @@ export const setlistsRoutes = new Hono<AppEnv>()
             bpm: song.bpm,
             timeSignature: song.timeSignature,
             coverUrl: song.coverUrl,
+            referenceUrl: song.referenceUrl,
             hasContent: sql<boolean>`length(${song.content}) > 0`,
           },
           personalKey: songUserState.personalKey,
