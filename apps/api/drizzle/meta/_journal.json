@@ -64,6 +64,13 @@
       "when": 1791142560000,
       "tag": "0008_super_admin",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1791199347510,
+      "tag": "0009_fk_visitas",
+      "breakpoints": true
     }
   ]
 }
