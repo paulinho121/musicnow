@@ -1,7 +1,9 @@
 import { SETLIST_STATUS } from '@ensaio/shared'
-import { CalendarDays, ChevronRight, Clock, FileUp, Globe, Guitar, MapPin, Plus, Search, Star } from 'lucide-react'
+import clsx from 'clsx'
+import { CalendarDays, ChevronRight, Clock, FileUp, Globe, Guitar, ImagePlus, MapPin, Plus, Search, Star } from 'lucide-react'
 import { type FormEvent, useState } from 'react'
 import { Link, useNavigate } from 'react-router'
+import { HeroBackground, HeroCustomizeDialog } from '../components/HeroBackground'
 import { SongCover } from '../components/SongCover'
 import { SongCard } from '../components/SongRow'
 import { ErrorState, Skeleton } from '../components/ui'
@@ -37,6 +39,8 @@ export function Dashboard() {
   const { data, isLoading, error, refetch } = useDashboard()
   const navigate = useNavigate()
   const [q, setQ] = useState('')
+  const [customizing, setCustomizing] = useState(false)
+  const heroImages = me?.heroImages ?? []
 
   const search = (e: FormEvent) => {
     e.preventDefault()
@@ -46,10 +50,27 @@ export function Dashboard() {
 
   return (
     <div className="space-y-9">
-      {/* Destaque: saudação e busca, sobre um brilho na cor do app */}
-      <header className="relative -mx-4 overflow-hidden px-4 pt-2 pb-1 md:mx-0 md:rounded-3xl md:border md:border-border md:bg-surface md:p-8">
-        <div className="pointer-events-none absolute -top-24 -right-16 size-72 rounded-full bg-accent/25 blur-3xl" />
-        <div className="pointer-events-none absolute -bottom-28 -left-10 size-64 rounded-full bg-fuchsia-500/10 blur-3xl" />
+      {/* Destaque: saudação e busca, sobre as imagens da pessoa (ou o brilho na cor do app) */}
+      <header
+        className={clsx(
+          'relative -mx-4 overflow-hidden px-4 md:mx-0 md:rounded-3xl md:border md:border-border md:bg-surface md:p-8',
+          heroImages.length ? 'pt-24 pb-5 sm:pt-28 md:min-h-72 md:pt-16' : 'pt-2 pb-1',
+        )}
+      >
+        {heroImages.length ? (
+          <HeroBackground images={heroImages} />
+        ) : (
+          <>
+            <div className="pointer-events-none absolute -top-24 -right-16 size-72 rounded-full bg-accent/25 blur-3xl" />
+            <div className="pointer-events-none absolute -bottom-28 -left-10 size-64 rounded-full bg-fuchsia-500/10 blur-3xl" />
+          </>
+        )}
+        <button
+          className="absolute top-3 right-3 z-10 inline-flex h-9 items-center gap-1.5 rounded-xl border border-white/15 bg-black/35 px-3 text-xs font-medium text-white/90 backdrop-blur transition hover:bg-black/55 md:top-4 md:right-4"
+          onClick={() => setCustomizing(true)}
+        >
+          <ImagePlus className="size-4" /> <span className="max-sm:sr-only">Personalizar</span>
+        </button>
         <div className="relative">
           <p className="text-sm font-medium text-muted">{greeting()},</p>
           <h1 className="text-3xl font-extrabold tracking-tight sm:text-4xl">{me?.name?.split(' ')[0] ?? '...'}</h1>
@@ -72,6 +93,7 @@ export function Dashboard() {
           </form>
         </div>
       </header>
+      <HeroCustomizeDialog images={heroImages} open={customizing} onClose={() => setCustomizing(false)} />
 
       <nav aria-label="Atalhos" className="grid grid-cols-4 gap-2 sm:gap-3">
         {ACTIONS.map(({ to, label, icon: Icon }) => (

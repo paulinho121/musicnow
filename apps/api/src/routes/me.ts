@@ -37,6 +37,8 @@ async function loadMe(uid: string) {
     city: p?.city ?? null,
     bio: p?.bio ?? null,
     viewerPrefs: p?.viewerPrefs ?? {},
+    /** Imagens do destaque do início (vazio = o visual padrão). */
+    heroImages: p?.heroImages ?? [],
     instruments,
     /** Perfil ainda não preenchido: o app leva a pessoa ao onboarding. */
     onboarded: Boolean(p?.role) && instruments.length > 0,

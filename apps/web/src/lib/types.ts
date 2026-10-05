@@ -134,6 +134,8 @@ export interface Me {
   city: string | null
   bio: string | null
   viewerPrefs: Record<string, unknown>
+  /** Imagens do destaque do início (vazio = visual padrão). */
+  heroImages?: { id: string; w: number; h: number }[]
   instruments: { instrument: Instrument; primary: boolean }[]
   onboarded: boolean
   isAdmin?: boolean

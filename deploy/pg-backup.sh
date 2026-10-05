@@ -16,14 +16,15 @@ for db in $(psql -Atc "SELECT datname FROM pg_database WHERE NOT datistemplate A
 done
 find "$DIR" -name '*.dump' -mtime +7 -delete
 
-# Partituras: as páginas ficam em disco (o banco só guarda os dados), então vão num pacote à parte.
+# Arquivos enviados (partituras e imagens do início): ficam em disco, fora do banco,
+# então vão num pacote à parte.
 UPLOADS=/var/lib/ensaio-facil/uploads
-SCORES_TAR="$DIR/partituras-$STAMP.tar"
-if [ -d "$UPLOADS/scores" ] && [ -n "$(ls -A "$UPLOADS/scores" 2>/dev/null)" ]; then
-  # As páginas já são WebP comprimido: tar sem gzip (mais rápido, mesmo tamanho).
-  tar -cf "$SCORES_TAR.tmp" -C "$UPLOADS" --exclude='*.tmp' scores && mv "$SCORES_TAR.tmp" "$SCORES_TAR"
+SCORES_TAR="$DIR/arquivos-$STAMP.tar"
+if [ -d "$UPLOADS" ] && [ -n "$(ls -A "$UPLOADS" 2>/dev/null)" ]; then
+  # Já são WebP comprimido: tar sem gzip (mais rápido, mesmo tamanho).
+  tar -cf "$SCORES_TAR.tmp" -C "$(dirname "$UPLOADS")" --exclude='*.tmp' "$(basename "$UPLOADS")" && mv "$SCORES_TAR.tmp" "$SCORES_TAR"
 fi
-find "$DIR" -name 'partituras-*.tar' -mtime +7 -delete
+find "$DIR" \( -name 'arquivos-*.tar' -o -name 'partituras-*.tar' \) -mtime +7 -delete
 
 if [ -r /etc/ensaio-facil/backup.env ]; then
   # shellcheck disable=SC1091

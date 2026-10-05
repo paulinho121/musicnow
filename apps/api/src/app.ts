@@ -9,6 +9,7 @@ import { mailEnabled } from './mail'
 import type { AppEnv } from './http'
 import { billingRoutes } from './routes/billing'
 import { catalogRoutes } from './routes/catalog'
+import { heroRoutes } from './routes/hero'
 import { meRoutes } from './routes/me'
 import { scoresRoutes } from './routes/scores'
 import { invitesRoutes, setlistsRoutes } from './routes/setlists'
@@ -24,6 +25,7 @@ const api = new Hono<AppEnv>()
   // Informações públicas para a tela de login (quais logins sociais estão ativos).
   .get('/meta', (c) => c.json({ providers: enabledProviders, passwordReset: mailEnabled }))
   .on(['GET', 'POST'], '/auth/*', (c) => auth.handler(c.req.raw))
+  .route('/me/hero', heroRoutes)
   .route('/me', meRoutes)
   .route('/songs', songsRoutes)
   .route('/shared', sharedSongRoutes)
@@ -46,8 +48,10 @@ export const app = new Hono()
   .use('/api/songs/import', bodyLimit({ maxSize: 8 * KB * KB, onError: tooLarge }))
   // Partitura: páginas já comprimidas no aparelho (até 30 páginas, ~16 MB no máximo).
   .use('/api/scores', bodyLimit({ maxSize: 16 * KB * KB, onError: tooLarge }))
+  // Imagem do destaque do início (já reduzida no aparelho).
+  .use('/api/me/hero', bodyLimit({ maxSize: 2 * KB * KB, onError: tooLarge }))
   .use('/api/*', async (c, next) =>
-    c.req.path === '/api/songs/import' || c.req.path === '/api/scores'
+    c.req.path === '/api/songs/import' || c.req.path === '/api/scores' || c.req.path === '/api/me/hero'
       ? next()
       : bodyLimit({ maxSize: 1 * KB * KB, onError: tooLarge })(c, next),
   )

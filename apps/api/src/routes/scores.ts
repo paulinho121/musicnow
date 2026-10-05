@@ -14,6 +14,7 @@ import { db, schema } from '../db'
 import { env } from '../env'
 import { forbidden, notFound, requireUser, validate, type AppEnv } from '../http'
 import { assertCanCreate } from '../billing'
+import { sweepHeroImages } from './hero'
 import { canViewSong } from './songs'
 
 const { song, songScore } = schema
@@ -214,7 +215,11 @@ export function startScoreSweeper() {
       if (info && Date.now() - info.mtimeMs > 60 * 60 * 1000) await rm(path.join(scoresDir(), name), { recursive: true, force: true })
     }
   }
-  const run = () => sweep().catch((e) => console.error('Partituras: falha na limpeza', e))
+  const run = () =>
+    Promise.all([
+      sweep().catch((e) => console.error('Partituras: falha na limpeza', e)),
+      sweepHeroImages().catch((e) => console.error('Imagens do início: falha na limpeza', e)),
+    ])
   setTimeout(run, 30_000)
   setInterval(run, 24 * 60 * 60 * 1000)
 }

@@ -97,6 +97,11 @@ export const profile = pgTable('profile', {
   bio: text(),
   /** Preferências do visualizador (fonte, espaçamento, rolagem...). */
   viewerPrefs: jsonb().$type<Record<string, unknown>>().notNull().default({}),
+  /**
+   * Imagens do destaque do início, escolhidas pela pessoa (até 5). Os arquivos ficam em
+   * UPLOAD_DIR/hero/<userId>/<id>.webp; aqui só os dados.
+   */
+  heroImages: jsonb().$type<{ id: string; w: number; h: number }[]>().notNull().default([]),
   ...timestamps,
 })
 
