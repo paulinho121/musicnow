@@ -36,6 +36,8 @@ export default defineConfig({
           '**/alphaTab-*.js',
           '**/pdf-*.js',
           '**/pdf.worker*',
+          // Fonte musical do Guitar Pro (~310 KB): só para quem abrir arquivo .gp.
+          'alphatab/**',
         ],
         navigateFallback: '/index.html',
         navigateFallbackDenylist: [/^\/api\//],
@@ -64,7 +66,7 @@ export default defineConfig({
           },
           {
             // Leitores pesados: guardados no primeiro uso.
-            urlPattern: ({ url }) => /\/assets\/(alphaTab|pdf)[-.]/.test(url.pathname),
+            urlPattern: ({ url }) => /\/assets\/(alphaTab|pdf)[-.]|^\/alphatab\/font\//.test(url.pathname),
             handler: 'CacheFirst',
             options: { cacheName: 'readers', expiration: { maxEntries: 10 }, cacheableResponse: { statuses: [200] } },
           },

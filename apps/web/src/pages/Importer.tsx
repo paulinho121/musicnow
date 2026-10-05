@@ -184,6 +184,8 @@ export function Importer() {
       {
         onSuccess: async (res) => {
           const gpItems = selected.filter((it) => it.file && /\.(gp|gp3|gp4|gp5|gpx)$/i.test(it.file.name))
+          let attached = 0
+          const failedScores: string[] = []
           if (gpItems.length > 0) {
             setAttachingScores(true)
             for (const it of gpItems) {
@@ -209,8 +211,11 @@ export function Importer() {
                     () => {},
                   )
                   pages.forEach((p) => URL.revokeObjectURL(p.url))
-                } catch {
-                  // Se a renderização falhar, a música continua salva com a cifra
+                  attached++
+                } catch (e) {
+                  // A música continua salva; só a partitura não foi anexada (e a pessoa fica sabendo).
+                  console.error('Partitura do Guitar Pro não anexada', it.file.name, e)
+                  failedScores.push(it.song.title)
                 }
               }
             }
@@ -218,7 +223,16 @@ export function Importer() {
           }
           setResult(res)
           setItems([])
-          toast(`${res.created.length} música(s) importada(s)${gpItems.length > 0 ? ' com partitura(s) anexa(s)' : ''}.`)
+          toast(
+            [
+              `${res.created.length} ${res.created.length === 1 ? 'música importada' : 'músicas importadas'}`,
+              attached ? `${attached} com partitura anexada` : null,
+              failedScores.length ? `não foi possível desenhar a partitura de: ${failedScores.join(', ')} (anexe pelo botão "Anexar partitura")` : null,
+            ]
+              .filter(Boolean)
+              .join(' · ') + '.',
+            failedScores.length ? 'error' : undefined,
+          )
         },
         onError: (err) => setError(err.message),
       },

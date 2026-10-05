@@ -3,7 +3,15 @@
 import type { ImportedSong } from '@ensaio/shared'
 import type { SourcePage } from './scoreProcess'
 
-const TARGET_PAGE_HEIGHT = 1900
+/** Largura (CSS) em que a partitura é desenhada: notas grandes o bastante para ler no celular. */
+const RENDER_WIDTH = 1100
+/** Página no formato A4 (altura = largura × 1,414). */
+const A4 = 1.414
+/**
+ * Fonte musical (Bravura, licença OFL) publicada junto com o app em /alphatab/font/.
+ * Sem ela o alphaTab não começa a desenhar (ele a procuraria dentro de node_modules).
+ */
+const fontDirectory = () => `${window.location.origin}/alphatab/font/`
 
 interface AlphaTabModule {
   importer: {
@@ -185,7 +193,12 @@ export async function parseGuitarProSong(file: File): Promise<ImportedSong> {
         ? `${firstMb.timeSignatureNumerator}/${firstMb.timeSignatureDenominator}`
         : null
 
-    const key = firstMb && typeof firstMb.keySignature === 'number' ? decodeKey(firstMb.keySignature, firstMb.keySignatureType === 1) : null
+    // Armadura 0 (Dó) é o padrão dos arquivos Guitar Pro, não quer dizer que a música é em Dó:
+    // nesse caso o tom fica em aberto (o servidor deduz pelos acordes, se houver).
+    const key =
+      firstMb && typeof firstMb.keySignature === 'number' && firstMb.keySignature !== 0
+        ? decodeKey(firstMb.keySignature, firstMb.keySignatureType === 1)
+        : null
 
     // Percorre compassos para montar as seções e acordes
     const sections: { title: string; lines: string[] }[] = []
@@ -247,16 +260,15 @@ export async function parseGuitarProSong(file: File): Promise<ImportedSong> {
       sections.push(currentSec)
     }
 
-    let content = ''
-    if (sections.length > 0 && totalChords > 0) {
-      content = sections.map((s) => `[${s.title}]\n${s.lines.join('\n')}`).join('\n\n')
-    } else {
-      content = `[Estrutura]\n| C  G | Am  F |\n\n(A tablatura contém ${masterBars.length} compassos; os acordes podem ser preenchidos ou conferidos na partitura anexa).`
-    }
+    // Sem acordes nomeados no arquivo (comum em tablatura de violão solo): a música fica sem
+    // cifra e abre direto na partitura anexada. Nunca inventamos acordes.
+    const content = sections.length > 0 && totalChords > 0 ? sections.map((s) => `[${s.title}]\n${s.lines.join('\n')}`).join('\n\n') : ''
 
     const warnings: string[] = []
     if (totalChords === 0) {
-      warnings.push('Nenhum diagrama de acorde nomeado foi encontrado no arquivo Guitar Pro. Apenas notas de tablatura foram detectadas.')
+      warnings.push(
+        `Este arquivo não tem acordes nomeados (só a tablatura, ${masterBars.length} compassos). A música entra sem cifra e abre direto na partitura.`,
+      )
     }
 
     return {
@@ -284,12 +296,12 @@ export async function readGuitarProScorePages(file: File): Promise<SourcePage[]>
 
   const buffer = await file.arrayBuffer()
 
-  // Cria contêiner fora da tela para o alphaTab renderizar
+  // Contêiner fora da tela para o alphaTab desenhar.
   const container = document.createElement('div')
   container.style.position = 'absolute'
   container.style.left = '-9999px'
   container.style.top = '0'
-  container.style.width = '1400px'
+  container.style.width = `${RENDER_WIDTH}px`
   container.style.background = '#ffffff'
   document.body.appendChild(container)
 
@@ -297,32 +309,28 @@ export async function readGuitarProScorePages(file: File): Promise<SourcePage[]>
 
   try {
     const rendered = await new Promise<HTMLCanvasElement[]>((resolve, reject) => {
-      const timeout = setTimeout(() => {
-        reject(new Error('Tempo limite excedido ao desenhar a partitura do Guitar Pro.'))
-      }, 20000)
-
+      const timeout = setTimeout(() => reject(new Error('A partitura demorou demais para ser desenhada.')), 30000)
       try {
         api = new at.AlphaTabApi(container, {
           core: {
             engine: 'html5',
             useWorkers: false,
+            fontDirectory: fontDirectory(),
+            // Desenha tudo de uma vez (o "preguiçoso" só desenharia o que está visível na tela).
+            enableLazyLoading: false,
           },
-          display: {
-            layoutMode: at.LayoutMode.Page,
-          },
-          player: {
-            enablePlayer: false,
-          },
+          display: { layoutMode: at.LayoutMode.Page },
+          player: { enablePlayer: false },
         })
-
+        api.error?.on?.((e: unknown) => {
+          clearTimeout(timeout)
+          reject(e instanceof Error ? e : new Error('O arquivo Guitar Pro não pôde ser desenhado.'))
+        })
         api.renderFinished.on(() => {
           clearTimeout(timeout)
-          setTimeout(() => {
-            const canvases = Array.from(container.querySelectorAll('canvas'))
-            resolve(canvases as HTMLCanvasElement[])
-          }, 100)
+          // Cada linha de pauta vira um canvas, na ordem do papel.
+          setTimeout(() => resolve(Array.from(container.querySelectorAll('canvas'))), 50)
         })
-
         api.load(new Uint8Array(buffer))
       } catch (e) {
         clearTimeout(timeout)
@@ -330,43 +338,49 @@ export async function readGuitarProScorePages(file: File): Promise<SourcePage[]>
       }
     })
 
-    if (!rendered || rendered.length === 0) {
-      throw new Error('Não foi possível gerar as páginas visuais a partir deste arquivo Guitar Pro.')
-    }
+    if (!rendered.length) throw new Error('Não foi possível gerar as páginas da partitura deste arquivo Guitar Pro.')
 
-    // Se o alphaTab gerou um único canvas contínuo, fatia em páginas no padrão A4
-    const pages: HTMLCanvasElement[] = []
-    for (const canvas of rendered) {
-      if (canvas.height <= TARGET_PAGE_HEIGHT) {
-        pages.push(canvas)
-      } else {
-        // Fatiamento em alturas proporcionais
-        let y = 0
-        while (y < canvas.height) {
-          const sliceH = Math.min(TARGET_PAGE_HEIGHT, canvas.height - y)
-          const slice = document.createElement('canvas')
-          slice.width = canvas.width
-          slice.height = sliceH
-          const ctx = slice.getContext('2d')!
-          ctx.fillStyle = '#ffffff'
-          ctx.fillRect(0, 0, slice.width, slice.height)
-          ctx.drawImage(canvas, 0, y, canvas.width, sliceH, 0, 0, canvas.width, sliceH)
-          pages.push(slice)
-          y += sliceH
-        }
+    // Junta as linhas de pauta em páginas A4, sem cortar uma linha ao meio.
+    const width = rendered[0].width
+    const pageHeight = Math.round(width * A4)
+    const margin = Math.round(width * 0.03)
+    const groups: HTMLCanvasElement[][] = [[]]
+    let used = margin
+    for (const sys of rendered) {
+      // Linha mais alta que a página (raro): vai sozinha e é cortada na montagem.
+      if (used + sys.height > pageHeight - margin && groups[groups.length - 1].length) {
+        groups.push([])
+        used = margin
       }
+      groups[groups.length - 1].push(sys)
+      used += sys.height
     }
+    const pages = groups.map((systems) => {
+      const page = document.createElement('canvas')
+      page.width = width
+      page.height = pageHeight
+      const ctx = page.getContext('2d')!
+      ctx.fillStyle = '#ffffff'
+      ctx.fillRect(0, 0, page.width, page.height)
+      let y = margin
+      for (const sys of systems) {
+        ctx.drawImage(sys, 0, y)
+        y += sys.height
+      }
+      return page
+    })
 
     return pages.map((pageCanvas, idx) => ({
       label: `${file.name} · pág. ${idx + 1}`,
-      render: async (width: number) => {
-        const scale = Math.min(1, width / pageCanvas.width)
+      render: async (w: number) => {
+        const scale = Math.min(1, w / pageCanvas.width)
         const out = document.createElement('canvas')
         out.width = Math.round(pageCanvas.width * scale)
         out.height = Math.round(pageCanvas.height * scale)
         const ctx = out.getContext('2d')!
         ctx.fillStyle = '#ffffff'
         ctx.fillRect(0, 0, out.width, out.height)
+        ctx.imageSmoothingQuality = 'high'
         ctx.drawImage(pageCanvas, 0, 0, out.width, out.height)
         return out
       },
