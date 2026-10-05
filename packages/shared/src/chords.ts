@@ -288,3 +288,22 @@ export function wrapChordPair(chords: string | null, lyrics: string | null, cols
   out(c, l)
   return rows
 }
+
+/**
+ * Move o acorde que começa na coluna `from` para a coluna `to`, sem mexer nos outros.
+ * Não deixa encostar nem pular por cima do vizinho (fica a 1 espaço dele).
+ * Devolve a linha nova e a coluna onde o acorde ficou.
+ */
+export function moveChordInLine(line: string, from: number, to: number): { line: string; col: number } {
+  const tokens = [...line.matchAll(/\S+/g)].map((m) => ({ text: m[0], start: m.index! }))
+  const i = tokens.findIndex((t) => t.start === from)
+  if (i < 0) return { line, col: from }
+  const tok = tokens[i]
+  const min = i > 0 ? tokens[i - 1].start + tokens[i - 1].text.length + 1 : 0
+  const max = i < tokens.length - 1 ? tokens[i + 1].start - tok.text.length - 1 : Number.MAX_SAFE_INTEGER
+  const col = Math.max(min, Math.min(max, Math.max(0, to)))
+  tokens[i] = { ...tok, start: col }
+  let out = ''
+  for (const t of tokens) out = out.padEnd(t.start, ' ') + t.text
+  return { line: out, col }
+}

@@ -4,6 +4,7 @@ import {
   isChord,
   isChordLine,
   wrapChordPair,
+  moveChordInLine,
   normalizeOffset,
   parseSheet,
   semitonesBetween,
@@ -158,5 +159,28 @@ describe('quebra de linha em tela pequena', () => {
     expect(rows.map((r) => r.chords).join(' ').split(/\s+/).filter((t) => t !== '|')).toEqual([
       'Dm7(9)', 'Dm7(9)', 'Em7(b5)', 'A7(b13)', 'Dm7(9)',
     ])
+  })
+})
+
+describe('ajustar a posição do acorde', () => {
+  it('move só o acorde escolhido, mantendo os outros no lugar', () => {
+    //         0123456789012345678901
+    const l = 'E                  E7'
+    expect(moveChordInLine(l, 19, 15)).toEqual({ line: 'E              E7', col: 15 })
+    expect(moveChordInLine(l, 0, 4)).toEqual({ line: '    E              E7', col: 4 })
+  })
+
+  it('não encosta nem pula o vizinho', () => {
+    const l = 'A            E  B'
+    // B não pode ir para antes do E: para a 1 espaço dele.
+    expect(moveChordInLine(l, 16, 2)).toEqual({ line: 'A            E B', col: 15 })
+    // E não pode passar o B.
+    expect(moveChordInLine(l, 13, 30).col).toBe(14)
+    // Nem antes do começo da linha.
+    expect(moveChordInLine(l, 0, -5).col).toBe(0)
+  })
+
+  it('coluna sem acorde: nada muda', () => {
+    expect(moveChordInLine('C   G', 2, 0)).toEqual({ line: 'C   G', col: 2 })
   })
 })

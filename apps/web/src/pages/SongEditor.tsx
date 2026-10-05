@@ -12,11 +12,12 @@ import {
   type Visibility,
 } from '@ensaio/shared'
 import clsx from 'clsx'
-import { ArrowLeft, Eye, HelpCircle, Save, Trash2 } from 'lucide-react'
+import { ArrowLeft, Eye, HelpCircle, MoveHorizontal, Save, Trash2 } from 'lucide-react'
 import { useEffect, useState, type FormEvent } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router'
 import { ChordSheet, useSheet } from '../components/ChordSheet'
 import { FindLinks } from '../components/FindLinks'
+import { ChordAligner } from '../components/ChordAligner'
 import { CoverPicker } from '../components/CoverPicker'
 import { MetadataLookup } from '../components/MetadataLookup'
 import { ErrorState, PageSpinner, useToast } from '../components/ui'
@@ -66,7 +67,10 @@ export function SongEditor() {
   const draft = (useLocation().state as { draft?: Partial<SongInput> } | null)?.draft
   const [form, setForm] = useState<SongInput>(() => (draft && !id ? { ...EMPTY, ...draft } : EMPTY))
   const [tagsText, setTagsText] = useState('')
-  const [tab, setTab] = useState<'edit' | 'preview'>('edit')
+  // ?aba=ajustar abre direto no ajuste da posição dos acordes (atalho da tela da música).
+  const [tab, setTab] = useState<'edit' | 'preview' | 'align'>(() =>
+    new URLSearchParams(window.location.search).get('aba') === 'ajustar' ? 'align' : 'edit',
+  )
   const [fieldError, setFieldError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -253,7 +257,7 @@ export function SongEditor() {
         <div className="mb-3 flex items-center justify-between gap-2">
           <h2 className="font-semibold">Cifra</h2>
           <div className="flex rounded-xl border border-border p-1" role="tablist">
-            {(['edit', 'preview'] as const).map((t) => (
+            {(['edit', 'align', 'preview'] as const).map((t) => (
               <button
                 key={t}
                 type="button"
@@ -262,7 +266,14 @@ export function SongEditor() {
                 onClick={() => setTab(t)}
                 className={clsx('h-8 rounded-lg px-3 text-sm font-medium', tab === t ? 'bg-surface-2 text-text' : 'text-muted')}
               >
-                {t === 'edit' ? 'Editar' : (
+                {t === 'edit' ? (
+                  'Editar'
+                ) : t === 'align' ? (
+                  <span className="inline-flex items-center gap-1.5">
+                    <MoveHorizontal className="size-4" /> <span className="max-sm:sr-only">Ajustar acordes</span>
+                    <span className="sm:hidden">Ajustar</span>
+                  </span>
+                ) : (
                   <span className="inline-flex items-center gap-1.5">
                     <Eye className="size-4" /> Ver
                   </span>
@@ -293,6 +304,12 @@ export function SongEditor() {
               </div>
             )}
           </>
+        ) : tab === 'align' ? (
+          form.content.trim() ? (
+            <ChordAligner content={form.content} onChange={(c) => set('content', c)} />
+          ) : (
+            <p className="py-10 text-center text-sm text-muted">Escreva ou cole a cifra primeiro.</p>
+          )
         ) : form.content.trim() ? (
           <div className="rounded-xl bg-bg p-4">
             <ChordSheet lines={lines} fontSize={15} lineHeight={1.45} wrap />

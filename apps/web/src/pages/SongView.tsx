@@ -15,6 +15,7 @@ import {
   Lock,
   LogOut,
   Minus,
+  MoveHorizontal,
   Pause,
   Pencil,
   Play,
@@ -776,6 +777,11 @@ export function SongViewer({ songId, setlist }: { songId: string; setlist?: Setl
           <Link to={`/musicas/${song.id}/imprimir${offset ? `?st=${offset}` : ''}`} className="flex h-12 items-center gap-3 rounded-xl px-2 hover:bg-surface-2">
             <Printer className="size-5 text-muted" /> Imprimir ou salvar PDF
           </Link>
+          {song.canEdit && song.content.trim() && (
+            <Link to={`/musicas/${song.id}/editar?aba=ajustar`} className="flex h-12 items-center gap-3 rounded-xl px-2 hover:bg-surface-2">
+              <MoveHorizontal className="size-5 text-muted" /> Ajustar posição dos acordes
+            </Link>
+          )}
           {song.canEdit && (
             <button
               className="flex h-12 items-center gap-3 rounded-xl px-2 text-left hover:bg-surface-2"
