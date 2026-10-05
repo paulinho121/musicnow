@@ -14,6 +14,7 @@ import {
   ClipboardPaste,
   Layers,
   Lightbulb,
+  Megaphone,
   MessageSquarePlus,
   MoreVertical,
   Music2,
@@ -34,6 +35,7 @@ import { EmptyState, KeyBadge, useToast } from '../ui'
 import { AddSongDialog } from './AddSongDialog'
 import { BlockDialog, blockColor, blockSubtitle, ImportTextDialog } from './Blocks'
 import { ItemMenu, listenUrl } from './ItemMenu'
+import { ShareSetlistDialog } from './ShareSetlistDialog'
 
 /** Blocos recolhidos neste repertório, lembrados neste aparelho. */
 function useCollapsedBlocks(setlistId: string) {
@@ -72,6 +74,7 @@ export function SongsPanel({ setlist }: { setlist: SetlistDetail }) {
   const [adding, setAdding] = useState<{ blockId: string | null } | null>(null)
   const [pasting, setPasting] = useState(false)
   const [editingBlock, setEditingBlock] = useState<SetlistBlock | null | 'new'>(null)
+  const [sharingBlock, setSharingBlock] = useState<string | null>(null)
   const [suggestFor, setSuggestFor] = useState<SetlistItem | null | 'general'>(null)
   // Lista limpa por padrão (como a folha de papel); "Organizar" mostra os controles.
   const [organizing, setOrganizing] = useState(false)
@@ -265,6 +268,17 @@ export function SongsPanel({ setlist }: { setlist: SetlistDetail }) {
                       {!isCollapsed && b.notes && <span className="mt-0.5 block truncate text-xs text-muted italic">{b.notes}</span>}
                     </span>
                   </button>
+                  {/* Divulgar só este bloco: qualquer pessoa do repertório pode */}
+                  {items.length > 0 && (
+                    <button
+                      className="grid size-8 shrink-0 place-items-center rounded-lg text-muted hover:bg-surface-2 hover:text-text"
+                      onClick={() => setSharingBlock(b.id)}
+                      aria-label={`Divulgar o ${b.name}`}
+                      title="Divulgar este bloco"
+                    >
+                      <Megaphone className="size-4" />
+                    </button>
+                  )}
                   {isAdmin && (
                     <div className="flex shrink-0 items-center">
                       {organizing && (
@@ -363,6 +377,7 @@ export function SongsPanel({ setlist }: { setlist: SetlistDetail }) {
         </>
       )}
       <SuggestDialog setlist={setlist} target={suggestFor} onClose={() => setSuggestFor(null)} />
+      <ShareSetlistDialog setlist={setlist} blockId={sharingBlock} open={sharingBlock !== null} onClose={() => setSharingBlock(null)} />
     </div>
   )
 }

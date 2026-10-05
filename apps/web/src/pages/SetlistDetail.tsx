@@ -1,11 +1,28 @@
 import { atLeast } from '@ensaio/shared'
 import clsx from 'clsx'
-import { Archive, ArchiveRestore, ArrowLeft, CalendarDays, Copy, GitBranch, MapPin, MoreVertical, Pencil, Play, Radio, Trash2, UserPlus, Users } from 'lucide-react'
+import {
+  Archive,
+  ArchiveRestore,
+  ArrowLeft,
+  CalendarDays,
+  Copy,
+  GitBranch,
+  MapPin,
+  Megaphone,
+  MoreVertical,
+  Pencil,
+  Play,
+  Radio,
+  Trash2,
+  UserPlus,
+  Users,
+} from 'lucide-react'
 import { useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
 import { BandPanel } from '../components/setlist/BandPanel'
 import { ExportButton } from '../components/setlist/ExportButton'
 import { HistoryPanel } from '../components/setlist/HistoryPanel'
+import { ShareSetlistDialog } from '../components/setlist/ShareSetlistDialog'
 import { SongsPanel } from '../components/setlist/SongsPanel'
 import { Sheet } from '../components/Sheet'
 import { ErrorState, PageSpinner, useToast } from '../components/ui'
@@ -36,6 +53,7 @@ export function SetlistDetail() {
   const del = useDeleteSetlist(id ?? '')
   const duplicate = useDuplicateSetlist(id ?? '')
   const [menu, setMenu] = useState(false)
+  const [sharing, setSharing] = useState(false)
 
   if (isLoading) return <PageSpinner />
   if (error || !s) return <ErrorState error={error ?? new Error('Repertório não encontrado.')} onRetry={() => refetch()} />
@@ -115,7 +133,9 @@ export function SetlistDetail() {
           </span>
           <span className="min-w-0 flex-1">
             <span className="block font-semibold">
-              {live.stage.leaderId === session?.user.id ? 'Você está comandando a banda' : `Ao vivo agora · ${live.stage.leaderName} no comando`}
+              {live.stage.leaderId === session?.user.id
+                ? 'Você está comandando a banda'
+                : `Ao vivo agora · ${live.stage.leaderName} no comando`}
             </span>
             <span className="block truncate text-sm text-muted">
               Tocando: {s.items[live.stage.position].song.title} · {live.presence.length} conectados
@@ -135,16 +155,25 @@ export function SetlistDetail() {
             <Radio className="size-4 animate-pulse" /> Comandar Banda ao Vivo
           </button>
         )}
-        <button className="btn-primary col-span-2 sm:col-auto" disabled={!s.items.length} onClick={() => navigate(`/repertorios/${s.id}/tocar/0`)}>
+        <button
+          className="btn-primary col-span-2 sm:col-auto"
+          disabled={!s.items.length}
+          onClick={() => navigate(`/repertorios/${s.id}/tocar/0`)}
+        >
           <Play className="size-4" /> {s.status === 'ensaio' ? 'Ensaiar' : 'Tocar'}
         </button>
         <ExportButton setlist={s} />
+        <button className="btn-ghost" onClick={() => setSharing(true)} disabled={!s.items.length}>
+          <Megaphone className="size-4" /> Divulgar
+        </button>
         {isAdmin && (
           <button className="btn-ghost" onClick={() => setParams({ aba: 'banda' }, { replace: true })}>
             <UserPlus className="size-4" /> Convidar Músicos
           </button>
         )}
       </div>
+
+      <ShareSetlistDialog setlist={s} open={sharing} onClose={() => setSharing(false)} />
 
       <div className="flex gap-1 border-b border-border" role="tablist">
         {TABS.map((t) => (
