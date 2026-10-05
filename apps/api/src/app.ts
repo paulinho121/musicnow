@@ -12,7 +12,7 @@ import { catalogRoutes } from './routes/catalog'
 import { meRoutes } from './routes/me'
 import { scoresRoutes } from './routes/scores'
 import { invitesRoutes, setlistsRoutes } from './routes/setlists'
-import { songsRoutes } from './routes/songs'
+import { sharedSongRoutes, songsRoutes } from './routes/songs'
 import { analyticsRoutes } from './routes/analytics'
 import { adminRoutes } from './routes/admin'
 
@@ -26,6 +26,7 @@ const api = new Hono<AppEnv>()
   .on(['GET', 'POST'], '/auth/*', (c) => auth.handler(c.req.raw))
   .route('/me', meRoutes)
   .route('/songs', songsRoutes)
+  .route('/shared', sharedSongRoutes)
   .route('/setlists', setlistsRoutes)
   .route('/invites', invitesRoutes)
   .route('/catalog', catalogRoutes)

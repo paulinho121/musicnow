@@ -87,6 +87,8 @@ export interface SongDetail extends SongInput {
   canShareMarks: boolean
   /** Partituras anexadas (vazio = só cifra). */
   scores: ScorePart[]
+  /** Recebida pelo link de compartilhamento (pode sair dela). */
+  sharedWithMe?: boolean
   createdAt: string
   updatedAt: string
 }

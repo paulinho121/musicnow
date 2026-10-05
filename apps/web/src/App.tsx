@@ -18,6 +18,7 @@ import { Profile } from './pages/Profile'
 import { SetlistDetail } from './pages/SetlistDetail'
 import { SetlistForm } from './pages/SetlistForm'
 import { SetlistPlay } from './pages/SetlistPlay'
+import { SharedSongAccept } from './pages/SharedSongAccept'
 import { Setlists } from './pages/Setlists'
 import { SongEditor } from './pages/SongEditor'
 import { SongView } from './pages/SongView'
@@ -101,6 +102,7 @@ export const router = createBrowserRouter([
           { path: '/repertorios/:id', element: <SetlistDetail /> },
           { path: '/repertorios/:id/editar', element: <SetlistForm /> },
           { path: '/convite/:code', element: <InviteAccept /> },
+          { path: '/compartilhado/:code', element: <SharedSongAccept /> },
           { path: '/perfil', element: <Profile /> },
           { path: '/assinatura', element: <Subscription /> },
           {

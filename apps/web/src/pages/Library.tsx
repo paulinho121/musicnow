@@ -1,6 +1,6 @@
 import { MAJOR_KEYS, MINOR_KEYS } from '@ensaio/shared'
 import clsx from 'clsx'
-import { FileUp, Globe, Music2, Plus, Search, X } from 'lucide-react'
+import { FileUp, Globe, Music2, Plus, Search, Share2, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router'
 import { SongRow } from '../components/SongRow'
@@ -11,6 +11,7 @@ const SCOPES = [
   { value: 'all', label: 'Todas' },
   { value: 'mine', label: 'Minhas' },
   { value: 'favorites', label: 'Favoritas' },
+  { value: 'shared', label: 'Compartilhadas comigo' },
   { value: 'public', label: 'Públicas' },
 ]
 
@@ -132,6 +133,11 @@ export function Library() {
             ))}
           </div>
         </>
+      ) : scope === 'shared' && !q ? (
+        <EmptyState icon={Share2} title="Ninguém compartilhou músicas com você ainda">
+          Quando alguém mandar o link de uma música, ela aparece aqui. Para compartilhar uma música sua, abra a música e toque em
+          Compartilhar.
+        </EmptyState>
       ) : filtered ? (
         <EmptyState
           icon={Search}

@@ -78,6 +78,13 @@
       "when": 1791201737649,
       "tag": "0010_assinaturas",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1791207020327,
+      "tag": "0011_compartilhar_musica",
+      "breakpoints": true
     }
   ]
 }

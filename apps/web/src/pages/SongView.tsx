@@ -13,6 +13,7 @@ import {
   ListMusic,
   ListPlus,
   Lock,
+  LogOut,
   Minus,
   Pause,
   Pencil,
@@ -20,6 +21,7 @@ import {
   Plus,
   Printer,
   RotateCcw,
+  Share2,
   Shrink,
   Star,
   Tag,
@@ -40,12 +42,14 @@ import { ReferencePlayer } from '../components/ReferencePlayer'
 import { ReportButton } from '../components/ReportDialog'
 import { ScoreUploadDialog } from '../components/score/ScoreUploadDialog'
 import { ScoreViewer } from '../components/score/ScoreViewer'
+import { ShareSongDialog } from '../components/ShareSongDialog'
 import { Sheet } from '../components/Sheet'
 import { CoverGlow, SongCover } from '../components/SongCover'
 import { ErrorState, PageSpinner, useToast } from '../components/ui'
 import { useSession } from '../lib/auth'
 import { useDeleteMark, useSavePersonalKey, useSong, useToggleFavorite } from '../lib/queries'
 import { downloadText } from '../lib/download'
+import { useLeaveSharedSong } from '../lib/songShare'
 import { useLocalState } from '../lib/storage'
 import type { SongMark } from '../lib/types'
 
@@ -106,6 +110,8 @@ export function SongViewer({ songId, setlist }: { songId: string; setlist?: Setl
   const [chordOpen, setChordOpen] = useState<string | null>(null)
   const [addOpen, setAddOpen] = useState(false)
   const [moreOpen, setMoreOpen] = useState(false)
+  const [shareOpen, setShareOpen] = useState(false)
+  const leaveShared = useLeaveSharedSong(songId)
   // Cifra ou partitura: a escolha vale para as próximas músicas (quem lê partitura não troca a cada uma).
   const setViewMode = (view: 'chord' | 'score') => setPrefs((p) => ({ ...p, view }))
   const [uploadScoreOpen, setUploadScoreOpen] = useState(false)
@@ -293,6 +299,16 @@ export function SongViewer({ songId, setlist }: { songId: string; setlist?: Setl
               open={addOpen}
               onOpenChange={setAddOpen}
             />
+          )}
+          {song.canEdit && !setlist && (
+            <button
+              className="btn-icon hidden shrink-0 border-transparent bg-transparent sm:inline-flex"
+              aria-label="Compartilhar música"
+              title="Compartilhar com outra pessoa"
+              onClick={() => setShareOpen(true)}
+            >
+              <Share2 className="size-5" />
+            </button>
           )}
           {song.canEdit && !setlist && (
             <Link to={`/musicas/${song.id}/editar`} className="btn-icon hidden shrink-0 border-transparent bg-transparent sm:inline-flex" aria-label="Editar">
@@ -724,8 +740,38 @@ export function SongViewer({ songId, setlist }: { songId: string; setlist?: Setl
           <Link to={`/musicas/${song.id}/imprimir${offset ? `?st=${offset}` : ''}`} className="flex h-12 items-center gap-3 rounded-xl px-2 hover:bg-surface-2">
             <Printer className="size-5 text-muted" /> Imprimir ou salvar PDF
           </Link>
+          {song.canEdit && (
+            <button
+              className="flex h-12 items-center gap-3 rounded-xl px-2 text-left hover:bg-surface-2"
+              onClick={() => {
+                setMoreOpen(false)
+                setShareOpen(true)
+              }}
+            >
+              <Share2 className="size-5 text-muted" /> Compartilhar com outra pessoa
+            </button>
+          )}
+          {song.sharedWithMe && (
+            <button
+              className="flex h-12 items-center gap-3 rounded-xl px-2 text-left text-danger hover:bg-danger/10"
+              onClick={() =>
+                confirm(`Tirar "${song.title}" da sua biblioteca? ${song.ownerName} pode compartilhar de novo depois.`) &&
+                leaveShared.mutate(undefined, {
+                  onSuccess: () => {
+                    toast('Música removida da sua biblioteca.')
+                    navigate('/musicas', { replace: true })
+                  },
+                  onError: (e) => toast(e.message, 'error'),
+                })
+              }
+            >
+              <LogOut className="size-5" /> Sair desta música compartilhada
+            </button>
+          )}
         </div>
       </Sheet>
+
+      {song.canEdit && <ShareSongDialog songId={song.id} title={song.title} open={shareOpen} onClose={() => setShareOpen(false)} />}
 
       <ScoreUploadDialog
         songId={song.id}

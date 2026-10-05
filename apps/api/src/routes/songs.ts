@@ -2,6 +2,7 @@ import { atLeast, guessKey, isChord, normalizeSearch, PUBLIC_LICENSES, stripLyri
 import { and, asc, desc, eq, exists, ilike, isNull, or, sql, type SQL } from 'drizzle-orm'
 import { Hono } from 'hono'
 import { HTTPException } from 'hono/http-exception'
+import { randomInt } from 'node:crypto'
 import { z } from 'zod'
 import { getRole } from '../access'
 import { assertCanCreate } from '../billing'
@@ -9,9 +10,10 @@ import { COVER_URL_RE } from '../covers'
 import { removeScoreFiles, scoresOfSong } from './scores'
 import { publish } from '../realtime'
 import { db, schema } from '../db'
+import { env } from '../env'
 import { forbidden, notFound, requireUser, validate, type AppEnv } from '../http'
 
-const { song, favorite, songUserState, songMark, songReport, setlistItem, setlistMember, setlist, user, changeLog } = schema
+const { song, songShare, favorite, songUserState, songMark, songReport, setlistItem, setlistMember, setlist, user, changeLog } = schema
 
 const keySchema = z
   .string()
@@ -89,6 +91,8 @@ export function canViewSong(userId: string): SQL {
   return or(
     eq(song.ownerId, userId),
     eq(song.visibility, 'public'),
+    // Compartilhada com a pessoa pelo link da música.
+    exists(db.select({ one: sql`1` }).from(songShare).where(and(eq(songShare.songId, song.id), eq(songShare.userId, userId)))),
     exists(
       db
         .select({ one: sql`1` })
@@ -149,6 +153,49 @@ async function loadOwnSong(id: string, userId: string) {
   return row
 }
 
+// ---------------------------------------------------------------------------
+// Compartilhar uma música por link (fora de repertório)
+
+// 10 caracteres sem letras ambíguas (0/O, 1/I/L): ~800 trilhões de combinações.
+const SHARE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'
+const newShareCode = () => Array.from({ length: 10 }, () => SHARE_ALPHABET[randomInt(SHARE_ALPHABET.length)]).join('')
+const shareUrl = (code: string) => `${env.APP_URL}/compartilhado/${code}`
+
+/** Quem tem a música (para a dona ver e remover). */
+async function sharesOf(songId: string) {
+  return db
+    .select({ userId: songShare.userId, name: user.name, image: user.image, createdAt: songShare.createdAt })
+    .from(songShare)
+    .innerJoin(user, eq(user.id, songShare.userId))
+    .where(eq(songShare.songId, songId))
+    .orderBy(asc(songShare.createdAt))
+}
+
+/** Abrir o link: prévia e "adicionar à minha biblioteca". Funciona para qualquer conta logada. */
+export const sharedSongRoutes = new Hono<AppEnv>()
+  .use(requireUser)
+  .get('/:code', validate('param', z.object({ code: z.string().regex(/^[A-Z2-9]{10}$/) })), async (c) => {
+    const uid = c.var.user.id
+    const { code } = c.req.valid('param')
+    const [row] = await db
+      .select({ id: song.id, title: song.title, artist: song.artist, coverUrl: song.coverUrl, ownerId: song.ownerId, ownerName: user.name })
+      .from(song)
+      .innerJoin(user, eq(user.id, song.ownerId))
+      .where(eq(song.shareCode, code))
+    if (!row) notFound('Link de música')
+    const [has] = await db.select({ one: sql`1` }).from(songShare).where(and(eq(songShare.songId, row.id), eq(songShare.userId, uid)))
+    const { ownerId, ...preview } = row
+    return c.json({ ...preview, isOwner: ownerId === uid, alreadyHas: ownerId === uid || Boolean(has) })
+  })
+  .post('/:code/accept', validate('param', z.object({ code: z.string().regex(/^[A-Z2-9]{10}$/) })), async (c) => {
+    const uid = c.var.user.id
+    const { code } = c.req.valid('param')
+    const [row] = await db.select({ id: song.id, ownerId: song.ownerId }).from(song).where(eq(song.shareCode, code))
+    if (!row) notFound('Link de música')
+    if (row.ownerId !== uid) await db.insert(songShare).values({ songId: row.id, userId: uid }).onConflictDoNothing()
+    return c.json({ songId: row.id }, 201)
+  })
+
 export const songsRoutes = new Hono<AppEnv>()
   .use(requireUser)
 
@@ -160,7 +207,7 @@ export const songsRoutes = new Hono<AppEnv>()
         q: z.string().optional(),
         key: z.string().optional(),
         style: z.string().optional(),
-        scope: z.enum(['all', 'mine', 'favorites', 'public']).default('all'),
+        scope: z.enum(['all', 'mine', 'favorites', 'public', 'shared']).default('all'),
         limit: z.coerce.number().int().min(1).max(100).default(50),
       }),
     ),
@@ -171,6 +218,8 @@ export const songsRoutes = new Hono<AppEnv>()
       if (scope === 'mine') where.push(eq(song.ownerId, uid))
       if (scope === 'public') where.push(eq(song.visibility, 'public'))
       if (scope === 'favorites') where.push(isFavoriteExpr(uid))
+      if (scope === 'shared')
+        where.push(exists(db.select({ one: sql`1` }).from(songShare).where(and(eq(songShare.songId, song.id), eq(songShare.userId, uid)))))
       if (key) where.push(eq(song.originalKey, key))
       if (style) where.push(ilike(song.style, style))
       const terms = q ? normalizeSearch(q).split(' ').filter(Boolean) : []
@@ -304,8 +353,9 @@ export const songsRoutes = new Hono<AppEnv>()
       )
       .orderBy(asc(songMark.lineIndex), asc(songMark.createdAt))
     const scores = await scoresOfSong(id)
+    const [shared] = await db.select({ one: sql`1` }).from(songShare).where(and(eq(songShare.songId, id), eq(songShare.userId, uid)))
 
-    const { searchText: _omit, ...data } = row.song
+    const { searchText: _omit, shareCode: _code, ...data } = row.song
     const isOwner = row.song.ownerId === uid
     // Letra sem autorização só sai para quem cadastrou; os outros recebem apenas acordes e seções.
     const lyricsHidden = !row.song.lyricsAuthorized && !isOwner
@@ -319,6 +369,8 @@ export const songsRoutes = new Hono<AppEnv>()
       personalKey: state?.personalKey ?? null,
       marks: marks.map((m) => ({ ...m.mark, authorName: m.authorName })),
       scores,
+      /** Recebida pelo link de compartilhamento (pode sair dela). */
+      sharedWithMe: Boolean(shared),
       setlistRole: access?.role ?? null,
       // Fora de repertório só a dona compartilha marcações; dentro, quem tem permissão de marcar.
       canShareMarks: access ? atLeast(access.role, 'mark') : isOwner,
@@ -388,6 +440,51 @@ export const songsRoutes = new Hono<AppEnv>()
     await db.insert(changeLog).values({ entityType: 'song', entityId: id, userId: uid, action: 'delete' })
     return c.body(null, 204)
   })
+
+  // ---- compartilhar por link (só a dona)
+  .get('/:id/share', validate('param', z.object({ id: z.string().uuid() })), async (c) => {
+    const row = await loadOwnSong(c.req.valid('param').id, c.var.user.id)
+    return c.json({ url: row.shareCode ? shareUrl(row.shareCode) : null, people: await sharesOf(row.id) })
+  })
+
+  // Cria o link (ou troca por um novo: o antigo deixa de funcionar).
+  .post(
+    '/:id/share',
+    validate('param', z.object({ id: z.string().uuid() })),
+    validate('json', z.object({ rotate: z.boolean().default(false) })),
+    async (c) => {
+      const uid = c.var.user.id
+      const row = await loadOwnSong(c.req.valid('param').id, uid)
+      await assertCanCreate(uid)
+      let code = row.shareCode
+      if (!code || c.req.valid('json').rotate) {
+        code = newShareCode()
+        await db.update(song).set({ shareCode: code }).where(eq(song.id, row.id))
+      }
+      return c.json({ url: shareUrl(code) })
+    },
+  )
+
+  // Desliga o link (quem já recebeu continua com a música).
+  .delete('/:id/share', validate('param', z.object({ id: z.string().uuid() })), async (c) => {
+    const row = await loadOwnSong(c.req.valid('param').id, c.var.user.id)
+    await db.update(song).set({ shareCode: null }).where(eq(song.id, row.id))
+    return c.body(null, 204)
+  })
+
+  // Tirar o acesso de alguém (a dona) ou sair da música compartilhada (a própria pessoa).
+  .delete(
+    '/:id/share/:userId',
+    validate('param', z.object({ id: z.string().uuid(), userId: z.string().min(1) })),
+    async (c) => {
+      const uid = c.var.user.id
+      const { id, userId } = c.req.valid('param')
+      const target = userId === 'eu' ? uid : userId
+      if (target !== uid) await loadOwnSong(id, uid)
+      await db.delete(songShare).where(and(eq(songShare.songId, id), eq(songShare.userId, target)))
+      return c.body(null, 204)
+    },
+  )
 
   .post(
     '/:id/report',

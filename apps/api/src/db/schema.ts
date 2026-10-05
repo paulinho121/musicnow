@@ -148,6 +148,8 @@ export const song = pgTable(
     coverUrl: text(),
     /** Quando a capa foi procurada pela última vez (para não repetir a busca toda hora). */
     coverCheckedAt: timestamp({ withTimezone: true }),
+    /** Código do link de compartilhamento (null = sem link ativo). Trocar o código invalida o link antigo. */
+    shareCode: text().unique(),
     /** Letra liberada para exibição (direitos autorais). */
     lyricsAuthorized: boolean().notNull().default(false),
     visibility: visibility().notNull().default('private'),
@@ -239,6 +241,21 @@ export const songScore = pgTable(
     ...timestamps,
   },
   (t) => [index().on(t.songId), index().on(t.uploadedBy)],
+)
+
+/** Quem recebeu a música por link (vê e toca; só a dona edita). */
+export const songShare = pgTable(
+  'song_share',
+  {
+    songId: uuid()
+      .notNull()
+      .references(() => song.id, { onDelete: 'cascade' }),
+    userId: text()
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.songId, t.userId] }), index().on(t.userId)],
 )
 
 /** Partituras e PDFs anexados a uma música (reservado; as partituras usam song_score). */
