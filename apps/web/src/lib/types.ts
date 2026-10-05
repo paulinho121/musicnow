@@ -15,6 +15,9 @@ export interface SongListItem {
   updatedAt: string
   /** Capa do álbum (Cover Art Archive); null/'' = capa gerada pelo app. */
   coverUrl: string | null
+  /** Prova social: repertórios de outras pessoas em que a música entrou, e quantas pessoas. */
+  usageSetlists: number
+  usagePeople: number
 }
 
 export type MarkType =
@@ -89,6 +92,8 @@ export interface SongDetail extends SongInput {
   scores: ScorePart[]
   /** Recebida pelo link de compartilhamento (pode sair dela). */
   sharedWithMe?: boolean
+  usageSetlists: number
+  usagePeople: number
   createdAt: string
   updatedAt: string
 }

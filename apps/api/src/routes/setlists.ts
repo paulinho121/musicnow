@@ -11,6 +11,7 @@ import { env } from '../env'
 import { forbidden, notFound, requireUser, validate, type AppEnv } from '../http'
 import { sendSetlistInviteEmail } from '../mail'
 import { getRole } from '../access'
+import { recordSongUsage } from '../usage'
 import { assertCanCreate, assertSetlistOwnerCanCreate } from '../billing'
 import {
   closeRoom,
@@ -526,6 +527,12 @@ export const setlistsRoutes = new Hono<AppEnv>()
             })),
           )
         }
+        // Repertório novo (cópia ou nova versão): as músicas "entram" nele também.
+        await recordSongUsage(
+          tx,
+          copy.id,
+          items.map((it) => it.songId),
+        )
         await tx.insert(changeLog).values({
           entityType: 'setlist',
           entityId: copy.id,
@@ -564,6 +571,7 @@ export const setlistsRoutes = new Hono<AppEnv>()
           .returning({ id: setlistItem.id })
         // Entra no fim do bloco escolhido.
         if (blockId) await renumber(tx, id)
+        await recordSongUsage(tx, id, [songId])
         await touch(tx, id, uid, 'add_song', { songId, title: visible.title })
         return row
       })
@@ -790,8 +798,10 @@ export const setlistsRoutes = new Hono<AppEnv>()
         }
 
         let position = 100_000 // entra no fim; o renumber acerta as posições
+        const addedSongs: string[] = []
         const add = async (t: { title: string; key: string | null }, blockId: string | null) => {
           const s = await resolve(t.title, t.key)
+          addedSongs.push(s.id)
           await tx.insert(setlistItem).values({
             setlistId: id,
             songId: s.id,
@@ -810,6 +820,7 @@ export const setlistsRoutes = new Hono<AppEnv>()
           for (const t of b.songs) await add(t, nb.id)
         }
         await renumber(tx, id)
+        await recordSongUsage(tx, id, addedSongs)
         await touch(tx, id, uid, 'import_text', { songs: total, blocks: parsed.blocks.length, created: created.length })
         return { songs: total, blocks: parsed.blocks.length, found, created }
       })

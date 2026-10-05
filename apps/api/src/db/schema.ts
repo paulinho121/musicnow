@@ -150,6 +150,12 @@ export const song = pgTable(
     coverCheckedAt: timestamp({ withTimezone: true }),
     /** Código do link de compartilhamento (null = sem link ativo). Trocar o código invalida o link antigo. */
     shareCode: text().unique(),
+    /**
+     * Prova social: quantas vezes a música entrou em repertórios de OUTRAS pessoas e quantas
+     * pessoas diferentes. A dona não conta. Atualizado a cada entrada (ver song_usage).
+     */
+    usageSetlists: integer().notNull().default(0),
+    usagePeople: integer().notNull().default(0),
     /** Letra liberada para exibição (direitos autorais). */
     lyricsAuthorized: boolean().notNull().default(false),
     visibility: visibility().notNull().default('private'),
@@ -241,6 +247,24 @@ export const songScore = pgTable(
     ...timestamps,
   },
   (t) => [index().on(t.songId), index().on(t.uploadedBy)],
+)
+
+/**
+ * Cada entrada de uma música num repertório (uma vez por repertório). Fica mesmo se o
+ * repertório for apagado depois: conta quantas vezes a música "entrou no repertório de alguém".
+ */
+export const songUsage = pgTable(
+  'song_usage',
+  {
+    songId: uuid()
+      .notNull()
+      .references(() => song.id, { onDelete: 'cascade' }),
+    /** Sem chave estrangeira de propósito: o histórico continua se o repertório for apagado. */
+    setlistId: uuid().notNull(),
+    setlistOwnerId: text().notNull(),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.songId, t.setlistId] })],
 )
 
 /** Quem recebeu a música por link (vê e toca; só a dona edita). */

@@ -134,6 +134,8 @@ export const songListColumns = {
   ownerName: user.name,
   updatedAt: song.updatedAt,
   coverUrl: song.coverUrl,
+  usageSetlists: song.usageSetlists,
+  usagePeople: song.usagePeople,
 }
 
 function dupKey(title: string, artist?: string | null) {
@@ -230,7 +232,11 @@ export const songsRoutes = new Hono<AppEnv>()
         .from(song)
         .innerJoin(user, eq(user.id, song.ownerId))
         .where(and(...where))
-        .orderBy(terms.length ? asc(song.title) : desc(song.updatedAt))
+        // Músicas públicas: as mais usadas por outros músicos primeiro (cifra testada no palco).
+        .orderBy(
+          ...(scope === 'public' ? [desc(song.usagePeople), desc(song.usageSetlists)] : []),
+          terms.length ? asc(song.title) : desc(song.updatedAt),
+        )
         .limit(limit)
       return c.json(rows)
     },

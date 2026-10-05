@@ -6,6 +6,7 @@ import { useAddItem } from '../../lib/setlists'
 import type { SetlistDetail } from '../../lib/types'
 import { Sheet } from '../Sheet'
 import { KeyBadge, Spinner, useToast } from '../ui'
+import { UsageBadge } from '../UsageBadge'
 
 /** Busca na biblioteca e adiciona ao fim do repertório (ou do bloco). Pode adicionar várias em sequência. */
 export function AddSongDialog({
@@ -68,7 +69,10 @@ export function AddSongDialog({
                     {s.title}
                     {s.visibility === 'private' && <Lock className="size-3.5 shrink-0 text-muted" aria-label="Privada: a banda passa a ver" />}
                   </p>
-                  <p className="truncate text-xs text-muted">{s.artist}</p>
+                  <p className="flex items-center gap-2 truncate text-xs text-muted">
+                    <span className="truncate">{s.artist}</span>
+                    <UsageBadge usagePeople={s.usagePeople} usageSetlists={s.usageSetlists} compact className="shrink-0" />
+                  </p>
                 </div>
                 <button className="btn-ghost h-9 shrink-0 px-3" disabled={busy === s.id} onClick={() => addSong(s.id, s.title)}>
                   {already ? <Check className="size-4 text-ok" /> : <Plus className="size-4" />}

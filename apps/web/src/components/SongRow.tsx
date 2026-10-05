@@ -4,6 +4,7 @@ import { Link } from 'react-router'
 import { useToggleFavorite } from '../lib/queries'
 import type { SongListItem } from '../lib/types'
 import { SongCover } from './SongCover'
+import { UsageBadge } from './UsageBadge'
 
 export function SongRow({ song }: { song: SongListItem }) {
   const fav = useToggleFavorite()
@@ -21,6 +22,7 @@ export function SongRow({ song }: { song: SongListItem }) {
             {[song.artist, song.style, song.bpm ? `${song.bpm} BPM` : null].filter(Boolean).join(' · ')}
           </p>
         </div>
+        <UsageBadge usagePeople={song.usagePeople} usageSetlists={song.usageSetlists} compact className="shrink-0 text-xs" />
         {song.originalKey && (
           <span className="shrink-0 rounded-md bg-accent/12 px-2 py-0.5 font-mono text-xs font-bold text-chord" title="Tom original">
             {song.originalKey}

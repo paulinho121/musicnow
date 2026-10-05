@@ -45,6 +45,7 @@ import { ScoreViewer } from '../components/score/ScoreViewer'
 import { ShareSongDialog } from '../components/ShareSongDialog'
 import { Sheet } from '../components/Sheet'
 import { CoverGlow, SongCover } from '../components/SongCover'
+import { UsageBadge } from '../components/UsageBadge'
 import { ErrorState, PageSpinner, useToast } from '../components/ui'
 import { useSession } from '../lib/auth'
 import { useDeleteMark, useSavePersonalKey, useSong, useToggleFavorite } from '../lib/queries'
@@ -404,6 +405,7 @@ export function SongViewer({ songId, setlist }: { songId: string; setlist?: Setl
                 {song.bpm && <HeroChip>{song.bpm} BPM</HeroChip>}
                 {song.timeSignature && <HeroChip>{song.timeSignature}</HeroChip>}
               </div>
+              <UsageBadge usagePeople={song.usagePeople} usageSetlists={song.usageSetlists} className="mt-2.5 text-xs font-medium" />
             </div>
           </div>
         </section>
