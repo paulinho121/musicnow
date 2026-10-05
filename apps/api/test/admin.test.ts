@@ -112,3 +112,24 @@ describe('bloquear usuário', () => {
     expect((await call({ ...musico, cookie: cookieOf(res) }, 'GET', '/me')).status).toBe(200)
   })
 })
+
+describe('registro de visitas', () => {
+  const visit = (ip: string, path: string) =>
+    app.request('/api/analytics/visit', {
+      method: 'POST',
+      headers: { origin: ORIGIN, 'content-type': 'application/json', 'x-forwarded-for': ip },
+      body: JSON.stringify({ path }),
+    })
+
+  it('não guarda o IP puro (LGPD) e segura excesso de um mesmo IP', async () => {
+    const ip = `203.0.113.${Math.floor(Math.random() * 200) + 10}`
+    const path = `/teste-${run}`
+    for (let i = 0; i < 35; i++) expect((await visit(ip, path)).status).toBe(200)
+    // A gravação é assíncrona: espera um instante.
+    await new Promise((r) => setTimeout(r, 500))
+    const rows = await client`select ip from page_visit where path = ${path}`
+    expect(rows.length).toBe(30)
+    expect(rows.every((r) => r.ip !== ip && /^[0-9a-f]{24}$/.test(r.ip))).toBe(true)
+    await client`delete from page_visit where path = ${path}`
+  })
+})

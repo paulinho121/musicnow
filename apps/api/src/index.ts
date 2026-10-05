@@ -1,6 +1,7 @@
 import { serve } from '@hono/node-server'
 import { app } from './app'
 import { startCoverWorker } from './covers'
+import { startVisitRetention } from './routes/analytics'
 import { startScoreSweeper } from './routes/scores'
 import { client } from './db'
 import { env } from './env'
@@ -11,6 +12,8 @@ await runMigrations()
 startCoverWorker()
 // Remove do disco partituras de músicas/contas apagadas.
 startScoreSweeper()
+// Apaga visitas com mais de 90 dias (LGPD).
+startVisitRetention()
 
 const server = serve({ fetch: app.fetch, port: env.PORT, hostname: '127.0.0.1' }, (info) => {
   console.log(`API do Ensaio Fácil em http://127.0.0.1:${info.port}`)
