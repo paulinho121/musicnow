@@ -23,6 +23,7 @@ import {
   notifyChanged,
   presence,
   setFollowing,
+  setStageKey,
   stopStage,
   totalConnections,
   updateStage,
@@ -410,19 +411,27 @@ export const setlistsRoutes = new Hono<AppEnv>()
     validate(
       'json',
       z.object({
-        action: z.enum(['go', 'stop']),
+        action: z.enum(['go', 'stop', 'key']),
         position: z.number().int().min(0).optional(),
         section: z.number().int().min(0).nullish(),
+        // action 'key': o tom que o líder escolheu para a música (null = o do repertório).
+        key: keySchema,
       }),
     ),
     async (c) => {
       const me = c.var.user
       const { id } = c.req.valid('param')
-      const { action, position, section } = c.req.valid('json')
+      const { action, position, section, key } = c.req.valid('json')
       await requireRole(id, me.id, 'admin')
       if (action === 'stop') {
         stopStage(id)
         return c.json({ stage: null })
+      }
+      if (action === 'key') {
+        if (position === undefined) throw new HTTPException(400, { message: 'Informe a música.' })
+        const stage = setStageKey(id, me.id, position, key ?? null)
+        if (!stage) throw new HTTPException(409, { message: 'Só quem está no comando muda o tom da banda.' })
+        return c.json({ stage })
       }
       const [{ n }] = await db
         .select({ n: sql<number>`count(*)::int` })

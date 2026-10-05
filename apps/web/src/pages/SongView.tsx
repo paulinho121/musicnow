@@ -82,6 +82,13 @@ export interface SetlistContext {
   live?: LiveControls
   /** O líder mandou rolar até uma linha (nonce muda a cada comando). */
   scrollTarget?: { line: number | null; nonce: number }
+  /**
+   * Tom da banda ao vivo: string = o líder escolheu esse tom; null = o tom do repertório;
+   * undefined = fora do Modo Palco (cada um no seu tom).
+   */
+  liveKey?: string | null
+  /** Só para quem comanda: avisa a banda quando o tom muda. */
+  onLiveKeyChange?: (key: string | null) => void
 }
 
 /** Rota /musicas/:id — a música solta. */
@@ -118,11 +125,12 @@ export function SongViewer({ songId, setlist }: { songId: string; setlist?: Setl
   const [uploadScoreOpen, setUploadScoreOpen] = useState(false)
 
   // Tom inicial: o do repertório; fora dele, o tom pessoal do músico; senão, o original.
-  const baseKey = setlist?.itemKey ?? song?.personalKey ?? null
+  const inLiveSync = setlist?.liveKey !== undefined
+  const baseKey = inLiveSync ? (setlist?.liveKey ?? setlist?.itemKey ?? null) : (setlist?.itemKey ?? song?.personalKey ?? null)
   const initialized = useRef<string | null>(null)
   useEffect(() => {
     if (!song) return
-    const marker = `${song.id}|${setlist?.id ?? ''}|${setlist?.itemKey ?? ''}`
+    const marker = `${song.id}|${setlist?.id ?? ''}|${setlist?.itemKey ?? ''}|${inLiveSync ? 'ao-vivo' : ''}`
     if (initialized.current === marker) return
     initialized.current = marker
     setOffset(song.originalKey && baseKey ? normalizeOffset(semitonesBetween(song.originalKey, baseKey)) : 0)
@@ -161,6 +169,27 @@ export function SongViewer({ songId, setlist }: { songId: string; setlist?: Setl
   const songChords = useMemo(() => chordsInSheet(lines), [lines])
 
   const shift = useCallback((d: number) => setOffset((o) => normalizeOffset(o + d)), [])
+
+  // Ao vivo: quando o líder muda o tom, todos que seguem vão para o mesmo tom.
+  // (Quem segue pode mudar o seu na hora, ex.: capotraste; volta ao do líder na próxima mudança.)
+  const liveKey = setlist?.liveKey
+  const repertoireKey = setlist?.itemKey ?? original
+  useEffect(() => {
+    if (liveKey === undefined || !original) return
+    const target = liveKey ?? repertoireKey
+    if (target && target !== transposeKey(original, offset)) setOffset(normalizeOffset(semitonesBetween(original, target)))
+    // Só quando o tom do líder muda (não a cada toque local de quem segue).
+  }, [liveKey, original])
+
+  // Quem comanda: avisa a banda meio segundo depois do último toque em +/− (sem tremer a tela de todos).
+  const onLiveKeyChange = setlist?.onLiveKeyChange
+  useEffect(() => {
+    if (!onLiveKeyChange || !currentKey) return
+    const bandKey = liveKey ?? repertoireKey
+    if (currentKey === bandKey) return
+    const t = setTimeout(() => onLiveKeyChange(currentKey === repertoireKey ? null : currentKey), 500)
+    return () => clearTimeout(t)
+  }, [currentKey, liveKey, repertoireKey, onLiveKeyChange])
   const next = setlist?.next
   const prev = setlist?.prev
 
@@ -404,6 +433,11 @@ export function SongViewer({ songId, setlist }: { songId: string; setlist?: Setl
                 )}
                 {song.bpm && <HeroChip>{song.bpm} BPM</HeroChip>}
                 {song.timeSignature && <HeroChip>{song.timeSignature}</HeroChip>}
+                {setlist?.liveKey && (
+                  <HeroChip>
+                    <span className="size-1.5 rounded-full bg-danger" /> Ao vivo <b className="font-mono text-chord">{setlist.liveKey}</b>
+                  </HeroChip>
+                )}
               </div>
               <UsageBadge usagePeople={song.usagePeople} usageSetlists={song.usageSetlists} className="mt-2.5 text-xs font-medium" />
             </div>

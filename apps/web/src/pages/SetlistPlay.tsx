@@ -141,6 +141,9 @@ export function SetlistPlay() {
           : undefined,
         onExit: () => navigate(`/repertorios/${s.id}`),
         scrollTarget,
+        // Ao vivo (comandando ou seguindo): todos no tom que o líder escolheu para esta música.
+        liveKey: stage && (isLeader || following) ? (stage.keys?.[String(index)] ?? null) : undefined,
+        onLiveKeyChange: isLeader ? (key) => live.command({ action: 'key', position: index, key }) : undefined,
         live: {
           status: live.status,
           stage,

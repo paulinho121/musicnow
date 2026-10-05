@@ -139,6 +139,30 @@ describe('Modo Palco', () => {
     await s.close()
   })
 
+  it('o líder muda o tom: quem segue recebe na hora, sem rolar a tela, e quem entra depois já pega', async () => {
+    const s = await listen(musico, setlistId)
+    await s.waitFor('hello')
+    const go = await call(lider, 'POST', `/setlists/${setlistId}/stage`, { action: 'go', position: 1 })
+    const seq = go.data.stage.seq
+    expect((await call(lider, 'POST', `/setlists/${setlistId}/stage`, { action: 'key', position: 1, key: 'Eb' })).status).toBe(200)
+    const st = await s.waitFor('stage', (d) => d?.keys?.['1'] === 'Eb')
+    // Mudar o tom não é comando de rolar: o seq não muda.
+    expect(st.seq).toBe(seq)
+    const tarde = await listen(musico, setlistId)
+    expect((await tarde.waitFor('hello')).stage.keys).toEqual({ '1': 'Eb' })
+    await tarde.close()
+    // Trocar de música mantém o tom escolhido para cada uma.
+    await call(lider, 'POST', `/setlists/${setlistId}/stage`, { action: 'go', position: 0 })
+    expect((await call(lider, 'GET', `/setlists/${setlistId}`)).data.stage.keys).toEqual({ '1': 'Eb' })
+    // Voltar ao tom do repertório.
+    await call(lider, 'POST', `/setlists/${setlistId}/stage`, { action: 'key', position: 1, key: null })
+    expect((await call(lider, 'GET', `/setlists/${setlistId}`)).data.stage.keys).toEqual({})
+    // Quem só visualiza não muda o tom da banda; tom inválido é recusado.
+    expect((await call(musico, 'POST', `/setlists/${setlistId}/stage`, { action: 'key', position: 1, key: 'E' })).status).toBe(403)
+    expect((await call(lider, 'POST', `/setlists/${setlistId}/stage`, { action: 'key', position: 1, key: 'X#' })).status).toBe(400)
+    await s.close()
+  })
+
   it('quem só visualiza não comanda; posição inválida é recusada', async () => {
     expect((await call(musico, 'POST', `/setlists/${setlistId}/stage`, { action: 'go', position: 0 })).status).toBe(403)
     expect((await call(lider, 'POST', `/setlists/${setlistId}/stage`, { action: 'go', position: 99 })).status).toBe(400)

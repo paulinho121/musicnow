@@ -11,6 +11,8 @@ export interface StageState {
   position: number
   section: number | null
   seq: number
+  /** Tom escolhido pelo líder em cada música durante o show (posição → tom). */
+  keys?: Record<string, string>
   startedAt: number
   updatedAt: number
 }
@@ -94,7 +96,7 @@ export function useSetlistLive(setlistId: string | undefined, revision: number |
   )
 
   const command = useCallback(
-    async (body: { action: 'go' | 'stop'; position?: number; section?: number | null }) => {
+    async (body: { action: 'go' | 'stop' | 'key'; position?: number; section?: number | null; key?: string | null }) => {
       if (!setlistId) return
       try {
         await api(`/setlists/${setlistId}/stage`, { method: 'POST', json: body })

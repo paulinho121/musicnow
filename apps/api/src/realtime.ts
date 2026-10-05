@@ -16,6 +16,11 @@ export interface StageState {
   section: number | null
   /** Sobe a cada comando, para o mesmo comando repetido (ex.: mesma seção) ser reaplicado. */
   seq: number
+  /**
+   * Tom que o líder escolheu em cada música durante o show (posição → tom). Vale só ao vivo:
+   * o tom salvo no repertório não muda. Sem entrada = o tom do repertório.
+   */
+  keys: Record<string, string>
   startedAt: number
   updatedAt: number
 }
@@ -146,11 +151,29 @@ export function updateStage(
     position: patch.position,
     section: patch.section ?? null,
     seq: (prev?.seq ?? 0) + 1,
+    // Outro admin assumindo o comando continua com os tons escolhidos até ali.
+    keys: prev?.keys ?? {},
     startedAt: prev && prev.leaderId === patch.leaderId ? prev.startedAt : now,
     updatedAt: now,
   }
   publish(setlistId, 'stage', r.stage)
   publishPresence(setlistId)
+  return r.stage
+}
+
+/**
+ * O líder mudou o tom da música (null = volta ao tom do repertório). Não sobe o `seq`:
+ * quem segue troca os acordes sem a tela rolar.
+ */
+export function setStageKey(setlistId: string, leaderId: string, position: number, key: string | null): StageState | null {
+  const stage = getStage(setlistId)
+  if (!stage || stage.leaderId !== leaderId) return null
+  const keys = { ...stage.keys }
+  if (key) keys[String(position)] = key
+  else delete keys[String(position)]
+  const r = room(setlistId)
+  r.stage = { ...stage, keys, updatedAt: Date.now() }
+  publish(setlistId, 'stage', r.stage)
   return r.stage
 }
 
