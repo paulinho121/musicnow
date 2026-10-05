@@ -30,7 +30,13 @@ export default defineConfig({
       workbox: {
         // Fontes latinas entram no cache offline; os outros alfabetos só se forem usados.
         globPatterns: ['**/*.{js,css,html,svg,woff2}'],
-        globIgnores: ['**/*-{cyrillic,cyrillic-ext,greek,greek-ext,vietnamese}-*.woff2'],
+        globIgnores: [
+          '**/*-{cyrillic,cyrillic-ext,greek,greek-ext,vietnamese}-*.woff2',
+          // Leitores pesados (Guitar Pro ~1,2 MB, PDF ~1,3 MB): só baixam para quem usar.
+          '**/alphaTab-*.js',
+          '**/pdf-*.js',
+          '**/pdf.worker*',
+        ],
         navigateFallback: '/index.html',
         navigateFallbackDenylist: [/^\/api\//],
         runtimeCaching: [
@@ -44,6 +50,23 @@ export default defineConfig({
               expiration: { maxEntries: 500, maxAgeSeconds: 60 * 60 * 24 * 30 },
               cacheableResponse: { statuses: [200] },
             },
+          },
+          {
+            // Páginas de partitura nunca mudam (cada envio ganha um id novo): depois de abertas,
+            // funcionam sem internet no palco.
+            urlPattern: ({ url }) => url.pathname.startsWith('/api/scores/') && url.pathname.endsWith('.webp'),
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'scores',
+              expiration: { maxEntries: 1500, maxAgeSeconds: 60 * 60 * 24 * 90 },
+              cacheableResponse: { statuses: [200] },
+            },
+          },
+          {
+            // Leitores pesados: guardados no primeiro uso.
+            urlPattern: ({ url }) => /\/assets\/(alphaTab|pdf)[-.]/.test(url.pathname),
+            handler: 'CacheFirst',
+            options: { cacheName: 'readers', expiration: { maxEntries: 10 }, cacheableResponse: { statuses: [200] } },
           },
         ],
       },
