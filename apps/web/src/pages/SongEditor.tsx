@@ -68,6 +68,11 @@ export function SongEditor() {
   const [form, setForm] = useState<SongInput>(() => (draft && !id ? { ...EMPTY, ...draft } : EMPTY))
   const [tagsText, setTagsText] = useState('')
   // ?aba=ajustar abre direto no ajuste da posição dos acordes (atalho da tela da música).
+  // ?voltar=/repertorios/... : depois de salvar (ou ao voltar), retorna para onde a pessoa estava.
+  const backTo = (() => {
+    const v = new URLSearchParams(window.location.search).get('voltar')
+    return v && v.startsWith('/') && !v.startsWith('//') ? v : null
+  })()
   const [tab, setTab] = useState<'edit' | 'preview' | 'align'>(() =>
     new URLSearchParams(window.location.search).get('aba') === 'ajustar' ? 'align' : 'edit',
   )
@@ -122,7 +127,7 @@ export function SongEditor() {
       {
         onSuccess: (res) => {
           toast(editing ? 'Música atualizada.' : 'Música cadastrada.')
-          navigate(`/musicas/${res.id}`, { replace: true })
+          navigate(backTo ?? `/musicas/${res.id}`, { replace: true })
         },
         onError: (err) => setFieldError(err.message),
       },
@@ -143,7 +148,7 @@ export function SongEditor() {
   return (
     <form onSubmit={submit} className="space-y-6" noValidate>
       <div className="flex items-center gap-2">
-        <Link to={editing ? `/musicas/${id}` : '/musicas'} className="btn-icon border-transparent bg-transparent" aria-label="Voltar">
+        <Link to={backTo ?? (editing ? `/musicas/${id}` : '/musicas')} className="btn-icon border-transparent bg-transparent" aria-label="Voltar">
           <ArrowLeft className="size-5" />
         </Link>
         <h1 className="flex-1 text-xl sm:text-2xl font-bold">{editing ? 'Editar música' : 'Nova música'}</h1>

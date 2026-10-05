@@ -122,6 +122,24 @@ export const SECTION_LABELS: Record<SectionType, string> = {
 }
 
 const SECTION_RE = /^\s*\[([^\]]+)\]\s*(.*)$/
+/** "INTRO: E A E B" / "Refrão:" — muito usado nas cifras da internet. */
+const LABEL_SECTION_RE = /^\s*([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ -]{1,24}?)\s*:\s*(.*)$/
+
+/**
+ * Linha de seção: "[Refrão] C G" ou "INTRO: E A E B". O formato com dois-pontos só vale
+ * para nomes de seção conhecidos e se o resto for acorde (senão "Tom: C" viraria seção).
+ */
+function matchSection(line: string): { label: string; rest: string } | null {
+  const sec = SECTION_RE.exec(line)
+  if (sec) return { label: sec[1].trim(), rest: sec[2] }
+  const lab = LABEL_SECTION_RE.exec(line)
+  if (lab && sectionTypeFromLabel(lab[1]) && (!lab[2].trim() || isChordLine(lab[2]))) {
+    const label = lab[1].trim()
+    // "INTRO" → "Intro"
+    return { label: label === label.toUpperCase() ? label[0] + label.slice(1).toLowerCase() : label, rest: lab[2] }
+  }
+  return null
+}
 
 export function sectionTypeFromLabel(label: string): SectionType | null {
   const l = label.trim().toLowerCase().replace(/\s*\d+$/, '')
@@ -179,13 +197,13 @@ export function parseSheet(content: string, semitones = 0, targetKey?: string | 
   return content.replace(/\r\n?/g, '\n').split('\n').map((raw): SheetLine => {
     const line = raw.replace(/\s+$/, '')
     if (line.trim() === '') return { kind: 'blank' }
-    const sec = SECTION_RE.exec(line)
+    const sec = matchSection(line)
     if (sec) {
-      const rest = sec[2]
+      const rest = sec.rest
       return {
         kind: 'section',
-        label: sec[1].trim(),
-        type: sectionTypeFromLabel(sec[1]),
+        label: sec.label,
+        type: sectionTypeFromLabel(sec.label),
         chords: rest && isChordLine(rest) ? shift(rest) : rest || undefined,
       }
     }
@@ -201,10 +219,10 @@ export function transposeSheet(content: string, semitones: number, targetKey?: s
     .replace(/\r\n?/g, '\n')
     .split('\n')
     .map((line) => {
-      const sec = SECTION_RE.exec(line)
-      if (sec && sec[2] && isChordLine(sec[2])) {
-        const head = line.slice(0, line.length - sec[2].length)
-        return head + transposeChordLine(sec[2], semitones, useFlats)
+      const sec = matchSection(line)
+      if (sec && sec.rest && isChordLine(sec.rest)) {
+        const head = line.slice(0, line.length - sec.rest.length)
+        return head + transposeChordLine(sec.rest, semitones, useFlats)
       }
       return isChordLine(line) ? transposeChordLine(line, semitones, useFlats) : line
     })

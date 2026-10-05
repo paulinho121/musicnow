@@ -30,7 +30,7 @@ import {
   Unlock,
 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router'
+import { Link, useLocation, useNavigate, useParams } from 'react-router'
 import { AddToSetlistButton } from '../components/AddToSetlist'
 import { GuitarDiagram } from '../components/ChordDiagrams'
 import { ChordDialog } from '../components/ChordDictionary'
@@ -120,6 +120,9 @@ export function SongViewer({ songId, setlist }: { songId: string; setlist?: Setl
   const [addOpen, setAddOpen] = useState(false)
   const [moreOpen, setMoreOpen] = useState(false)
   const [shareOpen, setShareOpen] = useState(false)
+  // Ajustar acordes e voltar para cá (inclusive dentro do repertório, no modo tocar).
+  const here = useLocation().pathname
+  const alignUrl = `/musicas/${songId}/editar?aba=ajustar&voltar=${encodeURIComponent(here)}`
   const leaveShared = useLeaveSharedSong(songId)
   // Cifra ou partitura: a escolha vale para as próximas músicas (quem lê partitura não troca a cada uma).
   const setViewMode = (view: 'chord' | 'score') => setPrefs((p) => ({ ...p, view }))
@@ -510,6 +513,14 @@ export function SongViewer({ songId, setlist }: { songId: string; setlist?: Setl
           </div>
         ) : (
           <>
+            {song.canEdit && song.content.trim() && !markMode && (
+              <Link
+                to={alignUrl}
+                className="mb-3 inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs font-medium text-muted hover:bg-surface-2 hover:text-text"
+              >
+                <MoveHorizontal className="size-3.5" /> Ajustar posição dos acordes
+              </Link>
+            )}
             {songChords.length > 0 && prefs.showChords && (
               <SongChords
                 chords={songChords}
@@ -778,7 +789,7 @@ export function SongViewer({ songId, setlist }: { songId: string; setlist?: Setl
             <Printer className="size-5 text-muted" /> Imprimir ou salvar PDF
           </Link>
           {song.canEdit && song.content.trim() && (
-            <Link to={`/musicas/${song.id}/editar?aba=ajustar`} className="flex h-12 items-center gap-3 rounded-xl px-2 hover:bg-surface-2">
+            <Link to={alignUrl} className="flex h-12 items-center gap-3 rounded-xl px-2 hover:bg-surface-2">
               <MoveHorizontal className="size-5 text-muted" /> Ajustar posição dos acordes
             </Link>
           )}

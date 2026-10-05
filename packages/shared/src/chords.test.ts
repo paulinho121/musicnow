@@ -184,3 +184,17 @@ describe('ajustar a posição do acorde', () => {
     expect(moveChordInLine('C   G', 2, 0)).toEqual({ line: 'C   G', col: 2 })
   })
 })
+
+describe('seção escrita com dois-pontos', () => {
+  it('"INTRO: E A E B" vira seção com acordes (e transpõe)', () => {
+    const [l] = parseSheet('INTRO: E A E B', 1, 'F')
+    expect(l).toEqual({ kind: 'section', label: 'Intro', type: 'intro', chords: 'F Bb F C' })
+    expect(transposeSheet('INTRO: E A E B', 2, 'F#')).toBe('INTRO: F# B F# C#')
+  })
+
+  it('"Refrão:" sozinho vira seção; "Tom: C" e letra com dois-pontos continuam como estão', () => {
+    expect(parseSheet('Refrão:')[0]).toMatchObject({ kind: 'section', label: 'Refrão', type: 'refrao' })
+    expect(parseSheet('Tom: C')[0].kind).toBe('lyrics')
+    expect(parseSheet('Solo: agora todos juntos')[0].kind).toBe('lyrics')
+  })
+})
