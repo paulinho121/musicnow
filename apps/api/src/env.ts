@@ -23,6 +23,16 @@ export const env = {
   GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET,
   APPLE_CLIENT_ID: process.env.APPLE_CLIENT_ID,
   APPLE_CLIENT_SECRET: process.env.APPLE_CLIENT_SECRET,
+  /** Asaas (assinaturas): chave da API, ambiente (sandbox|production) e o token que o Asaas manda nos avisos. */
+  ASAAS_API_KEY: process.env.ASAAS_API_KEY,
+  ASAAS_ENV: (process.env.ASAAS_ENV === 'production' ? 'production' : 'sandbox') as 'production' | 'sandbox',
+  ASAAS_WEBHOOK_TOKEN: process.env.ASAAS_WEBHOOK_TOKEN,
+  /**
+   * Cobrança valendo (fim do teste bloqueia a criação). Liga sozinha quando a chave do Asaas
+   * existe — sem ela não haveria como pagar. BILLING_ENFORCED=false desliga; =true força (testes).
+   */
+  BILLING_ENFORCED:
+    process.env.BILLING_ENFORCED === 'true' || (process.env.BILLING_ENFORCED !== 'false' && Boolean(process.env.ASAAS_API_KEY)),
   /** E-mails com acesso de Super Admin (separados por vírgula no .env). */
   ADMIN_EMAILS: (process.env.ADMIN_EMAILS ?? 'paulofernandoautomacao@gmail.com')
     .split(',')

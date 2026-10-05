@@ -1,9 +1,9 @@
 import { INSTRUMENTS, MUSICIAN_ROLES, type Instrument, type MusicianRole } from '@ensaio/shared'
 import { useQueryClient } from '@tanstack/react-query'
 import clsx from 'clsx'
-import { Check, LogOut, Moon, Star, Sun } from 'lucide-react'
+import { Check, ChevronRight, Crown, LogOut, Moon, Star, Sun } from 'lucide-react'
 import { type FormEvent, useEffect, useState } from 'react'
-import { useLocation, useNavigate } from 'react-router'
+import { Link, useLocation, useNavigate } from 'react-router'
 import { ErrorState, PageSpinner, useToast } from '../components/ui'
 import { logout as endSession } from '../lib/auth'
 import { useMe, useSaveProfile } from '../lib/queries'
@@ -169,6 +169,17 @@ export function Profile() {
         <p role="alert" className="rounded-xl border border-danger/40 bg-danger/10 px-4 py-3 text-sm text-danger">
           {formError}
         </p>
+      )}
+
+      {!onboarding && (
+        <Link to="/assinatura" className="card flex items-center gap-3 p-4 transition hover:border-accent/50">
+          <Crown className="size-5 shrink-0 text-accent" />
+          <span className="min-w-0 flex-1">
+            <span className="block font-semibold">Assinatura</span>
+            <span className="block text-sm text-muted">Plano, pagamentos e notas fiscais</span>
+          </span>
+          <ChevronRight className="size-4 text-muted" />
+        </Link>
       )}
 
       <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-between">

@@ -91,6 +91,33 @@ export interface SongDetail extends SongInput {
   updatedAt: string
 }
 
+/** Teste grátis / assinatura da pessoa. */
+export interface BillingSummary {
+  /** A cobrança está valendo (sem isso, tudo liberado). */
+  enforced: boolean
+  /** O pagamento (Asaas) já foi configurado no servidor. */
+  configured: boolean
+  active: boolean
+  reason: 'admin' | 'free' | 'subscription' | 'trial' | 'expired'
+  trialDaysLeft: number
+  status: 'trialing' | 'active' | 'past_due' | 'canceled'
+  plan: 'monthly' | 'yearly' | null
+  trialEndsAt: string | null
+  currentPeriodEnd: string | null
+  /** Escolheu um plano e a cobrança está esperando o pagamento. */
+  pending: boolean
+}
+
+export interface BillingPayment {
+  id: string
+  value: number
+  status: string
+  dueDate: string
+  paymentDate: string | null
+  billingType: string
+  invoiceUrl: string
+}
+
 export interface Me {
   id: string
   name: string
@@ -103,6 +130,7 @@ export interface Me {
   instruments: { instrument: Instrument; primary: boolean }[]
   onboarded: boolean
   isAdmin?: boolean
+  billing?: BillingSummary
 }
 
 export interface Dashboard {
@@ -270,6 +298,18 @@ export interface CatalogDetails {
 }
 
 export interface AdminOverview {
+  billing: {
+    monthly: number
+    yearly: number
+    paying: number
+    pastDue: number
+    trialing: number
+    canceling: number
+    expired: number
+    /** Receita mensal recorrente estimada (R$). */
+    mrr: number
+    enforced: boolean
+  }
   users: {
     total: number
     newToday: number

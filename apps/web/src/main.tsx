@@ -6,11 +6,13 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { RouterProvider } from 'react-router'
 import { router } from './App'
+import { PaywallDialog } from './components/BillingNotice'
 import { IntroSplash } from './components/IntroSplash'
 import { ToastProvider } from './components/ui'
 import { UpdateBanner } from './components/UpdateBanner'
 import { ApiError } from './lib/api'
 import { logout } from './lib/auth'
+import { openPaywall } from './lib/billing'
 import { onRouteChange, setupUpdates } from './lib/updates'
 
 setupUpdates()
@@ -20,6 +22,8 @@ router.subscribe(onRouteChange)
 // limpa o login local e volta para a tela de entrada, em vez de ficar preso num erro.
 let signingOut = false
 function onApiError(err: unknown) {
+  // 402: criar/editar sem assinatura ativa → janela "Assine para continuar".
+  if (err instanceof ApiError && err.status === 402) return openPaywall(err.message)
   if (!(err instanceof ApiError) || err.status !== 401 || signingOut) return
   signingOut = true
   // Conta bloqueada pelo suporte: a tela de entrada mostra o motivo.
@@ -50,6 +54,7 @@ createRoot(document.getElementById('root')!).render(
         <RouterProvider router={router} />
         <UpdateBanner />
         <IntroSplash />
+        <PaywallDialog />
       </ToastProvider>
     </QueryClientProvider>
   </StrictMode>,

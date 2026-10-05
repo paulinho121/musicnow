@@ -132,6 +132,19 @@ export function AuthPage({ mode }: { mode: 'login' | 'signup' }) {
         <button type="submit" className="btn-primary w-full" disabled={busy}>
           {busy ? 'Aguarde...' : mode === 'signup' ? 'Criar conta' : 'Entrar'}
         </button>
+        {mode === 'signup' && (
+          <p className="text-center text-xs text-muted">
+            14 dias grátis, sem cartão. Ao criar a conta, você concorda com os{' '}
+            <Link to="/termos" className="underline">
+              Termos de uso
+            </Link>{' '}
+            e a{' '}
+            <Link to="/privacidade" className="underline">
+              Política de privacidade
+            </Link>
+            .
+          </p>
+        )}
       </form>
 
       <p className="mt-6 text-center text-sm text-muted">

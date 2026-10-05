@@ -71,6 +71,13 @@
       "when": 1791199347510,
       "tag": "0009_fk_visitas",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1791201737649,
+      "tag": "0010_assinaturas",
+      "breakpoints": true
     }
   ]
 }

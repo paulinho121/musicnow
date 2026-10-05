@@ -186,6 +186,34 @@ export const songReport = pgTable(
 )
 
 /**
+ * Assinatura de cada pessoa (cobrança pelo Asaas). Quem cria conteúdo assina; quem só
+ * toca repertórios dos outros nunca precisa pagar. O teste grátis começa no cadastro.
+ */
+export const billingAccount = pgTable('billing_account', {
+  userId: text()
+    .primaryKey()
+    .references(() => user.id, { onDelete: 'cascade' }),
+  /** trialing | active | past_due | canceled */
+  status: text().notNull().default('trialing'),
+  /** monthly | yearly (o plano assinado ou escolhido no pagamento pendente) */
+  plan: text(),
+  trialEndsAt: timestamp({ withTimezone: true }).notNull(),
+  /** Acesso pago até esta data (renovada a cada pagamento confirmado). */
+  currentPeriodEnd: timestamp({ withTimezone: true }),
+  asaasCustomerId: text(),
+  asaasSubscriptionId: text(),
+  ...timestamps,
+})
+
+/** Avisos do Asaas já processados (o Asaas pode reenviar o mesmo aviso). */
+export const billingEvent = pgTable('billing_event', {
+  id: text().primaryKey(),
+  event: text().notNull(),
+  userId: text(),
+  receivedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+})
+
+/**
  * Partitura de uma música (uma "parte": grade, piano, sax alto em Mi♭...).
  * O PDF/foto original NUNCA chega ao servidor: o aparelho converte cada página numa
  * imagem WebP leve e limpa, e só ela é guardada em disco (UPLOAD_DIR/scores/<id>/<n>.webp).

@@ -7,6 +7,7 @@ import { auth, enabledProviders } from './auth'
 import { client } from './db'
 import { mailEnabled } from './mail'
 import type { AppEnv } from './http'
+import { billingRoutes } from './routes/billing'
 import { catalogRoutes } from './routes/catalog'
 import { meRoutes } from './routes/me'
 import { scoresRoutes } from './routes/scores'
@@ -29,6 +30,7 @@ const api = new Hono<AppEnv>()
   .route('/invites', invitesRoutes)
   .route('/catalog', catalogRoutes)
   .route('/scores', scoresRoutes)
+  .route('/billing', billingRoutes)
   .route('/analytics', analyticsRoutes)
   .route('/admin', adminRoutes)
 

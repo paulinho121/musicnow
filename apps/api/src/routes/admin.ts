@@ -1,8 +1,10 @@
+import { PLANS } from '@ensaio/shared'
 import { and, desc, eq, gte, ilike, or, sql } from 'drizzle-orm'
 import { Hono } from 'hono'
 import { HTTPException } from 'hono/http-exception'
 import { z } from 'zod'
 import { db, schema } from '../db'
+import { env } from '../env'
 import { notFound, requireAdmin, validate, type AppEnv } from '../http'
 import { getGlobalOnlineUsers } from '../realtime'
 
@@ -98,7 +100,21 @@ export const adminRoutes = new Hono<AppEnv>()
         .from(pageVisit),
     ])
 
+    // Assinaturas: pagantes (com tolerância de 3 dias), testes em andamento e receita mensal recorrente.
+    const [billing] = await db
+      .select({
+        monthly: sql<number>`count(*) filter (where ${schema.billingAccount.status} in ('active','past_due') and ${schema.billingAccount.currentPeriodEnd} > now() - interval '3 days' and ${schema.billingAccount.plan} = 'monthly')::int`,
+        yearly: sql<number>`count(*) filter (where ${schema.billingAccount.status} in ('active','past_due') and ${schema.billingAccount.currentPeriodEnd} > now() - interval '3 days' and ${schema.billingAccount.plan} = 'yearly')::int`,
+        pastDue: sql<number>`count(*) filter (where ${schema.billingAccount.status} = 'past_due')::int`,
+        trialing: sql<number>`count(*) filter (where ${schema.billingAccount.trialEndsAt} > now() and (${schema.billingAccount.currentPeriodEnd} is null or ${schema.billingAccount.currentPeriodEnd} < now()))::int`,
+        canceling: sql<number>`count(*) filter (where ${schema.billingAccount.status} = 'canceled' and ${schema.billingAccount.currentPeriodEnd} > now())::int`,
+        expired: sql<number>`count(*) filter (where ${schema.billingAccount.trialEndsAt} <= now() and (${schema.billingAccount.currentPeriodEnd} is null or ${schema.billingAccount.currentPeriodEnd} < now() - interval '3 days'))::int`,
+      })
+      .from(schema.billingAccount)
+    const mrr = Math.round((billing.monthly * PLANS.monthly.price + (billing.yearly * PLANS.yearly.price) / 12) * 100) / 100
+
     return c.json({
+      billing: { ...billing, paying: billing.monthly + billing.yearly, mrr, enforced: env.BILLING_ENFORCED },
       users: userStats[0],
       songs: songStats[0],
       setlists: setlistStats[0],

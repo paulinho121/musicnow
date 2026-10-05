@@ -3,6 +3,7 @@ import { Home, ListMusic, Music2, ShieldCheck, UserRound } from 'lucide-react'
 import { NavLink, Outlet } from 'react-router'
 import { useMe } from '../lib/queries'
 import { usePageTracking } from '../lib/usePageTracking'
+import { BillingBanner } from './BillingNotice'
 import { Logo } from './Logo'
 
 const BASE_NAV = [
@@ -45,6 +46,7 @@ export function Layout() {
       </aside>
 
       <main className="mx-auto w-full min-w-0 max-w-4xl flex-1 px-4 pt-5 pb-28 md:px-8 md:pt-8 md:pb-10">
+        <BillingBanner />
         <Outlet />
       </main>
 

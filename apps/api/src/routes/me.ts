@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { db, schema } from '../db'
 import { isAdminUser, requireUser, validate, type AppEnv } from '../http'
 import { canViewSong, isFavoriteExpr, songListColumns } from './songs'
+import { billingSummary } from '../billing'
 
 const { user, profile, userInstrument, song, songUserState, favorite, setlist, setlistMember, setlistItem } = schema
 
@@ -40,6 +41,8 @@ async function loadMe(uid: string) {
     /** Perfil ainda não preenchido: o app leva a pessoa ao onboarding. */
     onboarded: Boolean(p?.role) && instruments.length > 0,
     isAdmin: isAdminUser(u),
+    /** Teste grátis / assinatura (aviso no app e tela "Minha assinatura"). */
+    billing: await billingSummary(u),
   }
 }
 

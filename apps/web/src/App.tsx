@@ -9,6 +9,7 @@ import { ChordsPage } from './pages/ChordsPage'
 import { Dashboard } from './pages/Dashboard'
 import { FindSong } from './pages/FindSong'
 import { Importer } from './pages/Importer'
+import { Privacy, Terms } from './pages/Legal'
 import { InviteAccept } from './pages/InviteAccept'
 import { Library } from './pages/Library'
 import { ForgotPassword, ResetPassword } from './pages/PasswordReset'
@@ -20,6 +21,7 @@ import { SetlistPlay } from './pages/SetlistPlay'
 import { Setlists } from './pages/Setlists'
 import { SongEditor } from './pages/SongEditor'
 import { SongView } from './pages/SongView'
+import { Subscription } from './pages/Subscription'
 import { Welcome } from './pages/Welcome'
 
 import { AdminLayout } from './pages/admin/AdminLayout'
@@ -71,6 +73,9 @@ export const router = createBrowserRouter([
   },
   // Aberta mesmo logado: o link do e-mail pode ser aberto em qualquer aparelho.
   { path: '/redefinir-senha', element: <ResetPassword /> },
+  // Termos e privacidade: abertos para todos (antes de criar conta e dentro do app).
+  { path: '/termos', element: <Terms /> },
+  { path: '/privacidade', element: <Privacy /> },
   {
     element: <RequireAuth />,
     children: [
@@ -97,6 +102,7 @@ export const router = createBrowserRouter([
           { path: '/repertorios/:id/editar', element: <SetlistForm /> },
           { path: '/convite/:code', element: <InviteAccept /> },
           { path: '/perfil', element: <Profile /> },
+          { path: '/assinatura', element: <Subscription /> },
           {
             element: <RequireAdmin />,
             children: [

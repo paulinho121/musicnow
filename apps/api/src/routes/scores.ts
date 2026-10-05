@@ -13,6 +13,7 @@ import { z } from 'zod'
 import { db, schema } from '../db'
 import { env } from '../env'
 import { forbidden, notFound, requireUser, validate, type AppEnv } from '../http'
+import { assertCanCreate } from '../billing'
 import { canViewSong } from './songs'
 
 const { song, songScore } = schema
@@ -98,6 +99,7 @@ export const scoresRoutes = new Hono<AppEnv>()
     const [own] = await db.select({ ownerId: song.ownerId }).from(song).where(eq(song.id, songId))
     if (!own) notFound('Música')
     if (own.ownerId !== uid) forbidden('Só quem cadastrou a música pode anexar partituras.')
+    await assertCanCreate(uid)
 
     const pages: Uint8Array[] = []
     for (let i = 0; i < sizes.length; i++) {
@@ -151,6 +153,7 @@ export const scoresRoutes = new Hono<AppEnv>()
       const { id } = c.req.valid('param')
       const input = c.req.valid('json')
       await loadScoreForOwner(id, c.var.user.id)
+      await assertCanCreate(c.var.user.id)
       await db
         .update(songScore)
         .set({ label: input.label, instrument: input.instrument ?? null, updatedAt: new Date() })

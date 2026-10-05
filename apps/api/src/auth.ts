@@ -1,3 +1,4 @@
+import { TRIAL_DAYS } from '@ensaio/shared'
 import { betterAuth } from 'better-auth'
 import { APIError } from 'better-auth/api'
 import { drizzleAdapter } from 'better-auth/adapters/drizzle'
@@ -85,6 +86,15 @@ export const auth = betterAuth({
       create: {
         // Conta nova começa com a música de exemplo (passo a passo). Se falhar, o cadastro segue.
         after: async (created) => {
+          // Teste grátis de 14 dias começa no cadastro (só com a cobrança ligada; antes disso
+          // ele começa no primeiro acesso depois do lançamento).
+          if (env.BILLING_ENFORCED) {
+            await db
+              .insert(schema.billingAccount)
+              .values({ userId: created.id, trialEndsAt: new Date(Date.now() + TRIAL_DAYS * 24 * 60 * 60 * 1000) })
+              .onConflictDoNothing()
+              .catch((e) => console.error('Falha ao iniciar o teste grátis', e))
+          }
           await createWelcomeSong(created.id).catch((e) => console.error('Falha ao criar música de exemplo', e))
         },
       },

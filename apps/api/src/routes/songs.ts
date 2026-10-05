@@ -4,6 +4,7 @@ import { Hono } from 'hono'
 import { HTTPException } from 'hono/http-exception'
 import { z } from 'zod'
 import { getRole } from '../access'
+import { assertCanCreate } from '../billing'
 import { COVER_URL_RE } from '../covers'
 import { removeScoreFiles, scoresOfSong } from './scores'
 import { publish } from '../realtime'
@@ -216,6 +217,7 @@ export const songsRoutes = new Hono<AppEnv>()
 
   .post('/import', validate('json', importInput), async (c) => {
     const uid = c.var.user.id
+    await assertCanCreate(uid)
     const { songs, skipDuplicates } = c.req.valid('json')
     const existing = await ownSongKeys(uid)
     const created: { id: string; title: string }[] = []
@@ -325,6 +327,7 @@ export const songsRoutes = new Hono<AppEnv>()
 
   .post('/', validate('json', songInput), async (c) => {
     const uid = c.var.user.id
+    await assertCanCreate(uid)
     const input = c.req.valid('json')
     const originalKey = input.originalKey || guessKey(input.content)
     const [created] = await db
@@ -337,6 +340,7 @@ export const songsRoutes = new Hono<AppEnv>()
 
   .put('/:id', validate('param', z.object({ id: z.string().uuid() })), validate('json', songInput), async (c) => {
     const uid = c.var.user.id
+    await assertCanCreate(uid)
     const { id } = c.req.valid('param')
     const input = c.req.valid('json')
     const before = await loadOwnSong(id, uid)

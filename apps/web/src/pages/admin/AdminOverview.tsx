@@ -1,3 +1,4 @@
+import { formatBRL } from '@ensaio/shared'
 import { AlertCircle, Eye, FileMusic, Music, Shield, TrendingUp, Users } from 'lucide-react'
 import { Link } from 'react-router'
 import { ErrorState, PageSpinner } from '../../components/ui'
@@ -98,6 +99,34 @@ export function AdminOverview() {
           >
             Ver Denúncias
           </Link>
+        </div>
+      )}
+
+      {/* Assinaturas e receita */}
+      {data.billing && (
+        <div className="card grid grid-cols-2 gap-4 p-4 sm:grid-cols-4">
+          <div>
+            <p className="text-xs font-medium tracking-wider text-muted uppercase">Receita mensal</p>
+            <p className="text-2xl font-bold tracking-tight">{formatBRL(data.billing.mrr)}</p>
+            <p className="text-[11px] text-muted">{data.billing.enforced ? 'cobrança ativa' : 'cobrança ainda desligada'}</p>
+          </div>
+          <div>
+            <p className="text-xs font-medium tracking-wider text-muted uppercase">Assinantes</p>
+            <p className="text-2xl font-bold tracking-tight">{data.billing.paying}</p>
+            <p className="text-[11px] text-muted">
+              {data.billing.monthly} mensal · {data.billing.yearly} anual
+            </p>
+          </div>
+          <div>
+            <p className="text-xs font-medium tracking-wider text-muted uppercase">Em teste</p>
+            <p className="text-2xl font-bold tracking-tight">{data.billing.trialing}</p>
+            <p className="text-[11px] text-muted">{data.billing.expired} testes vencidos sem assinar</p>
+          </div>
+          <div>
+            <p className="text-xs font-medium tracking-wider text-muted uppercase">Atenção</p>
+            <p className="text-2xl font-bold tracking-tight">{data.billing.pastDue}</p>
+            <p className="text-[11px] text-muted">atrasados · {data.billing.canceling} cancelando</p>
+          </div>
         </div>
       )}
 

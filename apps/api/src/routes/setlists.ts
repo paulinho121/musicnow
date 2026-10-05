@@ -11,6 +11,7 @@ import { env } from '../env'
 import { forbidden, notFound, requireUser, validate, type AppEnv } from '../http'
 import { sendSetlistInviteEmail } from '../mail'
 import { getRole } from '../access'
+import { assertCanCreate, assertSetlistOwnerCanCreate } from '../billing'
 import {
   closeRoom,
   connectionsOf,
@@ -150,8 +151,27 @@ const itemInput = z.object({
 
 // ---------------------------------------------------------------------------
 
+/** Escritas que dependem da assinatura (método + caminho depois de /api/setlists). */
+const OWNER_GATED = [
+  ['PUT', /^\/[0-9a-f-]{36}$/],
+  ['POST', /^\/[0-9a-f-]{36}\/(items|blocks|import-text|invites)$/],
+  ['PUT', /^\/[0-9a-f-]{36}\/(items\/[^/]+|order|blocks\/[^/]+|members\/[^/]+|suggestions\/[^/]+)$/],
+] as const
+const billingGate = createMiddleware<AppEnv>(async (c, next) => {
+  const rest = c.req.path.replace(/^\/api\/setlists/, '')
+  const method = c.req.method
+  // Criar repertório ou duplicar: vale a assinatura de quem está criando.
+  if ((method === 'POST' && (rest === '' || rest === '/')) || (method === 'POST' && /\/duplicate$/.test(rest))) {
+    await assertCanCreate(c.var.user.id)
+  } else if (OWNER_GATED.some(([m, re]) => m === method && re.test(rest))) {
+    await assertSetlistOwnerCanCreate(rest.slice(1, 37))
+  }
+  await next()
+})
+
 export const setlistsRoutes = new Hono<AppEnv>()
   .use(requireUser)
+  .use(billingGate)
   .use(announceWrites)
 
   .get('/', async (c) => {
