@@ -1,10 +1,14 @@
+import { INSTRUMENTS, type Instrument } from '@ensaio/shared'
 import clsx from 'clsx'
-import { ChevronLeft, ChevronRight, Maximize, X } from 'lucide-react'
-import { useCallback, useEffect, useState } from 'react'
+import { ChevronLeft, ChevronRight, Loader2, Maximize, Pencil, Trash2, X } from 'lucide-react'
+import { type FormEvent, useCallback, useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useMe } from '../../lib/queries'
-import { scorePageUrl } from '../../lib/scores'
+import { scorePageUrl, useScoreActions } from '../../lib/scores'
+import { formatBytes } from '../../lib/scoreProcess'
 import type { ScorePart } from '../../lib/types'
+import { Sheet } from '../Sheet'
+import { useToast } from '../ui'
 
 /** Parte que abre primeiro: a escolhida antes nesta música, a do instrumento do músico ou a primeira. */
 function useChosenPart(songId: string, parts: ScorePart[]) {
@@ -36,9 +40,10 @@ function useChosenPart(songId: string, parts: ScorePart[]) {
 }
 
 /** Leitor da partitura: rolagem normal ou "modo palco" (página a página, com pedal). */
-export function ScoreViewer({ songId, parts }: { songId: string; parts: ScorePart[] }) {
+export function ScoreViewer({ songId, parts, canEdit = false }: { songId: string; parts: ScorePart[]; canEdit?: boolean }) {
   const [part, choose] = useChosenPart(songId, parts)
   const [stagePage, setStagePage] = useState<number | null>(null)
+  const [editing, setEditing] = useState(false)
   if (!part) return null
 
   return (
@@ -50,7 +55,12 @@ export function ScoreViewer({ songId, parts }: { songId: string; parts: ScorePar
               {p.label}
             </button>
           ))}
-        <button className="btn-primary ml-auto h-9 px-3 text-sm" onClick={() => setStagePage(0)}>
+        {canEdit && (
+          <button className="btn-icon ml-auto size-9" onClick={() => setEditing(true)} aria-label={`Editar a parte ${part.label}`} title="Renomear ou apagar esta parte">
+            <Pencil className="size-4" />
+          </button>
+        )}
+        <button className={clsx('btn-primary h-9 px-3 text-sm', !canEdit && 'ml-auto')} onClick={() => setStagePage(0)}>
           <Maximize className="size-4" /> Modo palco
         </button>
       </div>
@@ -74,7 +84,71 @@ export function ScoreViewer({ songId, parts }: { songId: string; parts: ScorePar
       </div>
 
       {stagePage !== null && <StageReader part={part} start={stagePage} onClose={() => setStagePage(null)} />}
+      {canEdit && <PartDialog songId={songId} part={part} open={editing} onClose={() => setEditing(false)} />}
     </div>
+  )
+}
+
+/** Renomear a parte, trocar o instrumento que a abre ou apagar (libera o espaço). */
+function PartDialog({ songId, part, open, onClose }: { songId: string; part: ScorePart; open: boolean; onClose: () => void }) {
+  const { update, remove } = useScoreActions(songId)
+  const toast = useToast()
+  const [label, setLabel] = useState(part.label)
+  const [instrument, setInstrument] = useState<Instrument | null>(part.instrument)
+
+  useEffect(() => {
+    if (!open) return
+    setLabel(part.label)
+    setInstrument(part.instrument)
+  }, [open, part])
+
+  const save = (e: FormEvent) => {
+    e.preventDefault()
+    if (!label.trim()) return
+    update.mutate({ id: part.id, label: label.trim(), instrument }, { onSuccess: onClose, onError: (err) => toast(err.message, 'error') })
+  }
+  const del = () => {
+    if (!confirm(`Apagar a parte "${part.label}" (${part.pages.length} páginas)? Não dá para desfazer.`)) return
+    remove.mutate(part.id, {
+      onSuccess: () => {
+        toast(`Parte apagada. ${formatBytes(part.totalBytes)} liberados.`)
+        onClose()
+      },
+      onError: (err) => toast(err.message, 'error'),
+    })
+  }
+
+  return (
+    <Sheet open={open} onClose={onClose} title="Editar parte">
+      <form onSubmit={save} className="space-y-4">
+        <label className="block">
+          <span className="label">Nome da parte</span>
+          <input className="input" value={label} onChange={(e) => setLabel(e.target.value)} maxLength={80} autoFocus />
+        </label>
+        <label className="block">
+          <span className="label">Abre direto para quem toca</span>
+          <select className="input" value={instrument ?? ''} onChange={(e) => setInstrument((e.target.value || null) as Instrument | null)}>
+            <option value="">qualquer instrumento</option>
+            {Object.entries(INSTRUMENTS).map(([k, v]) => (
+              <option key={k} value={k}>
+                {v}
+              </option>
+            ))}
+          </select>
+        </label>
+        <p className="text-xs text-muted">
+          {part.pages.length} {part.pages.length === 1 ? 'página' : 'páginas'} · {formatBytes(part.totalBytes)}
+        </p>
+        <div className="flex gap-2">
+          <button type="button" className="btn-ghost text-danger" onClick={del} disabled={remove.isPending}>
+            {remove.isPending ? <Loader2 className="size-4 animate-spin" /> : <Trash2 className="size-4" />} Apagar
+          </button>
+          <button className="btn-primary flex-1" disabled={update.isPending || !label.trim()}>
+            {update.isPending && <Loader2 className="size-4 animate-spin" />} Salvar
+          </button>
+        </div>
+      </form>
+    </Sheet>
   )
 }
 

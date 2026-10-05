@@ -49,7 +49,7 @@ import { downloadText } from '../lib/download'
 import { useLocalState } from '../lib/storage'
 import type { SongMark } from '../lib/types'
 
-const VIEWER_DEFAULTS = { fontSize: 17, lineHeight: 1.45, speed: 3, showChords: true, chordStrip: false, wrap: true }
+const VIEWER_DEFAULTS = { fontSize: 17, lineHeight: 1.45, speed: 3, showChords: true, chordStrip: false, wrap: true, view: 'chord' as 'chord' | 'score' }
 
 export interface BlockInfo {
   name: string
@@ -106,7 +106,8 @@ export function SongViewer({ songId, setlist }: { songId: string; setlist?: Setl
   const [chordOpen, setChordOpen] = useState<string | null>(null)
   const [addOpen, setAddOpen] = useState(false)
   const [moreOpen, setMoreOpen] = useState(false)
-  const [viewMode, setViewMode] = useState<'chord' | 'score'>('chord')
+  // Cifra ou partitura: a escolha vale para as próximas músicas (quem lê partitura não troca a cada uma).
+  const setViewMode = (view: 'chord' | 'score') => setPrefs((p) => ({ ...p, view }))
   const [uploadScoreOpen, setUploadScoreOpen] = useState(false)
 
   // Tom inicial: o do repertório; fora dele, o tom pessoal do músico; senão, o original.
@@ -146,6 +147,9 @@ export function SongViewer({ songId, setlist }: { songId: string; setlist?: Setl
   const currentKey = original ? transposeKey(original, offset) : null
   const isMinor = original ? (parseChord(original)?.suffix ?? '').startsWith('m') : false
   const lines = useSheet(song?.content ?? '', offset, currentKey)
+  // Partitura quando a pessoa escolheu ver partitura (ou a música só tem partitura, sem cifra).
+  const hasScores = Boolean(song?.scores?.length)
+  const viewMode: 'chord' | 'score' = hasScores && (prefs.view === 'score' || !song?.content.trim()) ? 'score' : 'chord'
   const sections = sectionsOf(lines)
   const songChords = useMemo(() => chordsInSheet(lines), [lines])
 
@@ -303,7 +307,7 @@ export function SongViewer({ songId, setlist }: { songId: string; setlist?: Setl
               )}
               aria-label={viewMode === 'score' ? 'Ver cifra' : 'Ver partitura'}
               title={viewMode === 'score' ? 'Ver cifra' : 'Ver partitura'}
-              onClick={() => setViewMode((m) => (m === 'score' ? 'chord' : 'score'))}
+              onClick={() => setViewMode(viewMode === 'score' ? 'chord' : 'score')}
             >
               <FileText className="size-5" />
             </button>
@@ -449,7 +453,7 @@ export function SongViewer({ songId, setlist }: { songId: string; setlist?: Setl
 
         {viewMode === 'score' && song.scores && song.scores.length > 0 ? (
           <div className="py-2">
-            <ScoreViewer songId={song.id} parts={song.scores} />
+            <ScoreViewer songId={song.id} parts={song.scores} canEdit={song.canEdit} />
           </div>
         ) : (
           <>
@@ -700,7 +704,7 @@ export function SongViewer({ songId, setlist }: { songId: string; setlist?: Setl
               className="flex h-12 items-center gap-3 rounded-xl px-2 text-left hover:bg-surface-2"
               onClick={() => {
                 setMoreOpen(false)
-                setViewMode((m) => (m === 'score' ? 'chord' : 'score'))
+                setViewMode(viewMode === 'score' ? 'chord' : 'score')
               }}
             >
               <FileText className="size-5 text-muted" /> {viewMode === 'score' ? 'Ver cifra' : 'Ver partitura'}

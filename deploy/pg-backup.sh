@@ -1,6 +1,7 @@
 #!/bin/bash
 # Backup diário do PostgreSQL (instalado em /usr/local/bin/pg-backup, roda às 03:00 como postgres).
-# 1. Guarda 7 dias em /var/backups/postgres (restauração rápida).
+# 1. Guarda 7 dias em /var/backups/postgres (restauração rápida), junto com as partituras
+#    (arquivos em disco, fora do banco).
 # 2. Se houver BACKUP_PAR_URL em /etc/ensaio-facil/backup.env, envia uma cópia para o
 #    Object Storage da Oracle — assim o backup sobrevive mesmo se a VM for perdida.
 set -euo pipefail
@@ -15,13 +16,22 @@ for db in $(psql -Atc "SELECT datname FROM pg_database WHERE NOT datistemplate A
 done
 find "$DIR" -name '*.dump' -mtime +7 -delete
 
+# Partituras: as páginas ficam em disco (o banco só guarda os dados), então vão num pacote à parte.
+UPLOADS=/var/lib/ensaio-facil/uploads
+SCORES_TAR="$DIR/partituras-$STAMP.tar"
+if [ -d "$UPLOADS/scores" ] && [ -n "$(ls -A "$UPLOADS/scores" 2>/dev/null)" ]; then
+  # As páginas já são WebP comprimido: tar sem gzip (mais rápido, mesmo tamanho).
+  tar -cf "$SCORES_TAR.tmp" -C "$UPLOADS" --exclude='*.tmp' scores && mv "$SCORES_TAR.tmp" "$SCORES_TAR"
+fi
+find "$DIR" -name 'partituras-*.tar' -mtime +7 -delete
+
 if [ -r /etc/ensaio-facil/backup.env ]; then
   # shellcheck disable=SC1091
   . /etc/ensaio-facil/backup.env
 fi
 if [ -n "${BACKUP_PAR_URL:-}" ]; then
   # Só a produção vai para fora; o banco de desenvolvimento pode ser recriado pelo seed.
-  for f in "$DIR"/ensaio_facil-"$STAMP".dump; do
+  for f in "$DIR"/ensaio_facil-"$STAMP".dump "$SCORES_TAR"; do
     [ -f "$f" ] || continue
     name="$(hostname)/$(basename "$f")"
     if curl -sf -X PUT --data-binary @"$f" -H 'Content-Type: application/octet-stream' "${BACKUP_PAR_URL%/}/$name" >/dev/null; then
