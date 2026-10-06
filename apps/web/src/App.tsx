@@ -6,6 +6,7 @@ import { PartnerDashboard } from './pages/PartnerDashboard'
 import { PartnerLink } from './pages/PartnerLink'
 import { QuickStart } from './pages/QuickStart'
 import { Transposer } from './pages/Transposer'
+import { PublicTuner, TunerPage } from './pages/TunerPages'
 import { PageSpinner } from './components/ui'
 import { useSession } from './lib/auth'
 import { useMe } from './lib/queries'
@@ -97,6 +98,8 @@ export const router = createBrowserRouter([
       { path: '/acordes', element: <ChordsIndex /> },
       { path: '/acordes/:slug', element: <ChordPage /> },
       { path: '/transpor-cifra', element: <Transposer /> },
+      { path: '/afinador-online', element: <PublicTuner /> },
+      { path: '/afinador-online/:slug', element: <PublicTuner /> },
       // Link do parceiro: guarda o cupom e leva ao cadastro.
       { path: '/p/:code', element: <PartnerLink /> },
       {
@@ -112,6 +115,7 @@ export const router = createBrowserRouter([
             element: <Layout />,
             children: inApp([
               { path: '/inicio', element: <Dashboard /> },
+              { path: '/afinador', element: <TunerPage /> },
               { path: '/comecar', element: <QuickStart /> },
               { path: '/musicas', element: <Library /> },
               { path: '/musicas/nova', element: <SongEditor /> },

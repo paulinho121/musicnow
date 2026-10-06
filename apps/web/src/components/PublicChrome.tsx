@@ -38,6 +38,9 @@ export function PublicHeader() {
           <Link to="/transpor-cifra" className="hidden px-3 text-sm font-medium text-muted hover:text-text md:block">
             Transpor cifra
           </Link>
+          <Link to="/afinador-online" className="hidden px-3 text-sm font-medium text-muted hover:text-text md:block">
+            Afinador
+          </Link>
           <Link to="/#precos" className="hidden px-3 text-sm font-medium text-muted hover:text-text lg:block">
             Preços
           </Link>
@@ -80,6 +83,11 @@ export function PublicFooter() {
             <li>
               <Link to="/transpor-cifra" className="hover:text-text">
                 Transpor cifra online
+              </Link>
+            </li>
+            <li>
+              <Link to="/afinador-online" className="hover:text-text">
+                Afinador online
               </Link>
             </li>
           </ul>

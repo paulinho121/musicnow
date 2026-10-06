@@ -6,13 +6,14 @@ import { Route, Routes, StaticRouter } from 'react-router'
 import { Privacy, Terms } from './pages/Legal'
 import { ChordPage, ChordsIndex } from './pages/PublicChords'
 import { Transposer, TRANSPOSER_FAQ } from './pages/Transposer'
+import { PublicTuner, TUNER_FAQ } from './pages/TunerPages'
 import { FAQ, Welcome } from './pages/Welcome'
 import { allPublicPages, chordNamePt, robotsTxt, sitemapXml } from './seo-pages'
 
 export { allPublicPages, robotsTxt, sitemapXml }
 
 /** Páginas com conteúdo pré-gerado (entrar e criar conta só ganham título e descrição). */
-const RENDERED = /^\/($|acordes(\/|$)|transpor-cifra$|termos$|privacidade$)/
+const RENDERED = /^\/($|acordes(\/|$)|afinador-online(\/|$)|transpor-cifra$|termos$|privacidade$)/
 export const isRendered = (path: string) => RENDERED.test(path)
 
 export function renderPage(path: string) {
@@ -23,6 +24,8 @@ export function renderPage(path: string) {
         <Route path="/acordes" element={<ChordsIndex />} />
         <Route path="/acordes/:slug" element={<ChordPage />} />
         <Route path="/transpor-cifra" element={<Transposer />} />
+        <Route path="/afinador-online" element={<PublicTuner />} />
+        <Route path="/afinador-online/:slug" element={<PublicTuner />} />
         <Route path="/termos" element={<Terms />} />
         <Route path="/privacidade" element={<Privacy />} />
       </Routes>
@@ -94,6 +97,21 @@ export function structuredData(siteUrl: string, path: string): object[] {
         ['Início', '/'],
         ['Transpor cifra', '/transpor-cifra'],
       ]),
+    ]
+  }
+  if (path.startsWith('/afinador-online')) {
+    return [
+      {
+        '@context': 'https://schema.org',
+        '@type': 'WebApplication',
+        name: 'Afinador online',
+        url: `${siteUrl}${path}`,
+        applicationCategory: 'MultimediaApplication',
+        operatingSystem: 'Web',
+        inLanguage: 'pt-BR',
+        offers: { '@type': 'Offer', price: '0', priceCurrency: 'BRL' },
+      },
+      faqPage(TUNER_FAQ),
     ]
   }
   if (path === '/acordes') {

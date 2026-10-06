@@ -1,5 +1,5 @@
 import clsx from 'clsx'
-import { Home, ListMusic, Music2, ShieldCheck, UserRound } from 'lucide-react'
+import { Gauge, Home, ListMusic, Music2, ShieldCheck, UserRound } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useEffect } from 'react'
 import { NavLink, Outlet } from 'react-router'
@@ -14,6 +14,7 @@ const BASE_NAV = [
   { to: '/inicio', label: 'Início', icon: Home },
   { to: '/musicas', label: 'Músicas', icon: Music2 },
   { to: '/repertorios', label: 'Repertórios', icon: ListMusic },
+  { to: '/afinador', label: 'Afinador', icon: Gauge },
   { to: '/perfil', label: 'Perfil', icon: UserRound },
 ]
 

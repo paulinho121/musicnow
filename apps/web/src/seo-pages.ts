@@ -1,7 +1,7 @@
 // Páginas públicas (as únicas que o Google deve indexar): título, descrição e prioridade no
 // sitemap. Usado no build (páginas pré-geradas, sitemap.xml, robots.txt) e no app (título e
 // canonical de cada tela). Sem import.meta e sem window: também roda no build (Node).
-import { allChordPages, chordFromSlug, chordInfo, noteNamePt } from '@ensaio/shared'
+import { allChordPages, chordFromSlug, chordInfo, noteNamePt, TUNER_INSTRUMENTS } from '@ensaio/shared'
 
 export interface PublicPage {
   title: string
@@ -45,6 +45,13 @@ export const PUBLIC_PAGES: Record<string, PublicPage> = {
     priority: 0.9,
     changefreq: 'monthly',
   },
+  '/afinador-online': {
+    title: 'Afinador online grátis: violão, guitarra, baixo, cavaquinho e ukulele · Ensaio Fácil',
+    description:
+      'Afinador online grátis pelo microfone: violão, guitarra, baixo, cavaquinho, ukulele, viola caipira, violino e bandolim. Funciona no celular, sem instalar nada.',
+    priority: 0.9,
+    changefreq: 'monthly',
+  },
   '/termos': {
     title: 'Termos de uso · Ensaio Fácil',
     description: 'Termos de uso do Ensaio Fácil: assinatura, teste grátis, cancelamento e regras de uso.',
@@ -77,9 +84,32 @@ function chordPage(symbol: string): PublicPage {
   }
 }
 
-/** A página pública deste endereço (inclui as de acorde), ou null se for tela do app. */
+function tunerPage(slug: string): PublicPage | null {
+  const inst = TUNER_INSTRUMENTS.find((i) => i.slug === slug)
+  if (!inst) return null
+  const strings = inst.tunings[0].strings.map((s) => s.replace(/-?\d$/, '')).join(' ')
+  if (inst.id === 'chromatic') {
+    return {
+      title: 'Afinador cromático online grátis · Ensaio Fácil',
+      description: 'Afinador cromático online e grátis: reconhece qualquer nota pelo microfone, para qualquer instrumento ou para a voz.',
+      priority: 0.7,
+      changefreq: 'yearly',
+    }
+  }
+  const name = inst.name.toLowerCase()
+  return {
+    title: `Afinador de ${name} online grátis (${strings}) · Ensaio Fácil`,
+    description: `Afine o ${name} pelo microfone do celular ou computador, grátis. Afinação padrão: ${strings}. Mostra a corda, a nota e se precisa apertar ou afrouxar.`,
+    priority: 0.8,
+    changefreq: 'yearly',
+  }
+}
+
+/** A página pública deste endereço (inclui as de acorde e de afinador), ou null se for tela do app. */
 export function publicPageFor(path: string): PublicPage | null {
   if (PUBLIC_PAGES[path]) return PUBLIC_PAGES[path]
+  const t = /^\/afinador-online\/([a-z0-9-]+)$/.exec(path)
+  if (t) return tunerPage(t[1])
   const m = /^\/acordes\/([a-z0-9-]+)$/.exec(path)
   const symbol = m && chordFromSlug(m[1])
   return symbol ? chordPage(symbol) : null
@@ -90,6 +120,7 @@ export function allPublicPages(): (PublicPage & { path: string })[] {
   return [
     ...Object.entries(PUBLIC_PAGES).map(([path, p]) => ({ path, ...p })),
     ...allChordPages().map((c) => ({ path: `/acordes/${c.slug}`, ...chordPage(c.symbol) })),
+    ...TUNER_INSTRUMENTS.map((i) => ({ path: `/afinador-online/${i.slug}`, ...tunerPage(i.slug)! })),
   ]
 }
 
@@ -100,6 +131,8 @@ export function allPublicPages(): (PublicPage & { path: string })[] {
  */
 export const PRIVATE_PREFIXES = [
   '/inicio',
+  // "$" = só o afinador do app (o /afinador-online é público).
+  '/afinador$',
   '/comecar',
   '/musicas',
   '/repertorios',
