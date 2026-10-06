@@ -2,6 +2,7 @@ import { serve } from '@hono/node-server'
 import { app } from './app'
 import { startCoverWorker } from './covers'
 import { startErrorRetention } from './errors'
+import { startLifecycleEmails } from './lifecycle'
 import { startVisitRetention } from './routes/analytics'
 import { startScoreSweeper } from './routes/scores'
 import { client } from './db'
@@ -16,6 +17,7 @@ startScoreSweeper()
 // Apaga visitas com mais de 90 dias (LGPD).
 startVisitRetention()
 startErrorRetention()
+startLifecycleEmails()
 
 const server = serve({ fetch: app.fetch, port: env.PORT, hostname: '127.0.0.1' }, (info) => {
   console.log(`API do Ensaio Fácil em http://127.0.0.1:${info.port}`)

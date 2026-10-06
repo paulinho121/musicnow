@@ -10,6 +10,7 @@ import { HTTPException } from 'hono/http-exception'
 import { db, schema } from './db'
 import { env } from './env'
 import { isAdminUser } from './http'
+import { paymentConfirmedEmail, paymentOverdueEmail } from './lifecycle'
 
 const { billingAccount, user, setlist } = schema
 type Account = typeof billingAccount.$inferSelect
@@ -288,7 +289,9 @@ export async function handleWebhook(body: AsaasWebhook): Promise<string> {
   const plan = (acc.plan as PlanId | null) ?? 'monthly'
   // Aviso de uma assinatura que já foi trocada (troca de plano): não mexe na atual.
   const subId = body.payment?.subscription ?? body.subscription?.id
-  const isOld = Boolean(subId && acc.asaasSubscriptionId && subId !== acc.asaasSubscriptionId) || Boolean(subId && !acc.asaasSubscriptionId && body.event.startsWith('SUBSCRIPTION_'))
+  const isOld =
+    Boolean(subId && acc.asaasSubscriptionId && subId !== acc.asaasSubscriptionId) ||
+    Boolean(subId && !acc.asaasSubscriptionId && body.event.startsWith('SUBSCRIPTION_'))
   switch (body.event) {
     case 'PAYMENT_CONFIRMED':
     case 'PAYMENT_RECEIVED': {
@@ -296,12 +299,18 @@ export async function handleWebhook(body: AsaasWebhook): Promise<string> {
       const end = periodEnd(p.dueDate, plan)
       // Nunca encurta um período maior já pago (ex.: aviso fora de ordem).
       const currentPeriodEnd = acc.currentPeriodEnd && acc.currentPeriodEnd > end ? acc.currentPeriodEnd : end
-      await db.update(billingAccount).set({ status: 'active', currentPeriodEnd, updatedAt: now }).where(eq(billingAccount.userId, acc.userId))
+      await db
+        .update(billingAccount)
+        .set({ status: 'active', currentPeriodEnd, updatedAt: now })
+        .where(eq(billingAccount.userId, acc.userId))
+      // Confirmado e recebido chegam os dois para o mesmo pagamento: o recibo sai uma vez.
+      void paymentConfirmedEmail(acc.userId, p, currentPeriodEnd).catch(() => {})
       return 'ativada'
     }
     case 'PAYMENT_OVERDUE':
       if (isOld) return 'ignorado (assinatura antiga)'
       await db.update(billingAccount).set({ status: 'past_due', updatedAt: now }).where(eq(billingAccount.userId, acc.userId))
+      if (body.payment) void paymentOverdueEmail(acc.userId, body.payment).catch(() => {})
       return 'atrasada'
     case 'PAYMENT_REFUNDED':
     case 'PAYMENT_CHARGEBACK_REQUESTED':

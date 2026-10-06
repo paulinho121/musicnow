@@ -88,6 +88,8 @@ export const profile = pgTable('profile', {
    * UPLOAD_DIR/hero/<userId>/<id>.webp; aqui só os dados.
    */
   heroImages: jsonb().$type<{ id: string; w: number; h: number }[]>().notNull().default([]),
+  /** Lembretes por e-mail (show amanhã, fim do teste). Os de pagamento sempre vão. */
+  emailReminders: boolean().notNull().default(true),
   ...timestamps,
 })
 
@@ -529,6 +531,24 @@ export const pageVisit = pgTable(
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index().on(t.createdAt), index().on(t.path), index().on(t.userId)],
+)
+
+/**
+ * E-mails automáticos já enviados (boas-vindas, fim do teste, pagamento, show amanhã).
+ * A chave (pessoa, tipo, referência) garante que o mesmo e-mail nunca sai duas vezes.
+ */
+export const emailLog = pgTable(
+  'email_log',
+  {
+    userId: text()
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    kind: text().notNull(),
+    /** O que o e-mail se refere (id do pagamento, do repertório + data, fim do teste...). */
+    ref: text().notNull().default(''),
+    sentAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.kind, t.ref] })],
 )
 
 /**

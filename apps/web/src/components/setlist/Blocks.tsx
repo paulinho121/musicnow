@@ -124,7 +124,7 @@ export function BlockDialog({
   )
 }
 
-const EXAMPLE = `BLOCO 1 (Balada - 80)
+export const EXAMPLE = `BLOCO 1 (Balada - 80)
 Programa de fim de semana - C
 Inevitável - C
 
@@ -214,7 +214,7 @@ export function ImportTextDialog({ setlistId, open, onClose }: { setlistId: stri
   )
 }
 
-function PreviewSongs({ songs }: { songs: { title: string; key: string | null }[] }) {
+export function PreviewSongs({ songs }: { songs: { title: string; key: string | null }[] }) {
   return (
     <ul className="mt-1 space-y-0.5">
       {songs.map((s, i) => (

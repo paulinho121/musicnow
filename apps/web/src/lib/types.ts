@@ -149,6 +149,8 @@ export interface Me {
   viewerPrefs: Record<string, unknown>
   /** Imagens do destaque do início (vazio = visual padrão). */
   heroImages?: { id: string; w: number; h: number }[]
+  /** Lembretes por e-mail (show amanhã, fim do teste). */
+  emailReminders?: boolean
   instruments: { instrument: Instrument; primary: boolean }[]
   onboarded: boolean
   isAdmin?: boolean
@@ -170,6 +172,8 @@ export interface Dashboard {
     songs: { title: string; artist: string | null; coverUrl: string | null }[]
   }[]
   counts: { mySongs: number; library: number }
+  /** Primeiros passos de quem está começando. */
+  onboarding?: { opened: boolean; setlist: boolean; band: boolean }
 }
 
 export interface SetlistSummary {

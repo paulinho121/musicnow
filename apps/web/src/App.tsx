@@ -1,6 +1,7 @@
 import { Navigate, Outlet, createBrowserRouter, type RouteObject, useLocation } from 'react-router'
 import { RouteError } from './components/AppError'
 import { Layout } from './components/Layout'
+import { QuickStart } from './pages/QuickStart'
 import { PageSpinner } from './components/ui'
 import { useSession } from './lib/auth'
 import { useMe } from './lib/queries'
@@ -99,6 +100,7 @@ export const router = createBrowserRouter([
             element: <Layout />,
             children: inApp([
               { path: '/inicio', element: <Dashboard /> },
+              { path: '/comecar', element: <QuickStart /> },
               { path: '/musicas', element: <Library /> },
               { path: '/musicas/nova', element: <SongEditor /> },
               { path: '/musicas/importar', element: <Importer /> },

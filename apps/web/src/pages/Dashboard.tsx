@@ -3,6 +3,7 @@ import clsx from 'clsx'
 import { CalendarDays, ChevronRight, Clock, FileUp, Globe, Guitar, ImagePlus, MapPin, Plus, Search, Star } from 'lucide-react'
 import { type FormEvent, useState } from 'react'
 import { Link, useNavigate } from 'react-router'
+import { GettingStarted } from '../components/GettingStarted'
 import { HeroBackground, HeroCustomizeDialog } from '../components/HeroBackground'
 import { SongCover } from '../components/SongCover'
 import { SongCard } from '../components/SongRow'
@@ -110,6 +111,8 @@ export function Dashboard() {
         ))}
       </nav>
 
+      {data?.onboarding && <GettingStarted progress={data.onboarding} />}
+
       {error ? (
         <ErrorState error={error} onRetry={() => refetch()} />
       ) : (
@@ -175,7 +178,9 @@ function NextEvent({ event: s }: { event: Upcoming }) {
       <Mosaic songs={s.songs} className="size-24 rounded-2xl shadow-xl shadow-black/40 sm:size-28" />
       <div className="relative min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
-          {s.eventDate && <span className="rounded-full bg-accent px-2.5 py-0.5 text-xs font-bold text-accent-ink">{whenLabel(s.eventDate)}</span>}
+          {s.eventDate && (
+            <span className="rounded-full bg-accent px-2.5 py-0.5 text-xs font-bold text-accent-ink">{whenLabel(s.eventDate)}</span>
+          )}
           <span className="rounded-full border border-border px-2.5 py-0.5 text-xs text-muted">{SETLIST_STATUS[s.status]}</span>
         </div>
         <p className="mt-2 line-clamp-2 text-lg leading-tight font-bold sm:text-xl">{s.name}</p>

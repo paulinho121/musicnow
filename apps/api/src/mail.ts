@@ -20,7 +20,18 @@ function escapeHtml(s: string) {
 }
 
 /** Layout simples, legível em qualquer cliente de e-mail (tabelas e estilos inline). */
-function layout({ title, body, button }: { title: string; body: string; button?: { label: string; url: string } }) {
+function layout({
+  title,
+  body,
+  button,
+  reminder = false,
+}: {
+  title: string
+  body: string
+  button?: { label: string; url: string }
+  /** Lembrete (pode ser desligado no perfil): o rodapé diz como. */
+  reminder?: boolean
+}) {
   const btn = button
     ? `<p style="margin:28px 0"><a href="${escapeHtml(button.url)}" style="background:#f5a524;color:#1a1204;text-decoration:none;font-weight:700;padding:14px 22px;border-radius:12px;display:inline-block">${escapeHtml(button.label)}</a></p>
        <p style="font-size:13px;color:#6b7080">Se o botão não funcionar, copie este endereço no navegador:<br><span style="word-break:break-all">${escapeHtml(button.url)}</span></p>`
@@ -33,11 +44,15 @@ function layout({ title, body, button }: { title: string; body: string; button?:
     ${body}
     ${btn}
   </td></tr></table>
-  <p style="font-size:12px;color:#8a8f9c;margin-top:16px">Você recebeu este e-mail porque tem uma conta no Ensaio Fácil.</p>
+  <p style="font-size:12px;color:#8a8f9c;margin-top:16px">Você recebeu este e-mail porque tem uma conta no Ensaio Fácil.${
+    reminder ? ` Não quer lembretes? <a href="${escapeHtml(env.APP_URL)}/perfil" style="color:#8a8f9c">Desligue no seu perfil</a>.` : ''
+  }</p>
   </td></tr></table></body></html>`
 }
 
 export async function sendMail({ to, subject, html, text }: { to: string; subject: string; html: string; text: string }) {
+  // Testes automáticos criam contas de mentira: nunca mandam e-mail de verdade.
+  if (process.env.NODE_ENV === 'test') return
   if (!transport) {
     console.warn(`[e-mail desativado] Para: ${to} | ${subject}\n${text}`)
     return
@@ -82,6 +97,145 @@ export async function sendSetlistInviteEmail(to: string, fromName: string, setli
       title: `Convite para "${setlistName}"`,
       body: `<p style="font-size:15px;line-height:1.5"><b>${escapeHtml(fromName)}</b> te convidou para participar do repertório <b>${escapeHtml(setlistName)}</b>. Lá você encontra a ordem das músicas, o tom de cada uma e as marcações da banda.</p>`,
       button: { label: 'Entrar no repertório', url },
+    }),
+  })
+}
+
+// ---------------------------------------------------------------- ciclo de vida da conta
+
+const p = (html: string) => `<p style="font-size:15px;line-height:1.5">${html}</p>`
+const first = (name: string) => escapeHtml(name.split(' ')[0] || name)
+const brl = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+const dateBR = (d: Date) => d.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: 'long' })
+
+export async function sendWelcomeEmail(to: string, name: string) {
+  const url = `${env.APP_URL}/comecar`
+  await sendMail({
+    to,
+    subject: 'Bem-vindo ao Ensaio Fácil: seu repertório em 1 minuto',
+    text: `Olá, ${name}!
+
+Sua conta está pronta. Comece em 3 passos:
+1. Abra a música de exemplo e troque o tom.
+2. Cole a lista do seu show (do WhatsApp mesmo): ${url}
+3. Mande o link para a banda: eles entram de graça.
+
+Bons ensaios!`,
+    html: layout({
+      title: `Bem-vindo, ${name.split(' ')[0] || name}!`,
+      body:
+        p('Sua conta está pronta. Em 3 passos a banda toda já está tocando junto:') +
+        `<ol style="font-size:15px;line-height:1.7;padding-left:20px;margin:0">
+          <li>Abra a <b>música de exemplo</b> e troque o tom com um toque.</li>
+          <li><b>Cole a lista</b> do seu próximo show, do WhatsApp mesmo: o app separa blocos e tons.</li>
+          <li>Mande o link para a <b>banda</b>: eles entram de graça e veem tudo no mesmo tom.</li>
+        </ol>`,
+      button: { label: 'Montar meu primeiro repertório', url },
+    }),
+  })
+}
+
+export async function sendTrialEndingEmail(to: string, name: string, endsAt: Date, daysLeft: number) {
+  const url = `${env.APP_URL}/assinatura`
+  const when = daysLeft <= 1 ? 'amanhã' : `em ${daysLeft} dias`
+  await sendMail({
+    to,
+    subject: `Seu teste grátis do Ensaio Fácil acaba ${when}`,
+    text: `Olá, ${name}! Seu teste grátis acaba ${when} (${dateBR(endsAt)}). Para continuar criando e editando músicas e repertórios, assine por R$ 9,99/mês ou R$ 99,90/ano: ${url}
+
+Suas músicas continuam salvas e você continua podendo abrir e tocar tudo.`,
+    html: layout({
+      title: `Seu teste grátis acaba ${when}`,
+      body:
+        p(`Olá, ${first(name)}! Seu teste grátis vai até <b>${dateBR(endsAt)}</b>.`) +
+        p(
+          'Para continuar <b>criando e editando</b> músicas e repertórios, assine por <b>R$ 9,99/mês</b> ou <b>R$ 99,90/ano</b> (2 meses grátis). Os músicos convidados nunca pagam.',
+        ) +
+        p('Fique tranquilo: suas músicas continuam salvas e você continua podendo abrir e tocar tudo.'),
+      button: { label: 'Escolher meu plano', url },
+      reminder: true,
+    }),
+  })
+}
+
+export async function sendTrialEndedEmail(to: string, name: string) {
+  const url = `${env.APP_URL}/assinatura`
+  await sendMail({
+    to,
+    subject: 'Seu teste grátis do Ensaio Fácil terminou',
+    text: `Olá, ${name}! Seu teste grátis terminou. Suas músicas e repertórios continuam salvos e você pode abrir e tocar tudo. Para voltar a criar e editar, assine: ${url}`,
+    html: layout({
+      title: 'Seu teste grátis terminou',
+      body:
+        p(`Olá, ${first(name)}! Suas músicas e repertórios continuam <b>salvos</b> e você ainda pode abrir e tocar tudo.`) +
+        p('Para voltar a <b>criar e editar</b>, é só assinar. Leva 1 minuto, com Pix, boleto ou cartão.'),
+      button: { label: 'Assinar agora', url },
+      reminder: true,
+    }),
+  })
+}
+
+export async function sendPaymentConfirmedEmail(to: string, name: string, value: number, until: Date, invoiceUrl: string | null) {
+  await sendMail({
+    to,
+    subject: 'Pagamento confirmado: obrigado por assinar o Ensaio Fácil',
+    text: `Olá, ${name}! Recebemos seu pagamento de ${brl(value)}. Sua assinatura vale até ${dateBR(until)}.${
+      invoiceUrl
+        ? `
+Comprovante: ${invoiceUrl}`
+        : ''
+    }`,
+    html: layout({
+      title: 'Pagamento confirmado',
+      body:
+        p(`Olá, ${first(name)}! Recebemos seu pagamento de <b>${brl(value)}</b>. Obrigado por apoiar o Ensaio Fácil!`) +
+        p(`Sua assinatura vale até <b>${dateBR(until)}</b> e renova sozinha.`),
+      button: invoiceUrl ? { label: 'Ver comprovante', url: invoiceUrl } : { label: 'Abrir o Ensaio Fácil', url: `${env.APP_URL}/inicio` },
+    }),
+  })
+}
+
+export async function sendPaymentOverdueEmail(to: string, name: string, value: number, invoiceUrl: string | null) {
+  const url = invoiceUrl ?? `${env.APP_URL}/assinatura`
+  await sendMail({
+    to,
+    subject: 'Não conseguimos confirmar seu pagamento do Ensaio Fácil',
+    text: `Olá, ${name}! O pagamento de ${brl(value)} da sua assinatura ainda não foi confirmado. Pague por aqui para não perder o acesso: ${url}
+
+Se já pagou, pode ignorar: a confirmação chega em até 1 dia útil.`,
+    html: layout({
+      title: 'Pagamento pendente',
+      body:
+        p(
+          `Olá, ${first(name)}! O pagamento de <b>${brl(value)}</b> da sua assinatura ainda não foi confirmado (cartão recusado ou boleto/Pix vencido).`,
+        ) +
+        p('Pague pelo link abaixo para não perder o acesso a criar e editar. Você tem <b>3 dias</b> de tolerância.') +
+        p('Se já pagou, pode ignorar: a confirmação chega em até 1 dia útil.'),
+      button: { label: 'Pagar agora', url },
+    }),
+  })
+}
+
+export async function sendShowTomorrowEmail(
+  to: string,
+  name: string,
+  show: { name: string; eventDate: Date; location: string | null; songCount: number; url: string },
+) {
+  const time = show.eventDate.toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' })
+  const where = [`amanhã às ${time}`, show.location].filter(Boolean).join(' · ')
+  await sendMail({
+    to,
+    subject: `Amanhã: ${show.name}`,
+    text: `Olá, ${name}! "${show.name}" é ${where}. São ${show.songCount} músicas. Repasse o repertório: ${show.url}`,
+    html: layout({
+      title: `Amanhã: ${show.name}`,
+      body:
+        p(`Olá, ${first(name)}! <b>${escapeHtml(show.name)}</b> é ${escapeHtml(where)}.`) +
+        p(
+          `São <b>${show.songCount} ${show.songCount === 1 ? 'música' : 'músicas'}</b>. Que tal uma última passada nos tons e nas marcações da banda?`,
+        ),
+      button: { label: 'Abrir o repertório', url: show.url },
+      reminder: true,
     }),
   })
 }

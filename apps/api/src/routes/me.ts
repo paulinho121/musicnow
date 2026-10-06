@@ -18,6 +18,7 @@ const profileInput = z.object({
     .max(9)
     .default([]),
   viewerPrefs: z.record(z.string(), z.unknown()).optional(),
+  emailReminders: z.boolean().optional(),
 })
 
 async function loadMe(uid: string) {
@@ -39,6 +40,8 @@ async function loadMe(uid: string) {
     viewerPrefs: p?.viewerPrefs ?? {},
     /** Imagens do destaque do início (vazio = o visual padrão). */
     heroImages: p?.heroImages ?? [],
+    /** Lembretes por e-mail (show amanhã, fim do teste). */
+    emailReminders: p?.emailReminders ?? true,
     instruments,
     /** Perfil ainda não preenchido: o app leva a pessoa ao onboarding. */
     onboarded: Boolean(p?.role) && instruments.length > 0,
@@ -56,9 +59,7 @@ export const meRoutes = new Hono<AppEnv>()
   .put('/', validate('json', profileInput), async (c) => {
     const uid = c.var.user.id
     const input = c.req.valid('json')
-    const instruments = input.instruments.filter(
-      (i, idx, arr) => arr.findIndex((x) => x.instrument === i.instrument) === idx,
-    )
+    const instruments = input.instruments.filter((i, idx, arr) => arr.findIndex((x) => x.instrument === i.instrument) === idx)
     // Exatamente um instrumento principal quando há instrumentos.
     if (instruments.length && !instruments.some((i) => i.primary)) instruments[0].primary = true
     let seenPrimary = false
@@ -74,6 +75,7 @@ export const meRoutes = new Hono<AppEnv>()
         city: input.city ?? null,
         bio: input.bio ?? null,
         ...(input.viewerPrefs ? { viewerPrefs: input.viewerPrefs } : {}),
+        ...(input.emailReminders !== undefined ? { emailReminders: input.emailReminders } : {}),
       }
       await tx
         .insert(profile)
@@ -143,7 +145,12 @@ export const meRoutes = new Hono<AppEnv>()
           .select({ setlistId: setlistItem.setlistId, title: song.title, artist: song.artist, coverUrl: song.coverUrl })
           .from(setlistItem)
           .innerJoin(song, eq(song.id, setlistItem.songId))
-          .where(inArray(setlistItem.setlistId, upcoming.map((s) => s.id)))
+          .where(
+            inArray(
+              setlistItem.setlistId,
+              upcoming.map((s) => s.id),
+            ),
+          )
           .orderBy(asc(setlistItem.position))
       : []
     const withSongs = upcoming.map((s) => {
@@ -151,5 +158,17 @@ export const meRoutes = new Hono<AppEnv>()
       return { ...s, songCount: mine.length, songs: mine.slice(0, 4).map(({ setlistId: _, ...rest }) => rest) }
     })
 
-    return c.json({ recent, favorites, upcoming: withSongs, counts: counts[0] })
+    // Primeiros passos (cartão do início para contas novas): abriu uma música, montou um
+    // repertório com músicas, chamou a banda (alguém entrou ou tem convite criado).
+    const [progress] = await db.execute<{ setlist: boolean; band: boolean }>(sql`
+      select
+        exists(select 1 from ${setlist} s join ${setlistItem} i on i.setlist_id = s.id where s.owner_id = ${uid}) as setlist,
+        exists(select 1 from ${setlist} s where s.owner_id = ${uid} and (
+          exists(select 1 from ${setlistMember} m where m.setlist_id = s.id and m.user_id <> ${uid})
+          or exists(select 1 from ${schema.invite} v where v.setlist_id = s.id)
+        )) as band
+    `)
+    const onboarding = { opened: recent.length > 0, setlist: !!progress?.setlist, band: !!progress?.band }
+
+    return c.json({ recent, favorites, upcoming: withSongs, counts: counts[0], onboarding })
   })

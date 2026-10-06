@@ -7,6 +7,7 @@ import { db, schema } from './db'
 import { env } from './env'
 import { sendPasswordChangedEmail, sendPasswordResetEmail } from './mail'
 import { beforeDeleteAccount } from './account-delete'
+import { welcomeEmail } from './lifecycle'
 import { createWelcomeSong } from './welcome-song'
 
 // Login social só é ativado quando as credenciais existem no ambiente.
@@ -103,6 +104,8 @@ export const auth = betterAuth({
               .catch((e) => console.error('Falha ao iniciar o teste grátis', e))
           }
           await createWelcomeSong(created.id).catch((e) => console.error('Falha ao criar música de exemplo', e))
+          // Sem await: o cadastro não espera o e-mail sair.
+          welcomeEmail(created.id).catch((e) => console.error('Falha no e-mail de boas-vindas', e))
         },
       },
     },

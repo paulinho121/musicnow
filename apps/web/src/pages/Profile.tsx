@@ -1,7 +1,7 @@
 import { INSTRUMENTS, MUSICIAN_ROLES, type Instrument, type MusicianRole } from '@ensaio/shared'
 import { useQueryClient } from '@tanstack/react-query'
 import clsx from 'clsx'
-import { Check, ChevronRight, Crown, LogOut, Moon, Star, Sun } from 'lucide-react'
+import { Check, ChevronRight, Crown, LogOut, Mail, Moon, Star, Sun } from 'lucide-react'
 import { type FormEvent, useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router'
 import { DeleteAccount } from '../components/DeleteAccount'
@@ -62,7 +62,8 @@ export function Profile() {
       {
         onSuccess: () => {
           toast('Perfil salvo.')
-          if (onboarding) navigate(from && from !== '/perfil' ? from : '/inicio', { replace: true })
+          // Conta nova sem destino (ex.: convite) vai montar o primeiro repertório.
+          if (onboarding) navigate(from && from !== '/perfil' && from !== '/inicio' ? from : '/comecar', { replace: true })
         },
         onError: (err) => setFormError(err.message),
       },
@@ -169,6 +170,33 @@ export function Profile() {
             {theme === 'dark' ? 'Escuro' : 'Claro'}
           </button>
         </section>
+      )}
+
+      {!onboarding && (
+        <label className="card flex cursor-pointer items-center justify-between gap-4 p-4 md:p-5">
+          <span>
+            <span className="flex items-center gap-2 font-semibold">
+              <Mail className="size-4 text-muted" /> Lembretes por e-mail
+            </span>
+            <span className="block text-sm text-muted">Show amanhã e fim do teste grátis. Avisos de pagamento sempre chegam.</span>
+          </span>
+          <input
+            type="checkbox"
+            className="size-5 shrink-0 accent-[var(--accent)]"
+            checked={me.emailReminders ?? true}
+            disabled={save.isPending}
+            onChange={(e) =>
+              // Salva na hora, com os dados já salvos do perfil (não mexe no que está sendo editado).
+              save.mutate(
+                { name: me.name, city: me.city, role: me.role, instruments: me.instruments, emailReminders: e.target.checked },
+                {
+                  onSuccess: (m) => toast(m.emailReminders ? 'Lembretes ligados.' : 'Lembretes desligados.'),
+                  onError: (err) => toast(err.message, 'error'),
+                },
+              )
+            }
+          />
+        </label>
       )}
 
       {formError && (
