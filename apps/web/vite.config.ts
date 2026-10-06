@@ -89,7 +89,9 @@ export default defineConfig({
           },
           {
             // Capas de álbum (Cover Art Archive): guardadas para o repertório baixado ficar bonito sem internet.
-            urlPattern: ({ url }) => /(^|\.)(coverartarchive|archive)\.org$/.test(url.hostname),
+            // (Pedidos "cors" ficam de fora: a imagem "Tocando agora" desenha a capa e precisa da versão
+            // com permissão; a guardada aqui é a das <img>, que o desenho não pode usar.)
+            urlPattern: ({ url, request }) => request.mode !== 'cors' && /(^|\.)(coverartarchive|archive)\.org$/.test(url.hostname),
             handler: 'CacheFirst',
             options: {
               cacheName: 'covers',

@@ -33,6 +33,7 @@ import {
   Plus,
   Printer,
   RotateCcw,
+  Share,
   Share2,
   Shrink,
   Star,
@@ -54,6 +55,7 @@ import { ReferencePlayer } from '../components/ReferencePlayer'
 import { ReportButton } from '../components/ReportDialog'
 import { ScoreUploadDialog } from '../components/score/ScoreUploadDialog'
 import { ScoreViewer } from '../components/score/ScoreViewer'
+import { NowPlayingDialog } from '../components/NowPlayingDialog'
 import { ShareSongDialog } from '../components/ShareSongDialog'
 import { Sheet } from '../components/Sheet'
 import { CoverGlow, SongCover } from '../components/SongCover'
@@ -105,6 +107,8 @@ export interface BlockInfo {
 export interface SetlistContext {
   id: string
   name: string
+  /** Local do show (para o "Tocando agora"). */
+  location?: string | null
   position: number
   total: number
   /** Tom definido para esta música no repertório (null = tom original). */
@@ -158,6 +162,7 @@ export function SongViewer({ songId, setlist }: { songId: string; setlist?: Setl
   const [addOpen, setAddOpen] = useState(false)
   const [moreOpen, setMoreOpen] = useState(false)
   const [shareOpen, setShareOpen] = useState(false)
+  const [nowOpen, setNowOpen] = useState(false)
   // Ajustar acordes e voltar para cá (inclusive dentro do repertório, no modo tocar).
   const here = useLocation().pathname
   const alignUrl = `/musicas/${songId}/editar?aba=ajustar&voltar=${encodeURIComponent(here)}`
@@ -377,6 +382,15 @@ export function SongViewer({ songId, setlist }: { songId: string; setlist?: Setl
             }}
           >
             <Tag className="size-5" />
+          </button>
+          {/* "Tocando agora" nos Stories/Status: para todos, também dentro do repertório. */}
+          <button
+            className="btn-icon shrink-0 border-transparent bg-transparent"
+            aria-label="Postar tocando agora"
+            title="Postar “Tocando agora” nos Stories ou no Status"
+            onClick={() => setNowOpen(true)}
+          >
+            <Share className="size-5" />
           </button>
           {!setlist && (
             <AddToSetlistButton
@@ -910,6 +924,15 @@ export function SongViewer({ songId, setlist }: { songId: string; setlist?: Setl
               <MoveHorizontal className="size-5 text-muted" /> Ajustar posição dos acordes
             </Link>
           )}
+          <button
+            className="flex h-12 items-center gap-3 rounded-xl px-2 text-left hover:bg-surface-2"
+            onClick={() => {
+              setMoreOpen(false)
+              setNowOpen(true)
+            }}
+          >
+            <Share className="size-5 text-muted" /> Postar “Tocando agora”
+          </button>
           {song.canEdit && (
             <button
               className="flex h-12 items-center gap-3 rounded-xl px-2 text-left hover:bg-surface-2"
@@ -941,6 +964,18 @@ export function SongViewer({ songId, setlist }: { songId: string; setlist?: Setl
         </div>
       </Sheet>
 
+      <NowPlayingDialog
+        song={{
+          title: song.title,
+          artist: song.artist,
+          coverUrl: song.coverUrl,
+          show: setlist?.name,
+          location: setlist?.location,
+          key: currentKey,
+        }}
+        open={nowOpen}
+        onClose={() => setNowOpen(false)}
+      />
       {song.canEdit && <ShareSongDialog songId={song.id} title={song.title} open={shareOpen} onClose={() => setShareOpen(false)} />}
 
       <ScoreUploadDialog

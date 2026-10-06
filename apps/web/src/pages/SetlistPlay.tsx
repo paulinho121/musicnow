@@ -120,6 +120,7 @@ export function SetlistPlay() {
       setlist={{
         id: s.id,
         name: s.name,
+        location: s.location,
         position: index,
         total,
         itemKey: item.key,
