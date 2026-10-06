@@ -1,4 +1,5 @@
 import nodemailer from 'nodemailer'
+import { PLANS } from '@ensaio/shared'
 import { env } from './env'
 
 // SMTP genérico: funciona com Gmail (senha de app), Brevo, Resend, Zoho...
@@ -141,7 +142,7 @@ export async function sendTrialEndingEmail(to: string, name: string, endsAt: Dat
   await sendMail({
     to,
     subject: `Seu teste grátis do Ensaio Fácil acaba ${when}`,
-    text: `Olá, ${name}! Seu teste grátis acaba ${when} (${dateBR(endsAt)}). Para continuar criando e editando músicas e repertórios, assine por R$ 9,99/mês ou R$ 99,90/ano: ${url}
+    text: `Olá, ${name}! Seu teste grátis acaba ${when} (${dateBR(endsAt)}). Para continuar criando e editando músicas e repertórios, assine por ${brl(PLANS.monthly.price)}/mês ou ${brl(PLANS.yearly.price)}/ano: ${url}
 
 Suas músicas continuam salvas e você continua podendo abrir e tocar tudo.`,
     html: layout({
@@ -149,7 +150,7 @@ Suas músicas continuam salvas e você continua podendo abrir e tocar tudo.`,
       body:
         p(`Olá, ${first(name)}! Seu teste grátis vai até <b>${dateBR(endsAt)}</b>.`) +
         p(
-          'Para continuar <b>criando e editando</b> músicas e repertórios, assine por <b>R$ 9,99/mês</b> ou <b>R$ 99,90/ano</b> (2 meses grátis). Os músicos convidados nunca pagam.',
+          `Para continuar <b>criando e editando</b> músicas e repertórios, assine por <b>${brl(PLANS.monthly.price)}/mês</b> ou <b>${brl(PLANS.yearly.price)}/ano</b> (2 meses grátis). Os músicos convidados nunca pagam.`,
         ) +
         p('Fique tranquilo: suas músicas continuam salvas e você continua podendo abrir e tocar tudo.'),
       button: { label: 'Escolher meu plano', url },

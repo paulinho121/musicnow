@@ -24,6 +24,7 @@ const profileInput = z.object({
 async function loadMe(uid: string) {
   const [u] = await db.select().from(user).where(eq(user.id, uid))
   const [p] = await db.select().from(profile).where(eq(profile.userId, uid))
+  const [partnerRow] = await db.select({ code: schema.partner.code }).from(schema.partner).where(eq(schema.partner.userId, uid))
   const instruments = await db
     .select({ instrument: userInstrument.instrument, primary: userInstrument.primary })
     .from(userInstrument)
@@ -46,6 +47,8 @@ async function loadMe(uid: string) {
     /** Perfil ainda não preenchido: o app leva a pessoa ao onboarding. */
     onboarded: Boolean(p?.role) && instruments.length > 0,
     isAdmin: isAdminUser(u),
+    /** Cupom de parceiro desta conta (painel do parceiro), se for parceiro. */
+    partnerCode: partnerRow?.code ?? null,
     /** Teste grátis / assinatura (aviso no app e tela "Minha assinatura"). */
     billing: await billingSummary(u),
   }

@@ -1,7 +1,7 @@
 import { INSTRUMENTS, MUSICIAN_ROLES, type Instrument, type MusicianRole } from '@ensaio/shared'
 import { useQueryClient } from '@tanstack/react-query'
 import clsx from 'clsx'
-import { Check, ChevronRight, Crown, LogOut, Mail, Moon, Star, Sun } from 'lucide-react'
+import { Check, ChevronRight, Crown, Handshake, LogOut, Mail, Moon, Star, Sun } from 'lucide-react'
 import { type FormEvent, useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router'
 import { DeleteAccount } from '../components/DeleteAccount'
@@ -203,6 +203,17 @@ export function Profile() {
         <p role="alert" className="rounded-xl border border-danger/40 bg-danger/10 px-4 py-3 text-sm text-danger">
           {formError}
         </p>
+      )}
+
+      {!onboarding && me.partnerCode && (
+        <Link to="/parceiro" className="card flex items-center gap-3 border-accent/40 p-4 transition hover:border-accent">
+          <Handshake className="size-5 shrink-0 text-accent" />
+          <span className="min-w-0 flex-1">
+            <span className="block font-semibold">Painel do parceiro</span>
+            <span className="block text-sm text-muted">Seu cupom {me.partnerCode}, link para divulgar e comissões</span>
+          </span>
+          <ChevronRight className="size-4 text-muted" />
+        </Link>
       )}
 
       {!onboarding && (

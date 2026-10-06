@@ -205,6 +205,56 @@ export const billingAccount = pgTable('billing_account', {
   ...timestamps,
 })
 
+/**
+ * Parceiros (músicos que divulgam o app): cada um tem um cupom (ex.: LUIZ) e o link /p/luiz.
+ * Quem se cadastra com o cupom ganha mais dias de teste; o parceiro ganha uma comissão única
+ * sobre o 1º pagamento de cada indicado. A conta do próprio parceiro (userId) não paga.
+ */
+export const partner = pgTable('partner', {
+  id: uuid().primaryKey().defaultRandom(),
+  /** Cupom, sempre em maiúsculas (LUIZ, LOUVOR10). */
+  code: text().notNull().unique(),
+  name: text().notNull(),
+  /** Conta do parceiro no app (acesso grátis e painel do parceiro). */
+  userId: text().references(() => user.id, { onDelete: 'set null' }),
+  /** Chave Pix para receber a comissão. */
+  pixKey: text(),
+  /** Comissão sobre o 1º pagamento do indicado (%). */
+  commissionPercent: integer().notNull().default(50),
+  /** Dias de teste grátis de quem usa o cupom. */
+  trialDays: integer().notNull().default(30),
+  active: boolean().notNull().default(true),
+  notes: text(),
+  ...timestamps,
+})
+
+/**
+ * Quem chegou por um parceiro e a comissão dessa indicação (uma só, no 1º pagamento).
+ * status: signed (cadastrou) → converted (pagou; comissão liberada 8 dias depois, prazo do
+ * direito de arrependimento) → paid (comissão paga ao parceiro); canceled = reembolso.
+ */
+export const partnerReferral = pgTable(
+  'partner_referral',
+  {
+    userId: text()
+      .primaryKey()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    partnerId: uuid()
+      .notNull()
+      .references(() => partner.id, { onDelete: 'cascade' }),
+    status: text().notNull().default('signed'),
+    plan: text(),
+    paymentId: text(),
+    /** Valor do 1º pagamento e da comissão, em centavos. */
+    paymentCents: integer(),
+    commissionCents: integer(),
+    convertedAt: timestamp({ withTimezone: true }),
+    paidAt: timestamp({ withTimezone: true }),
+    ...timestamps,
+  },
+  (t) => [index().on(t.partnerId), index().on(t.status)],
+)
+
 /** Avisos do Asaas já processados (o Asaas pode reenviar o mesmo aviso). */
 export const billingEvent = pgTable('billing_event', {
   id: text().primaryKey(),

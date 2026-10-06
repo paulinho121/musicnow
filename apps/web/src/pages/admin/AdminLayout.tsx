@@ -1,5 +1,5 @@
 import clsx from 'clsx'
-import { Activity, AlertOctagon, BarChart3, Bug, ShieldCheck, Users } from 'lucide-react'
+import { Activity, AlertOctagon, BarChart3, Bug, Handshake, ShieldCheck, Users } from 'lucide-react'
 import { NavLink, Outlet } from 'react-router'
 
 const TABS = [
@@ -7,6 +7,7 @@ const TABS = [
   { to: '/admin/visitas', label: 'Fluxo de Visitas', icon: Activity },
   { to: '/admin/usuarios', label: 'Usuários Cadastrados', icon: Users },
   { to: '/admin/denuncias', label: 'Moderação & Denúncias', icon: AlertOctagon },
+  { to: '/admin/parceiros', label: 'Parceiros', icon: Handshake },
   { to: '/admin/erros', label: 'Erros do App', icon: Bug },
 ]
 

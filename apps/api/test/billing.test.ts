@@ -51,7 +51,7 @@ const webhook = (body: unknown, token = TOKEN) => call(null, 'POST', '/billing/w
 const payment = (over: Record<string, unknown>) => ({
   id: `pay_${run}`,
   customer: `cus_${run}`,
-  value: 9.99,
+  value: 14.9,
   status: 'RECEIVED',
   dueDate: new Date().toISOString().slice(0, 10),
   billingType: 'PIX',
@@ -136,18 +136,28 @@ describe('avisos do Asaas', () => {
   })
 
   it('aviso da assinatura antiga (troca de plano) não cancela a atual', async () => {
-    const r = await webhook({ id: `evt_velha_${run}`, event: 'SUBSCRIPTION_DELETED', subscription: { id: `sub_velha_${run}`, externalReference: lider.id } })
+    const r = await webhook({
+      id: `evt_velha_${run}`,
+      event: 'SUBSCRIPTION_DELETED',
+      subscription: { id: `sub_velha_${run}`, externalReference: lider.id },
+    })
     expect(r.data.result).toMatch(/assinatura antiga/)
     expect((await call(lider, 'GET', '/me')).data.billing.status).toBe('active')
   })
 
   it('cancelar a renovação mantém o acesso até o fim do período pago', async () => {
-    expect((await webhook({ id: `evt_cancel_${run}`, event: 'SUBSCRIPTION_DELETED', subscription: { id: subId } })).data.result).toBe('cancelada')
+    expect((await webhook({ id: `evt_cancel_${run}`, event: 'SUBSCRIPTION_DELETED', subscription: { id: subId } })).data.result).toBe(
+      'cancelada',
+    )
     expect((await call(lider, 'GET', '/me')).data.billing).toMatchObject({ status: 'canceled', active: true, reason: 'subscription' })
   })
 
   it('reembolso (direito de arrependimento) encerra o acesso pago', async () => {
-    const r = await webhook({ id: `evt_reemb_${run}`, event: 'PAYMENT_REFUNDED', payment: payment({ externalReference: lider.id, status: 'REFUNDED' }) })
+    const r = await webhook({
+      id: `evt_reemb_${run}`,
+      event: 'PAYMENT_REFUNDED',
+      payment: payment({ externalReference: lider.id, status: 'REFUNDED' }),
+    })
     expect(r.data.result).toBe('reembolsada')
     // Sem período pago e com o teste vencido: volta a ficar só para leitura (depois da tolerância de 3 dias).
     await client`update billing_account set current_period_end = now() - interval '4 days' where user_id = ${lider.id}`

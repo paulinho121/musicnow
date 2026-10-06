@@ -26,7 +26,10 @@ const METHOD: Record<string, string> = { PIX: 'Pix', CREDIT_CARD: 'Cartão', BOL
 function maskCpfCnpj(v: string) {
   const d = onlyDigits(v).slice(0, 14)
   if (d.length <= 11)
-    return d.replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})\.(\d{3})(\d)/, '$1.$2.$3').replace(/\.(\d{3})(\d{1,2})$/, '.$1-$2')
+    return d
+      .replace(/(\d{3})(\d)/, '$1.$2')
+      .replace(/(\d{3})\.(\d{3})(\d)/, '$1.$2.$3')
+      .replace(/\.(\d{3})(\d{1,2})$/, '.$1-$2')
   return d
     .replace(/^(\d{2})(\d)/, '$1.$2')
     .replace(/^(\d{2})\.(\d{3})(\d)/, '$1.$2.$3')
@@ -86,17 +89,24 @@ export function Subscription() {
                   type="button"
                   onClick={() => setPlan(id)}
                   aria-pressed={on}
-                  className={clsx('relative rounded-2xl border p-4 text-left transition', on ? 'border-accent bg-accent/10' : 'border-border hover:border-accent/40')}
+                  className={clsx(
+                    'relative rounded-2xl border p-4 text-left transition',
+                    on ? 'border-accent bg-accent/10' : 'border-border hover:border-accent/40',
+                  )}
                 >
                   {id === 'yearly' && (
-                    <span className="absolute -top-2.5 right-3 rounded-full bg-accent px-2 py-0.5 text-[11px] font-bold text-accent-ink">2 meses grátis</span>
+                    <span className="absolute -top-2.5 right-3 rounded-full bg-accent px-2 py-0.5 text-[11px] font-bold text-accent-ink">
+                      2 meses grátis
+                    </span>
                   )}
                   <p className="text-sm font-semibold text-muted">{p.label}</p>
                   <p className="mt-1 text-2xl font-extrabold">
                     {formatBRL(p.price)}
                     <span className="text-sm font-medium text-muted">{id === 'monthly' ? '/mês' : '/ano'}</span>
                   </p>
-                  <p className="mt-1 text-xs text-muted">{id === 'yearly' ? `Equivale a ${formatBRL(p.price / 12)} por mês` : 'Cancele quando quiser'}</p>
+                  <p className="mt-1 text-xs text-muted">
+                    {id === 'yearly' ? `Equivale a ${formatBRL(p.price / 12)} por mês` : 'Cancele quando quiser'}
+                  </p>
                   {on && <Check className="absolute right-3 bottom-3 size-5 text-accent" />}
                 </button>
               )
@@ -106,7 +116,14 @@ export function Subscription() {
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="block">
               <span className="label">Nome completo</span>
-              <input className="input" value={name} onChange={(e) => setName(e.target.value)} maxLength={120} autoComplete="name" required />
+              <input
+                className="input"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                maxLength={120}
+                autoComplete="name"
+                required
+              />
             </label>
             <label className="block">
               <span className="label">CPF ou CNPJ</span>
@@ -145,7 +162,8 @@ export function Subscription() {
                     {formatBRL(p.value)} · {METHOD[p.billingType] ?? p.billingType}
                   </span>
                   <span className="block text-xs text-muted">
-                    {PAYMENT_STATUS[p.status] ?? p.status} · {p.paymentDate ? `pago em ${fmtDate(p.paymentDate)}` : `vence em ${fmtDate(p.dueDate)}`}
+                    {PAYMENT_STATUS[p.status] ?? p.status} ·{' '}
+                    {p.paymentDate ? `pago em ${fmtDate(p.paymentDate)}` : `vence em ${fmtDate(p.dueDate)}`}
                   </span>
                 </span>
                 <a href={p.invoiceUrl} target="_blank" rel="noreferrer" className="btn-ghost h-9 shrink-0 px-3 text-xs">
@@ -158,7 +176,11 @@ export function Subscription() {
       )}
 
       {subscribed && b.status !== 'canceled' && (
-        <button className="text-sm text-muted underline-offset-4 hover:text-danger hover:underline" onClick={doCancel} disabled={cancel.isPending}>
+        <button
+          className="text-sm text-muted underline-offset-4 hover:text-danger hover:underline"
+          onClick={doCancel}
+          disabled={cancel.isPending}
+        >
           Cancelar a renovação
         </button>
       )}
@@ -187,6 +209,8 @@ export function Subscription() {
 function StatusCard({ b }: { b: BillingSummary }) {
   const lines: { title: string; text: string; tone: 'ok' | 'info' | 'warn' | 'danger' } = (() => {
     if (b.reason === 'admin') return { title: 'Acesso de administrador', text: 'Tudo liberado na sua conta.', tone: 'ok' }
+    if (b.reason === 'partner')
+      return { title: 'Conta de parceiro', text: 'Acesso liberado enquanto você for parceiro do Ensaio Fácil.', tone: 'ok' }
     if (b.reason === 'free') return { title: 'Tudo liberado', text: 'A cobrança ainda não começou. Aproveite!', tone: 'ok' }
     if (b.reason === 'trial')
       return {
@@ -197,8 +221,13 @@ function StatusCard({ b }: { b: BillingSummary }) {
     if (b.reason === 'subscription') {
       const plan = b.plan ? PLANS[b.plan].label : ''
       if (b.status === 'canceled')
-        return { title: `Plano ${plan} cancelado`, text: `Seu acesso continua até ${fmtDate(b.currentPeriodEnd)}. Você pode assinar de novo quando quiser.`, tone: 'warn' }
-      if (b.status === 'past_due') return { title: 'Pagamento atrasado', text: 'Pague a cobrança em aberto para não perder a edição.', tone: 'warn' }
+        return {
+          title: `Plano ${plan} cancelado`,
+          text: `Seu acesso continua até ${fmtDate(b.currentPeriodEnd)}. Você pode assinar de novo quando quiser.`,
+          tone: 'warn',
+        }
+      if (b.status === 'past_due')
+        return { title: 'Pagamento atrasado', text: 'Pague a cobrança em aberto para não perder a edição.', tone: 'warn' }
       return { title: `Plano ${plan} ativo`, text: `Renova em ${fmtDate(b.currentPeriodEnd)}.`, tone: 'ok' }
     }
     return {

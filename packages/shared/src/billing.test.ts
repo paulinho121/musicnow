@@ -14,8 +14,8 @@ describe('cobrança', () => {
   })
 
   it('preços', () => {
-    expect(formatBRL(PLANS.monthly.price).replace(/\s/g, ' ')).toBe('R$ 9,99')
-    expect(formatBRL(PLANS.yearly.price).replace(/\s/g, ' ')).toBe('R$ 99,90')
+    expect(formatBRL(PLANS.monthly.price).replace(/\s/g, ' ')).toBe('R$ 14,90')
+    expect(formatBRL(PLANS.yearly.price).replace(/\s/g, ' ')).toBe('R$ 149,00')
     // Anual sai por menos de 10 mensalidades (2 meses grátis).
     expect(PLANS.yearly.price).toBeLessThan(PLANS.monthly.price * 10.1)
   })

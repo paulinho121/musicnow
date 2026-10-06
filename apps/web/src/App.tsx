@@ -2,6 +2,8 @@ import { Navigate, Outlet, createBrowserRouter, type RouteObject, useLocation } 
 import { RouteError } from './components/AppError'
 import { Layout } from './components/Layout'
 import { ChordPage, ChordsIndex } from './pages/PublicChords'
+import { PartnerDashboard } from './pages/PartnerDashboard'
+import { PartnerLink } from './pages/PartnerLink'
 import { QuickStart } from './pages/QuickStart'
 import { Transposer } from './pages/Transposer'
 import { PageSpinner } from './components/ui'
@@ -31,6 +33,7 @@ import { Welcome } from './pages/Welcome'
 import { AdminLayout } from './pages/admin/AdminLayout'
 import { AdminOverview } from './pages/admin/AdminOverview'
 import { AdminErrors } from './pages/admin/AdminErrors'
+import { AdminPartners } from './pages/admin/AdminPartners'
 import { AdminReports } from './pages/admin/AdminReports'
 import { AdminTraffic } from './pages/admin/AdminTraffic'
 import { AdminUsers } from './pages/admin/AdminUsers'
@@ -94,6 +97,8 @@ export const router = createBrowserRouter([
       { path: '/acordes', element: <ChordsIndex /> },
       { path: '/acordes/:slug', element: <ChordPage /> },
       { path: '/transpor-cifra', element: <Transposer /> },
+      // Link do parceiro: guarda o cupom e leva ao cadastro.
+      { path: '/p/:code', element: <PartnerLink /> },
       {
         element: <RequireAuth />,
         children: [
@@ -122,6 +127,7 @@ export const router = createBrowserRouter([
               { path: '/compartilhado/:code', element: <SharedSongAccept /> },
               { path: '/perfil', element: <Profile /> },
               { path: '/assinatura', element: <Subscription /> },
+              { path: '/parceiro', element: <PartnerDashboard /> },
               {
                 element: <RequireAdmin />,
                 children: [
@@ -134,6 +140,7 @@ export const router = createBrowserRouter([
                       { path: 'usuarios', element: <AdminUsers /> },
                       { path: 'denuncias', element: <AdminReports /> },
                       { path: 'erros', element: <AdminErrors /> },
+                      { path: 'parceiros', element: <AdminPartners /> },
                     ],
                   },
                 ],

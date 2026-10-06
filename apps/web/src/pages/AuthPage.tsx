@@ -1,9 +1,11 @@
+import { TRIAL_DAYS } from '@ensaio/shared'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { Eye, EyeOff, ListMusic, Loader2, Music2, Radio } from 'lucide-react'
+import { Eye, EyeOff, Gift, ListMusic, Loader2, Music2, Radio } from 'lucide-react'
 import { type FormEvent, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router'
 import { Logo } from '../components/Logo'
 import { api } from '../lib/api'
+import { fetchCoupon, saveCoupon, useCouponFromUrl } from '../lib/coupon'
 import { authErrorMessage, clearOfflineData, signIn, signUp } from '../lib/auth'
 
 export function AuthPage({ mode }: { mode: 'login' | 'signup' }) {
@@ -11,6 +13,22 @@ export function AuthPage({ mode }: { mode: 'login' | 'signup' }) {
   const location = useLocation()
   const qc = useQueryClient()
   const from = (location.state as { from?: string } | null)?.from ?? '/inicio'
+  // Cupom de parceiro (link /p/luiz → ?cupom=LUIZ, ou digitado aqui): usado logo depois de entrar.
+  const [coupon, setCoupon] = useCouponFromUrl(mode === 'signup' ? new URLSearchParams(location.search).get('cupom') : null)
+  const [couponOpen, setCouponOpen] = useState(false)
+  const [couponInput, setCouponInput] = useState('')
+  const [couponError, setCouponError] = useState<string | null>(null)
+  const applyCoupon = async () => {
+    setCouponError(null)
+    try {
+      const c = await fetchCoupon(couponInput)
+      saveCoupon(c.code)
+      setCoupon(c)
+      setCouponOpen(false)
+    } catch {
+      setCouponError('Cupom não encontrado ou encerrado.')
+    }
+  }
 
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
@@ -66,9 +84,20 @@ export function AuthPage({ mode }: { mode: 'login' | 'signup' }) {
             <Logo size="xl" />
           </Link>
           <div className="card p-6 shadow-2xl shadow-black/20 sm:p-8">
+            {mode === 'signup' && coupon && (
+              <p className="mb-5 flex items-center gap-2 rounded-xl border border-ok/30 bg-ok/10 px-3 py-2.5 text-sm">
+                <Gift className="size-4 shrink-0 text-ok" />
+                <span>
+                  Cupom <b>{coupon.code}</b> aplicado: <b>{coupon.trialDays} dias grátis</b>
+                  <span className="text-muted"> · indicação de {coupon.name}</span>
+                </span>
+              </p>
+            )}
             <h1 className="text-2xl font-extrabold tracking-tight sm:text-3xl">{mode === 'signup' ? 'Crie sua conta' : 'Entrar'}</h1>
             <p className="mt-1.5 mb-7 text-sm text-muted">
-              {mode === 'signup' ? '14 dias grátis, sem cartão. Leva menos de um minuto.' : 'Bom te ver de novo. Acesse seus repertórios.'}
+              {mode === 'signup'
+                ? `${coupon?.trialDays ?? TRIAL_DAYS} dias grátis, sem cartão. Leva menos de um minuto.`
+                : 'Bom te ver de novo. Acesse seus repertórios.'}
             </p>
 
             {Boolean(meta?.providers.length) && (
@@ -145,6 +174,34 @@ export function AuthPage({ mode }: { mode: 'login' | 'signup' }) {
                 {busy && <Loader2 className="size-4 animate-spin" />}
                 {busy ? 'Aguarde…' : mode === 'signup' ? 'Criar conta grátis' : 'Entrar'}
               </button>
+              {mode === 'signup' && !coupon && (
+                <div className="text-center text-sm">
+                  {couponOpen ? (
+                    <div className="flex gap-2">
+                      <input
+                        className="input h-10 font-mono uppercase"
+                        value={couponInput}
+                        onChange={(e) => setCouponInput(e.target.value)}
+                        placeholder="Seu cupom"
+                        aria-label="Cupom"
+                        autoCapitalize="characters"
+                      />
+                      <button type="button" className="btn-ghost h-10 shrink-0" onClick={applyCoupon} disabled={!couponInput.trim()}>
+                        Aplicar
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      className="text-muted underline-offset-4 hover:text-text hover:underline"
+                      onClick={() => setCouponOpen(true)}
+                    >
+                      Tem um cupom?
+                    </button>
+                  )}
+                  {couponError && <p className="mt-1.5 text-xs text-danger">{couponError}</p>}
+                </div>
+              )}
               {mode === 'signup' && (
                 <p className="text-center text-xs text-muted">
                   Ao criar a conta, você concorda com os{' '}

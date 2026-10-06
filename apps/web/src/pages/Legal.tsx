@@ -51,6 +51,10 @@ export function Terms() {
       <ul>
         <li>Toda conta nova tem {TRIAL_DAYS} dias de teste com tudo liberado, sem pedir cartão.</li>
         <li>
+          Cupons de parceiros podem dar mais dias de teste. Cada conta usa um cupom só, nos primeiros 7 dias depois do cadastro e antes da
+          primeira assinatura.
+        </li>
+        <li>
           Depois do teste, ver e tocar músicas e repertórios continua gratuito. Para criar e editar músicas, partituras e repertórios, é
           preciso assinar: plano mensal de {formatBRL(PLANS.monthly.price)} ou anual de {formatBRL(PLANS.yearly.price)}.
         </li>

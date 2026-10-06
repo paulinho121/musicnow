@@ -1,4 +1,4 @@
-// Cobrança: quem cria conteúdo assina (R$ 9,99/mês ou R$ 99,90/ano); quem só toca os
+// Cobrança: quem cria conteúdo assina (R$ 14,90/mês ou R$ 149/ano); quem só toca os
 // repertórios dos outros nunca paga. Todo mundo começa com 14 dias de teste.
 //
 // Pagamento pelo Asaas: a pessoa paga na página de cobrança do próprio Asaas (Pix, cartão
@@ -11,6 +11,7 @@ import { db, schema } from './db'
 import { env } from './env'
 import { isAdminUser } from './http'
 import { paymentConfirmedEmail, paymentOverdueEmail } from './lifecycle'
+import { cancelPartnerCommission, isActivePartner, recordPartnerConversion, referralTrialDays } from './partners'
 
 const { billingAccount, user, setlist } = schema
 type Account = typeof billingAccount.$inferSelect
@@ -21,28 +22,32 @@ const DAY = 24 * 60 * 60 * 1000
 export async function getAccount(userId: string): Promise<Account> {
   const [row] = await db.select().from(billingAccount).where(eq(billingAccount.userId, userId))
   if (row) return row
+  // Quem chegou pelo cupom de um parceiro tem mais dias de teste.
+  const days = (await referralTrialDays(userId)) ?? TRIAL_DAYS
   const [created] = await db
     .insert(billingAccount)
-    .values({ userId, trialEndsAt: new Date(Date.now() + TRIAL_DAYS * DAY) })
+    .values({ userId, trialEndsAt: new Date(Date.now() + days * DAY) })
     .onConflictDoNothing()
     .returning()
   return created ?? (await db.select().from(billingAccount).where(eq(billingAccount.userId, userId)))[0]
 }
 
-export type AccessReason = 'admin' | 'free' | 'subscription' | 'trial' | 'expired'
+export type AccessReason = 'admin' | 'partner' | 'free' | 'subscription' | 'trial' | 'expired'
 
-/** Pode criar e editar? (admins e o período antes de a cobrança valer, sempre) */
-export function accessOf(acc: Account, isAdmin: boolean, now = new Date()) {
+/** Pode criar e editar? (admins, parceiros ativos e o período antes de a cobrança valer, sempre) */
+export function accessOf(acc: Account, isAdmin: boolean, now = new Date(), isPartner = false) {
   const paidUntil = acc.currentPeriodEnd ? acc.currentPeriodEnd.getTime() + GRACE_DAYS * DAY : 0
   const reason: AccessReason = isAdmin
     ? 'admin'
-    : !env.BILLING_ENFORCED
-      ? 'free'
-      : paidUntil > now.getTime()
-        ? 'subscription'
-        : acc.trialEndsAt.getTime() > now.getTime()
-          ? 'trial'
-          : 'expired'
+    : isPartner
+      ? 'partner'
+      : !env.BILLING_ENFORCED
+        ? 'free'
+        : paidUntil > now.getTime()
+          ? 'subscription'
+          : acc.trialEndsAt.getTime() > now.getTime()
+            ? 'trial'
+            : 'expired'
   const trialDaysLeft = Math.max(0, Math.ceil((acc.trialEndsAt.getTime() - now.getTime()) / DAY))
   return { active: reason !== 'expired', reason, trialDaysLeft }
 }
@@ -66,7 +71,7 @@ export async function billingSummary(u: { id: string; email: string; role?: stri
     }
   }
   const acc = await getAccount(u.id)
-  const access = accessOf(acc, isAdminUser(u))
+  const access = accessOf(acc, isAdminUser(u), new Date(), await isActivePartner(u.id))
   return {
     enforced: env.BILLING_ENFORCED,
     configured: Boolean(env.ASAAS_API_KEY),
@@ -87,7 +92,8 @@ export async function assertCanCreate(userId: string) {
   if (!env.BILLING_ENFORCED) return
   const [u] = await db.select({ email: user.email, role: user.role }).from(user).where(eq(user.id, userId))
   if (!u) throw new HTTPException(401, { message: 'Faça login para continuar.' })
-  if (!accessOf(await getAccount(userId), isAdminUser(u)).active) throw new HTTPException(402, { message: PAYWALL_MESSAGE })
+  if (!accessOf(await getAccount(userId), isAdminUser(u), new Date(), await isActivePartner(userId)).active)
+    throw new HTTPException(402, { message: PAYWALL_MESSAGE })
 }
 
 /** Repertório de outra pessoa: o que vale é a assinatura do DONO (quem paga pelo repertório). */
@@ -305,6 +311,8 @@ export async function handleWebhook(body: AsaasWebhook): Promise<string> {
         .where(eq(billingAccount.userId, acc.userId))
       // Confirmado e recebido chegam os dois para o mesmo pagamento: o recibo sai uma vez.
       void paymentConfirmedEmail(acc.userId, p, currentPeriodEnd).catch(() => {})
+      // Indicado por um parceiro: comissão única sobre este 1º pagamento.
+      await recordPartnerConversion(acc.userId, p, plan).catch((e) => console.error('Parceiros: comissão', e))
       return 'ativada'
     }
     case 'PAYMENT_OVERDUE':
@@ -314,7 +322,9 @@ export async function handleWebhook(body: AsaasWebhook): Promise<string> {
       return 'atrasada'
     case 'PAYMENT_REFUNDED':
     case 'PAYMENT_CHARGEBACK_REQUESTED':
-      // Reembolso (direito de arrependimento) ou contestação: o acesso pago acaba.
+      // Reembolso (direito de arrependimento) ou contestação: o acesso pago acaba
+      // e a comissão do parceiro (se ainda não foi paga) é cancelada.
+      await cancelPartnerCommission(acc.userId, body.payment?.id).catch(() => {})
       await db
         .update(billingAccount)
         .set({ status: 'canceled', currentPeriodEnd: now, updatedAt: now })

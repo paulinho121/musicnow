@@ -1,10 +1,14 @@
 import clsx from 'clsx'
 import { Home, ListMusic, Music2, ShieldCheck, UserRound } from 'lucide-react'
+import { useQueryClient } from '@tanstack/react-query'
+import { useEffect } from 'react'
 import { NavLink, Outlet } from 'react-router'
-import { useMe } from '../lib/queries'
+import { redeemPendingCoupon } from '../lib/coupon'
+import { keys, useMe } from '../lib/queries'
 import { usePageTracking } from '../lib/usePageTracking'
 import { BillingBanner } from './BillingNotice'
 import { Logo } from './Logo'
+import { useToast } from './ui'
 
 const BASE_NAV = [
   { to: '/inicio', label: 'Início', icon: Home },
@@ -17,10 +21,18 @@ const BASE_NAV = [
 export function Layout() {
   usePageTracking()
   const { data: me } = useMe()
+  const qc = useQueryClient()
+  const toast = useToast()
+  // Cupom de parceiro guardado (link /p/luiz ou cadastro): usa assim que a pessoa entra no app.
+  useEffect(() => {
+    redeemPendingCoupon().then((r) => {
+      if (!r) return
+      toast(`Cupom ${r.code} aplicado: ${r.trialDays} dias grátis!`)
+      qc.invalidateQueries({ queryKey: keys.me })
+    })
+  }, [qc, toast])
 
-  const navItems = me?.isAdmin
-    ? [...BASE_NAV, { to: '/admin', label: 'Gestão', icon: ShieldCheck }]
-    : BASE_NAV
+  const navItems = me?.isAdmin ? [...BASE_NAV, { to: '/admin', label: 'Gestão', icon: ShieldCheck }] : BASE_NAV
 
   return (
     <div className="min-h-dvh md:flex">
@@ -61,10 +73,7 @@ export function Layout() {
             key={to}
             to={to}
             className={({ isActive }) =>
-              clsx(
-                'flex h-16 flex-col items-center justify-center gap-1 text-[11px] font-medium',
-                isActive ? 'text-accent' : 'text-muted',
-              )
+              clsx('flex h-16 flex-col items-center justify-center gap-1 text-[11px] font-medium', isActive ? 'text-accent' : 'text-muted')
             }
           >
             <Icon className="size-5" />

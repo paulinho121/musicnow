@@ -118,7 +118,7 @@ export interface BillingSummary {
   /** O pagamento (Asaas) já foi configurado no servidor. */
   configured: boolean
   active: boolean
-  reason: 'admin' | 'free' | 'subscription' | 'trial' | 'expired'
+  reason: 'admin' | 'partner' | 'free' | 'subscription' | 'trial' | 'expired'
   trialDaysLeft: number
   status: 'trialing' | 'active' | 'past_due' | 'canceled'
   plan: 'monthly' | 'yearly' | null
@@ -154,6 +154,8 @@ export interface Me {
   instruments: { instrument: Instrument; primary: boolean }[]
   onboarded: boolean
   isAdmin?: boolean
+  /** Cupom de parceiro desta conta (painel do parceiro). */
+  partnerCode?: string | null
   billing?: BillingSummary
 }
 

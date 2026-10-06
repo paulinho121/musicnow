@@ -1,11 +1,12 @@
 import { PLANS } from '@ensaio/shared'
-import { and, desc, eq, gte, ilike, or, sql } from 'drizzle-orm'
+import { and, desc, eq, gte, ilike, inArray, or, sql } from 'drizzle-orm'
 import { Hono } from 'hono'
 import { HTTPException } from 'hono/http-exception'
 import { z } from 'zod'
 import { db, schema } from '../db'
 import { env } from '../env'
 import { notFound, requireAdmin, validate, type AppEnv } from '../http'
+import { isPayable, isValidCode, normalizeCode, partnerStats } from '../partners'
 import { getGlobalOnlineUsers } from '../realtime'
 
 const { user, profile, song, setlist, songScore, songReport, pageVisit, session } = schema
@@ -26,6 +27,42 @@ function parseUserAgent(ua: string | null): { device: string; browser: string } 
   else if (lower.includes('opera') || lower.includes('opr')) browser = 'Opera'
 
   return { device, browser }
+}
+
+const partnerInput = z.object({
+  code: z.string().min(3).max(40),
+  name: z.string().trim().min(1).max(120),
+  /** E-mail da conta do parceiro no app (acesso grátis e painel). Vazio = sem conta ligada. */
+  email: z.string().trim().max(200).nullish(),
+  pixKey: z.string().trim().max(200).nullish(),
+  commissionPercent: z.number().int().min(0).max(100).default(50),
+  trialDays: z.number().int().min(1).max(90).default(30),
+  active: z.boolean().default(true),
+  notes: z.string().trim().max(1000).nullish(),
+})
+
+/** Dados do parceiro para gravar: cupom normalizado e a conta achada pelo e-mail. */
+async function partnerValues(input: Partial<z.infer<typeof partnerInput>>) {
+  const { email, ...rest } = input
+  const values: Record<string, unknown> = { ...rest }
+  if (input.code !== undefined) {
+    const code = normalizeCode(input.code)
+    if (!isValidCode(code)) throw new HTTPException(400, { message: 'O cupom precisa ter de 3 a 20 letras ou números.' })
+    values.code = code
+  }
+  if (email !== undefined) {
+    if (!email) values.userId = null
+    else {
+      const [u] = await db
+        .select({ id: user.id })
+        .from(user)
+        .where(eq(sql`lower(${user.email})`, email.toLowerCase()))
+      if (!u)
+        throw new HTTPException(400, { message: `Não achamos uma conta com o e-mail ${email}. Peça para o parceiro criar a conta antes.` })
+      values.userId = u.id
+    }
+  }
+  return values as typeof schema.partner.$inferInsert
 }
 
 export const adminRoutes = new Hono<AppEnv>()
@@ -397,5 +434,86 @@ export const adminRoutes = new Hono<AppEnv>()
   })
   .delete('/errors', async (c) => {
     await db.delete(schema.appError)
+    return c.json({ ok: true })
+  })
+
+  // 8. Parceiros (cupons e comissões)
+  .get('/partners', async (c) => {
+    const rows = await db
+      .select({
+        id: schema.partner.id,
+        code: schema.partner.code,
+        name: schema.partner.name,
+        pixKey: schema.partner.pixKey,
+        commissionPercent: schema.partner.commissionPercent,
+        trialDays: schema.partner.trialDays,
+        active: schema.partner.active,
+        notes: schema.partner.notes,
+        createdAt: schema.partner.createdAt,
+        userEmail: user.email,
+      })
+      .from(schema.partner)
+      .leftJoin(user, eq(user.id, schema.partner.userId))
+      .orderBy(desc(schema.partner.createdAt))
+    const partners = await Promise.all(rows.map(async (p) => ({ ...p, ...(await partnerStats(p.id)).totals })))
+    // Ranking: quem mais trouxe assinantes primeiro.
+    partners.sort((a, b) => b.customers - a.customers || b.signups - a.signups)
+    return c.json({ partners })
+  })
+
+  .post('/partners', validate('json', partnerInput), async (c) => {
+    const input = c.req.valid('json')
+    const values = await partnerValues(input)
+    const [p] = await db.insert(schema.partner).values(values).onConflictDoNothing().returning()
+    if (!p) throw new HTTPException(400, { message: `Já existe um parceiro com o cupom ${values.code}.` })
+    return c.json({ partner: p }, 201)
+  })
+
+  .patch('/partners/:id', validate('param', z.object({ id: z.string().uuid() })), validate('json', partnerInput.partial()), async (c) => {
+    const input = c.req.valid('json')
+    const values = await partnerValues(input)
+    const [p] = await db
+      .update(schema.partner)
+      .set({ ...values, updatedAt: new Date() })
+      .where(eq(schema.partner.id, c.req.valid('param').id))
+      .returning()
+    if (!p) notFound('Parceiro')
+    return c.json({ partner: p })
+  })
+
+  // Indicações de um parceiro (com o nome de quem assinou: só o administrador vê).
+  .get('/partners/:id/referrals', validate('param', z.object({ id: z.string().uuid() })), async (c) => {
+    const { rows } = await partnerStats(c.req.valid('param').id)
+    const names = rows.length
+      ? await db
+          .select({ id: user.id, name: user.name, email: user.email })
+          .from(user)
+          .where(
+            inArray(
+              user.id,
+              rows.map((r) => r.userId),
+            ),
+          )
+      : []
+    return c.json({
+      referrals: rows.map((r) => {
+        const u = names.find((n) => n.id === r.userId)
+        return { ...r, status: isPayable(r) ? 'payable' : r.status, name: u?.name ?? null, email: u?.email ?? null }
+      }),
+    })
+  })
+
+  // Comissão paga ao parceiro (Pix feito fora do app).
+  .post('/referrals/:userId/paid', validate('param', z.object({ userId: z.string().min(1) })), async (c) => {
+    const [r] = await db
+      .select()
+      .from(schema.partnerReferral)
+      .where(eq(schema.partnerReferral.userId, c.req.valid('param').userId))
+    if (!r) notFound('Indicação')
+    if (!isPayable(r)) throw new HTTPException(400, { message: 'Esta comissão ainda não está liberada para pagamento.' })
+    await db
+      .update(schema.partnerReferral)
+      .set({ status: 'paid', paidAt: new Date(), updatedAt: new Date() })
+      .where(eq(schema.partnerReferral.userId, r.userId))
     return c.json({ ok: true })
   })

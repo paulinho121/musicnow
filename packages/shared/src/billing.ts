@@ -5,12 +5,12 @@ export const TRIAL_DAYS = 14
 export const GRACE_DAYS = 3
 
 export const PLANS = {
-  monthly: { label: 'Mensal', price: 9.99, cycle: 'MONTHLY', months: 1 },
-  yearly: { label: 'Anual', price: 99.9, cycle: 'YEARLY', months: 12 },
+  monthly: { label: 'Mensal', price: 14.9, cycle: 'MONTHLY', months: 1 },
+  yearly: { label: 'Anual', price: 149, cycle: 'YEARLY', months: 12 },
 } as const
 export type PlanId = keyof typeof PLANS
 
-/** "R$ 9,99" */
+/** "R$ 14,90" */
 export const formatBRL = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 
 /** Só os dígitos de um CPF/CNPJ digitado com pontos, traços e barra. */

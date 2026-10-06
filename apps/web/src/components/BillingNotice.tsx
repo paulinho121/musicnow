@@ -11,7 +11,7 @@ import { Sheet } from './Sheet'
 export function BillingBanner() {
   const { data: me } = useMe()
   const b = me?.billing
-  if (!b?.enforced || b.reason === 'admin' || b.reason === 'free') return null
+  if (!b?.enforced || b.reason === 'admin' || b.reason === 'partner' || b.reason === 'free') return null
 
   let tone: 'info' | 'warn' | 'danger' = 'info'
   let icon = Clock
@@ -20,7 +20,9 @@ export function BillingBanner() {
   if (b.reason === 'expired') {
     tone = 'danger'
     icon = AlertTriangle
-    text = b.pending ? 'Falta concluir o pagamento para voltar a criar e editar.' : 'Seu teste grátis terminou. Ver e tocar continua liberado; para criar e editar, assine.'
+    text = b.pending
+      ? 'Falta concluir o pagamento para voltar a criar e editar.'
+      : 'Seu teste grátis terminou. Ver e tocar continua liberado; para criar e editar, assine.'
     cta = b.pending ? 'Concluir pagamento' : `Assinar por ${formatBRL(PLANS.monthly.price)}`
   } else if (b.reason === 'trial') {
     tone = b.trialDaysLeft <= 3 ? 'warn' : 'info'
@@ -77,7 +79,11 @@ export function PaywallDialog() {
           <p className="text-sm">{message}</p>
         </div>
         <ul className="space-y-1.5 text-sm text-muted">
-          {['Músicas, cifras e partituras ilimitadas', 'Repertórios com blocos e Modo Palco para a banda', 'A banda toca de graça: só quem cria assina'].map((t) => (
+          {[
+            'Músicas, cifras e partituras ilimitadas',
+            'Repertórios com blocos e Modo Palco para a banda',
+            'A banda toca de graça: só quem cria assina',
+          ].map((t) => (
             <li key={t} className="flex items-center gap-2">
               <Sparkles className="size-4 shrink-0 text-accent" /> {t}
             </li>

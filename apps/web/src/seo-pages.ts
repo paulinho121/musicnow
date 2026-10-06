@@ -105,6 +105,7 @@ export const PRIVATE_PREFIXES = [
   '/repertorios',
   '/perfil',
   '/assinatura',
+  '/parceiro',
   '/admin',
   '/redefinir-senha',
   '/esqueci-senha',
