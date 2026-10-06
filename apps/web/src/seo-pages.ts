@@ -139,6 +139,7 @@ export const PRIVATE_PREFIXES = [
   '/perfil',
   '/assinatura',
   '/parceiro',
+  '/agenda',
   '/ajuda',
   '/admin',
   '/redefinir-senha',

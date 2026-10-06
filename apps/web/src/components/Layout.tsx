@@ -1,5 +1,5 @@
 import clsx from 'clsx'
-import { Gauge, Home, LifeBuoy, ListMusic, Music2, ShieldCheck, UserRound } from 'lucide-react'
+import { CalendarDays, Gauge, Home, LifeBuoy, ListMusic, Music2, ShieldCheck, UserRound } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { Suspense, useEffect } from 'react'
 import { NavLink, Outlet } from 'react-router'
@@ -14,6 +14,7 @@ const BASE_NAV = [
   { to: '/inicio', label: 'Início', icon: Home },
   { to: '/musicas', label: 'Músicas', icon: Music2 },
   { to: '/repertorios', label: 'Repertórios', icon: ListMusic },
+  { to: '/agenda', label: 'Agenda', icon: CalendarDays },
   { to: '/afinador', label: 'Afinador', icon: Gauge },
   // No celular a Ajuda fica no Perfil (a barra de baixo não comporta tudo).
   { to: '/ajuda', label: 'Ajuda', icon: LifeBuoy, desktopOnly: true },
@@ -35,7 +36,7 @@ export function Layout() {
     })
   }, [qc, toast])
 
-  const navItems = me?.isAdmin ? [...BASE_NAV, { to: '/admin', label: 'Gestão', icon: ShieldCheck }] : BASE_NAV
+  const navItems = me?.isAdmin ? [...BASE_NAV, { to: '/admin', label: 'Gestão', icon: ShieldCheck, desktopOnly: true }] : BASE_NAV
   const mobileItems = navItems.filter((i) => !('desktopOnly' in i && i.desktopOnly))
 
   return (
@@ -80,7 +81,11 @@ export function Layout() {
             key={to}
             to={to}
             className={({ isActive }) =>
-              clsx('flex h-16 flex-col items-center justify-center gap-1 text-[11px] font-medium', isActive ? 'text-accent' : 'text-muted')
+              clsx(
+                'flex h-16 min-w-0 flex-col items-center justify-center gap-1 font-medium',
+                mobileItems.length > 5 ? 'text-[10px]' : 'text-[11px]',
+                isActive ? 'text-accent' : 'text-muted',
+              )
             }
           >
             <Icon className="size-5" />

@@ -41,3 +41,13 @@ export function isValidCpfCnpj(input: string): boolean {
   }
   return false
 }
+
+/** "1.200,50", "R$ 800" ou "800" → centavos (null se vazio ou inválido). */
+export function parseBRL(text: string): number | null {
+  const clean = text.replace(/[^\d,.]/g, '')
+  if (!clean) return null
+  // Vírgula é o separador dos centavos; pontos são de milhar.
+  const normalized = clean.includes(',') ? clean.replace(/\./g, '').replace(',', '.') : clean.replace(/\.(?=\d{3}(\D|$))/g, '')
+  const value = Number(normalized)
+  return Number.isFinite(value) ? Math.round(value * 100) : null
+}

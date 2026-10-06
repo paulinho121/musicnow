@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { formatBRL, isValidCpfCnpj, PLANS } from './billing'
+import { formatBRL, isValidCpfCnpj, parseBRL, PLANS } from './billing'
 
 describe('cobrança', () => {
   it('CPF e CNPJ: aceita válidos (com ou sem máscara) e recusa inválidos', () => {
@@ -18,5 +18,20 @@ describe('cobrança', () => {
     expect(formatBRL(PLANS.yearly.price).replace(/\s/g, ' ')).toBe('R$ 149,00')
     // Anual sai por menos de 10 mensalidades (2 meses grátis).
     expect(PLANS.yearly.price).toBeLessThan(PLANS.monthly.price * 10.1)
+  })
+})
+
+describe('valor digitado em reais', () => {
+  it('entende os jeitos comuns de escrever', () => {
+    expect(parseBRL('800')).toBe(80000)
+    expect(parseBRL('800,00')).toBe(80000)
+    expect(parseBRL('R$ 1.200,50')).toBe(120050)
+    expect(parseBRL('1.500')).toBe(150000)
+    expect(parseBRL('99,9')).toBe(9990)
+    expect(parseBRL('0,5')).toBe(50)
+  })
+  it('vazio ou sem número vira null', () => {
+    expect(parseBRL('')).toBeNull()
+    expect(parseBRL('abc')).toBeNull()
   })
 })

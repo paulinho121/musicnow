@@ -3,6 +3,7 @@ import clsx from 'clsx'
 import { CalendarDays, ChevronRight, Clock, FileUp, Globe, Guitar, ImagePlus, MapPin, Plus, Search, Star } from 'lucide-react'
 import { type FormEvent, useState } from 'react'
 import { Link, useNavigate } from 'react-router'
+import { AgendaSummary } from '../components/AgendaSummary'
 import { GettingStarted } from '../components/GettingStarted'
 import { HeroBackground, HeroCustomizeDialog } from '../components/HeroBackground'
 import { SongCover } from '../components/SongCover'
@@ -112,6 +113,7 @@ export function Dashboard() {
       </nav>
 
       {data?.onboarding && <GettingStarted progress={data.onboarding} />}
+      <AgendaSummary />
 
       {error ? (
         <ErrorState error={error} onRetry={() => refetch()} />

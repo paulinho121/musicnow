@@ -583,6 +583,36 @@ export const pageVisit = pgTable(
   (t) => [index().on(t.createdAt), index().on(t.path), index().on(t.userId)],
 )
 
+/**
+ * Agenda do músico: shows e apresentações com o cachê combinado. Só a própria pessoa vê
+ * (nem a banda, nem o dono do repertório ligado).
+ */
+export const gig = pgTable(
+  'gig',
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    userId: text()
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    title: text().notNull(),
+    startsAt: timestamp({ withTimezone: true }).notNull(),
+    location: text(),
+    contractor: text(),
+    /** Telefone/WhatsApp do contratante. */
+    contact: text(),
+    /** Cachê combinado, em centavos (null = sem valor combinado). */
+    feeCents: integer(),
+    /** Quando o cachê foi recebido (null = a receber). */
+    paidAt: timestamp({ withTimezone: true }),
+    /** confirmed | tentative | canceled */
+    status: text().notNull().default('confirmed'),
+    notes: text(),
+    setlistId: uuid().references(() => setlist.id, { onDelete: 'set null' }),
+    ...timestamps,
+  },
+  (t) => [index().on(t.userId, t.startsAt)],
+)
+
 /** Pedidos de ajuda (aba Ajuda): problema, dúvida ou sugestão, com a tela e o aparelho. */
 export const supportTicket = pgTable(
   'support_ticket',

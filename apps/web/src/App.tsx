@@ -44,6 +44,7 @@ const SongView = page(() => import('./pages/SongView'), 'SongView')
 const Subscription = page(() => import('./pages/Subscription'), 'Subscription')
 const Checkout = page(() => import('./pages/Checkout'), 'Checkout')
 const Help = page(() => import('./pages/Help'), 'Help')
+const Agenda = page(() => import('./pages/Agenda'), 'Agenda')
 const AdminSupport = page(() => import('./pages/admin/AdminSupport'), 'AdminSupport')
 const AdminLayout = page(() => import('./pages/admin/AdminLayout'), 'AdminLayout')
 const AdminOverview = page(() => import('./pages/admin/AdminOverview'), 'AdminOverview')
@@ -164,6 +165,7 @@ export const router = createBrowserRouter([
               { path: '/assinatura', element: <Subscription /> },
               { path: '/assinatura/pagar/:id', element: <Checkout /> },
               { path: '/ajuda', element: <Help /> },
+              { path: '/agenda', element: <Agenda /> },
               { path: '/parceiro', element: <PartnerDashboard /> },
               {
                 element: <RequireAdmin />,

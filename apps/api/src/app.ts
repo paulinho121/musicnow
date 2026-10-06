@@ -19,6 +19,7 @@ import { errorsRoutes } from './routes/errors'
 import { ogRoutes } from './routes/og'
 import { partnersRoutes } from './routes/partners'
 import { supportRoutes } from './routes/support'
+import { gigsRoutes } from './routes/gigs'
 import { recordError } from './errors'
 import { adminRoutes } from './routes/admin'
 
@@ -44,6 +45,7 @@ const api = new Hono<AppEnv>()
   .route('/partners', partnersRoutes)
   .route('/og', ogRoutes)
   .route('/support', supportRoutes)
+  .route('/gigs', gigsRoutes)
   .route('/admin', adminRoutes)
 
 const KB = 1024
