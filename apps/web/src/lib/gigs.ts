@@ -13,6 +13,8 @@ export interface Gig {
   contractor: string | null
   contact: string | null
   feeCents: number | null
+  /** Adiantamento (sinal) já recebido. */
+  depositCents: number | null
   paidAt: string | null
   status: GigStatus
   notes: string | null
@@ -51,6 +53,13 @@ export function useDeleteGig() {
     onSuccess: () => qc.invalidateQueries({ queryKey: gigKeys.all }),
   })
 }
+
+/** Quanto deste show já entrou (tudo, se recebido; senão, o adiantamento). */
+export const receivedOf = (g: Pick<Gig, 'feeCents' | 'depositCents' | 'paidAt'>) =>
+  g.paidAt ? (g.feeCents ?? 0) : Math.min(g.depositCents ?? 0, g.feeCents ?? Infinity)
+/** Quanto ainda falta receber deste show. */
+export const remainingOf = (g: Pick<Gig, 'feeCents' | 'depositCents' | 'paidAt'>) =>
+  g.paidAt ? 0 : Math.max(0, (g.feeCents ?? 0) - (g.depositCents ?? 0))
 
 export const brl = (cents: number) => (cents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 

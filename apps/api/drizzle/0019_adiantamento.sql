@@ -1,0 +1,1 @@
+ALTER TABLE "gig" ADD COLUMN "deposit_cents" integer;

@@ -24,6 +24,8 @@ interface Form {
   contractor: string
   contact: string
   fee: string
+  /** Adiantamento (sinal) já recebido. */
+  deposit: string
   paid: boolean
   status: GigStatus
   notes: string
@@ -39,6 +41,7 @@ const fromGig = (g: Gig | null): Form =>
         contractor: g.contractor ?? '',
         contact: g.contact ?? '',
         fee: g.feeCents != null ? (g.feeCents / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '',
+        deposit: g.depositCents ? (g.depositCents / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '',
         paid: Boolean(g.paidAt),
         status: g.status,
         notes: g.notes ?? '',
@@ -51,6 +54,7 @@ const fromGig = (g: Gig | null): Form =>
         contractor: '',
         contact: '',
         fee: '',
+        deposit: '',
         paid: false,
         status: 'confirmed',
         notes: '',
@@ -72,6 +76,8 @@ export function GigDialog({ gig, open, onClose }: { gig: Gig | null; open: boole
   const toast = useToast()
   const set = <K extends keyof Form>(k: K, v: Form[K]) => setForm((f) => ({ ...f, [k]: v }))
   const feeCents = parseBRL(form.fee)
+  const depositCents = parseBRL(form.deposit)
+  const remaining = feeCents != null && !form.paid ? Math.max(0, feeCents - (depositCents ?? 0)) : null
 
   const chooseSetlist = (id: string) => {
     const s = setlists.data?.find((x) => x.id === id)
@@ -89,6 +95,8 @@ export function GigDialog({ gig, open, onClose }: { gig: Gig | null; open: boole
     e.preventDefault()
     if (!form.title.trim()) return toast('Dê um nome ao show.', 'error')
     if (form.fee.trim() && feeCents == null) return toast('Valor do cachê inválido.', 'error')
+    if (form.deposit.trim() && depositCents == null) return toast('Valor do adiantamento inválido.', 'error')
+    if (depositCents && feeCents != null && depositCents > feeCents) return toast('O adiantamento não pode ser maior que o cachê.', 'error')
     save.mutate(
       {
         id: gig?.id,
@@ -98,6 +106,7 @@ export function GigDialog({ gig, open, onClose }: { gig: Gig | null; open: boole
         contractor: form.contractor.trim() || null,
         contact: form.contact.trim() || null,
         feeCents,
+        depositCents: depositCents || null,
         paidAt: form.paid ? (gig?.paidAt ?? new Date().toISOString()) : null,
         status: form.status,
         notes: form.notes.trim() || null,
@@ -187,34 +196,38 @@ export function GigDialog({ gig, open, onClose }: { gig: Gig | null; open: boole
             />
           </label>
         </div>
-        <div className="grid items-end gap-4 sm:grid-cols-2">
-          <label className="block">
-            <span className="label">Cachê combinado</span>
-            <div className="relative">
-              <span className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-sm text-muted">R$</span>
-              <input
-                className="input pl-10"
-                inputMode="decimal"
-                value={form.fee}
-                onChange={(e) => set('fee', e.target.value)}
-                placeholder="800,00"
-              />
-            </div>
-            {form.fee.trim() && (
-              <span className={feeCents == null ? 'mt-1 block text-xs text-danger' : 'mt-1 block text-xs text-muted'}>
-                {feeCents == null ? 'Valor inválido' : brl(feeCents)}
-              </span>
-            )}
-          </label>
-          <label className="flex h-11 items-center gap-2 text-sm">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <MoneyInput label="Cachê combinado" value={form.fee} onChange={(v) => set('fee', v)} cents={feeCents} placeholder="800,00" />
+          <MoneyInput
+            label="Adiantamento recebido (sinal)"
+            value={form.deposit}
+            onChange={(v) => set('deposit', v)}
+            cents={depositCents}
+            placeholder="0,00"
+            disabled={form.paid}
+          />
+        </div>
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border px-3 py-2.5">
+          <label className="flex items-center gap-2 text-sm">
             <input
               type="checkbox"
               className="size-5 accent-[var(--ok)]"
               checked={form.paid}
               onChange={(e) => set('paid', e.target.checked)}
             />
-            Cachê já recebido
+            Recebido por completo
           </label>
+          {feeCents != null && (
+            <span className="text-sm">
+              {form.paid ? (
+                <b className="text-ok">Tudo recebido</b>
+              ) : (
+                <>
+                  Falta receber <b className={remaining ? 'text-accent' : 'text-ok'}>{brl(remaining ?? 0)}</b>
+                </>
+              )}
+            </span>
+          )}
         </div>
         <label className="block">
           <span className="label">Observações</span>
@@ -254,5 +267,44 @@ export function GigDialog({ gig, open, onClose }: { gig: Gig | null; open: boole
         </div>
       </form>
     </Sheet>
+  )
+}
+
+/** Campo de valor em reais, com a prévia formatada ("R$ 1.200,50") embaixo. */
+function MoneyInput({
+  label,
+  value,
+  onChange,
+  cents,
+  placeholder,
+  disabled,
+}: {
+  label: string
+  value: string
+  onChange: (v: string) => void
+  cents: number | null
+  placeholder: string
+  disabled?: boolean
+}) {
+  return (
+    <label className={disabled ? 'block opacity-50' : 'block'}>
+      <span className="label">{label}</span>
+      <div className="relative">
+        <span className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-sm text-muted">R$</span>
+        <input
+          className="input pl-10"
+          inputMode="decimal"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={placeholder}
+          disabled={disabled}
+        />
+      </div>
+      {value.trim() && (
+        <span className={cents == null ? 'mt-1 block text-xs text-danger' : 'mt-1 block text-xs text-muted'}>
+          {cents == null ? 'Valor inválido' : brl(cents)}
+        </span>
+      )}
+    </label>
   )
 }

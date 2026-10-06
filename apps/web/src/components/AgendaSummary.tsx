@@ -1,6 +1,6 @@
 import { CalendarDays, ChevronRight, Wallet } from 'lucide-react'
 import { Link } from 'react-router'
-import { brl, useGigs } from '../lib/gigs'
+import { brl, remainingOf, useGigs } from '../lib/gigs'
 
 const whenFmt = new Intl.DateTimeFormat('pt-BR', { weekday: 'short', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
 
@@ -10,9 +10,7 @@ export function AgendaSummary() {
   if (!gigs?.length) return null
   const now = new Date()
   const next = gigs.find((g) => g.status !== 'canceled' && new Date(g.startsAt) >= now)
-  const pending = gigs
-    .filter((g) => g.status !== 'canceled' && !g.paidAt && new Date(g.startsAt) < now)
-    .reduce((n, g) => n + (g.feeCents ?? 0), 0)
+  const pending = gigs.filter((g) => g.status !== 'canceled' && new Date(g.startsAt) < now).reduce((n, g) => n + remainingOf(g), 0)
   if (!next && !pending) return null
 
   return (

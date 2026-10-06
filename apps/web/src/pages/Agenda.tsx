@@ -17,7 +17,18 @@ import { useMemo, useState } from 'react'
 import { Link } from 'react-router'
 import { GigDialog } from '../components/GigDialog'
 import { EmptyState, ErrorState, PageSpinner, useToast } from '../components/ui'
-import { brl, downloadIcs, type Gig, googleCalendarUrl, mapsUrl, useGigPaid, useGigs, whatsappOf } from '../lib/gigs'
+import {
+  brl,
+  downloadIcs,
+  type Gig,
+  googleCalendarUrl,
+  mapsUrl,
+  receivedOf,
+  remainingOf,
+  useGigPaid,
+  useGigs,
+  whatsappOf,
+} from '../lib/gigs'
 
 const monthFmt = new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric' })
 const dayFmt = new Intl.DateTimeFormat('pt-BR', { day: '2-digit' })
@@ -31,12 +42,13 @@ const fromKey = (k: number) => new Date(Math.floor(k / 12), k % 12, 1)
 /** Soma de um grupo de shows (cancelados não contam). */
 function totals(gigs: Gig[]) {
   const valid = gigs.filter((g) => g.status !== 'canceled')
-  const sum = (f: (g: Gig) => boolean) => valid.filter(f).reduce((n, g) => n + (g.feeCents ?? 0), 0)
+  const sum = (f: (g: Gig) => number) => valid.reduce((n, g) => n + f(g), 0)
   return {
     shows: valid.length,
-    combined: sum(() => true),
-    received: sum((g) => Boolean(g.paidAt)),
-    pending: sum((g) => !g.paidAt),
+    combined: sum((g) => g.feeCents ?? 0),
+    // O adiantamento já conta como recebido; o resto fica a receber.
+    received: sum(receivedOf),
+    pending: sum(remainingOf),
   }
 }
 
@@ -50,10 +62,10 @@ export function Agenda() {
   const sum = totals(inMonth)
   // Shows que já passaram e o cachê ainda não caiu (de qualquer mês).
   const overdue = useMemo(
-    () => (gigs ?? []).filter((g) => g.status !== 'canceled' && !g.paidAt && (g.feeCents ?? 0) > 0 && new Date(g.startsAt) < new Date()),
+    () => (gigs ?? []).filter((g) => g.status !== 'canceled' && remainingOf(g) > 0 && new Date(g.startsAt) < new Date()),
     [gigs],
   )
-  const overdueTotal = overdue.reduce((n, g) => n + (g.feeCents ?? 0), 0)
+  const overdueTotal = overdue.reduce((n, g) => n + remainingOf(g), 0)
 
   if (isLoading) return <PageSpinner />
   if (error || !gigs) return <ErrorState error={error} onRetry={() => refetch()} />
@@ -151,14 +163,14 @@ function PaidButton({ g, small = false }: { g: Gig; small?: boolean }) {
         paid.mutate(
           { id: g.id, paid: !isPaid },
           {
-            onSuccess: () => toast(isPaid ? 'Voltou para "a receber".' : `Cachê de ${brl(g.feeCents ?? 0)} recebido!`),
+            onSuccess: () => toast(isPaid ? 'Voltou para "a receber".' : `Recebido: ${brl(remainingOf(g))}. Cachê completo!`),
             onError: (e) => toast(e.message, 'error'),
           },
         )
       }
     >
       {isPaid ? <Undo2 className="size-3.5" /> : <Check className="size-3.5" />}
-      {isPaid ? 'Desfazer' : 'Recebi'}
+      {isPaid ? 'Desfazer' : g.depositCents ? 'Recebi o resto' : 'Recebi'}
     </button>
   )
 }
@@ -167,7 +179,7 @@ function OverdueRow({ g }: { g: Gig }) {
   return (
     <li className="flex items-center gap-3 text-sm">
       <span className="min-w-0 flex-1 truncate">
-        <b>{brl(g.feeCents ?? 0)}</b> · {g.title} <span className="text-muted">({shortFmt.format(new Date(g.startsAt))})</span>
+        <b>{brl(remainingOf(g))}</b> · {g.title} <span className="text-muted">({shortFmt.format(new Date(g.startsAt))})</span>
       </span>
       <PaidButton g={g} small />
     </li>
@@ -218,11 +230,16 @@ function GigCard({ g, onEdit }: { g: Gig; onEdit: () => void }) {
                       ? 'A receber'
                       : 'Confirmado'}
             </p>
+            {!g.paidAt && !canceled && (g.depositCents ?? 0) > 0 && (
+              <p className="text-xs text-muted">
+                sinal {brl(g.depositCents!)} · falta <b className="text-accent">{brl(remainingOf(g))}</b>
+              </p>
+            )}
           </div>
         </div>
         {g.notes && <p className="line-clamp-2 text-sm text-muted">{g.notes}</p>}
         <div className="flex flex-wrap gap-1.5">
-          {!canceled && (g.feeCents ?? 0) > 0 && <PaidButton g={g} small />}
+          {!canceled && (g.feeCents ?? 0) > 0 && (g.paidAt || remainingOf(g) > 0) && <PaidButton g={g} small />}
           {wa && (
             <a href={wa} target="_blank" rel="noreferrer" className="chip h-8 text-xs" title="Conversar com o contratante">
               <MessageCircle className="size-3.5" /> WhatsApp

@@ -15,12 +15,19 @@ const gigInput = z.object({
   contractor: z.string().trim().max(120).nullish(),
   contact: z.string().trim().max(40).nullish(),
   feeCents: z.number().int().min(0).max(100_000_000).nullish(),
+  depositCents: z.number().int().min(0).max(100_000_000).nullish(),
   paidAt: z.coerce.date().nullish(),
   status: z.enum(['confirmed', 'tentative', 'canceled']).default('confirmed'),
   notes: z.string().trim().max(2000).nullish(),
   setlistId: z.string().uuid().nullish(),
 })
 const idParam = z.object({ id: z.string().uuid() })
+
+/** O adiantamento não pode passar do cachê combinado. */
+function assertDeposit(input: { feeCents?: number | null; depositCents?: number | null }) {
+  if (input.depositCents && input.feeCents != null && input.depositCents > input.feeCents)
+    throw new HTTPException(400, { message: 'O adiantamento não pode ser maior que o cachê.' })
+}
 
 /** O repertório ligado precisa ser da pessoa ou de uma banda em que ela toca. */
 async function assertSetlistAccess(userId: string, setlistId: string | null | undefined) {
@@ -41,6 +48,7 @@ const columns = {
   contractor: gig.contractor,
   contact: gig.contact,
   feeCents: gig.feeCents,
+  depositCents: gig.depositCents,
   paidAt: gig.paidAt,
   status: gig.status,
   notes: gig.notes,
@@ -65,6 +73,7 @@ export const gigsRoutes = new Hono<AppEnv>()
   .post('/', validate('json', gigInput), async (c) => {
     const uid = c.var.user.id
     const input = c.req.valid('json')
+    assertDeposit(input)
     await assertSetlistAccess(uid, input.setlistId)
     const [row] = await db
       .insert(gig)
@@ -76,6 +85,7 @@ export const gigsRoutes = new Hono<AppEnv>()
   .put('/:id', validate('param', idParam), validate('json', gigInput), async (c) => {
     const uid = c.var.user.id
     const input = c.req.valid('json')
+    assertDeposit(input)
     await assertSetlistAccess(uid, input.setlistId)
     const [row] = await db
       .update(gig)
@@ -85,6 +95,7 @@ export const gigsRoutes = new Hono<AppEnv>()
         contractor: input.contractor ?? null,
         contact: input.contact ?? null,
         feeCents: input.feeCents ?? null,
+        depositCents: input.depositCents ?? null,
         paidAt: input.paidAt ?? null,
         notes: input.notes ?? null,
         setlistId: input.setlistId ?? null,

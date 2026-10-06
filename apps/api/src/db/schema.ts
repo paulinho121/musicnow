@@ -602,7 +602,9 @@ export const gig = pgTable(
     contact: text(),
     /** Cachê combinado, em centavos (null = sem valor combinado). */
     feeCents: integer(),
-    /** Quando o cachê foi recebido (null = a receber). */
+    /** Adiantamento (sinal) já recebido, em centavos: conta como recebido; falta o resto. */
+    depositCents: integer(),
+    /** Quando o cachê foi recebido por completo (null = ainda falta receber). */
     paidAt: timestamp({ withTimezone: true }),
     /** confirmed | tentative | canceled */
     status: text().notNull().default('confirmed'),

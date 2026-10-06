@@ -104,4 +104,13 @@ describe('agenda', () => {
     expect((await call(ana, 'DELETE', `/gigs/${gigId}`)).status).toBe(204)
     expect((await call(ana, 'GET', '/gigs')).data.gigs).toHaveLength(0)
   })
+
+  it('guarda o adiantamento e recusa adiantamento maior que o cachê', async () => {
+    const ok = await call(ana, 'POST', '/gigs', { title: 'Festa', startsAt: '2026-12-05T23:00:00Z', feeCents: 80000, depositCents: 30000 })
+    expect(ok.status).toBe(201)
+    const g = (await call(ana, 'GET', '/gigs')).data.gigs.find((x: { id: string }) => x.id === ok.data.id)
+    expect(g).toMatchObject({ feeCents: 80000, depositCents: 30000, paidAt: null })
+    const bad = await call(ana, 'POST', '/gigs', { title: 'Festa', startsAt: '2026-12-05T23:00:00Z', feeCents: 80000, depositCents: 90000 })
+    expect(bad.status).toBe(400)
+  })
 })
