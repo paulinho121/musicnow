@@ -9,6 +9,7 @@ import { router } from './App'
 import { AppErrorBoundary, clearReloadFlag } from './components/AppError'
 import { PaywallDialog } from './components/BillingNotice'
 import { IntroSplash } from './components/IntroSplash'
+import { OfflineBanner } from './components/OfflineBanner'
 import { ToastProvider } from './components/ui'
 import { UpdateBanner } from './components/UpdateBanner'
 import { ApiError } from './lib/api'
@@ -48,6 +49,9 @@ const queryClient: QueryClient = new QueryClient({
   defaultOptions: {
     queries: {
       staleTime: 30_000,
+      // Sem internet, tenta mesmo assim: o service worker responde com o que está guardado
+      // no aparelho (repertório baixado para o show). O padrão pausaria a busca para sempre.
+      networkMode: 'offlineFirst',
       // Não insiste em erros de permissão/validação; só em falhas de rede/servidor.
       retry: (count, err) => !(err instanceof ApiError && err.status >= 400 && err.status < 500) && count < 2,
       refetchOnWindowFocus: false,
@@ -62,6 +66,7 @@ createRoot(document.getElementById('root')!).render(
         <ToastProvider>
           <RouterProvider router={router} />
           <UpdateBanner />
+          <OfflineBanner />
           <IntroSplash />
           <PaywallDialog />
         </ToastProvider>

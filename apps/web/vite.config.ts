@@ -53,11 +53,25 @@ export default defineConfig({
         runtimeCaching: [
           {
             // Músicas já abertas continuam disponíveis sem internet (palco sem sinal).
-            urlPattern: ({ url }) => url.pathname.startsWith('/api/songs') || url.pathname.startsWith('/api/me'),
+            // Repertórios também (a lista e cada um; o "ao vivo" /events nunca é guardado),
+            // para o "Baixar para o show" (src/lib/offline.ts).
+            urlPattern: ({ url }) =>
+              url.pathname.startsWith('/api/songs') ||
+              url.pathname.startsWith('/api/me') ||
+              /^\/api\/setlists(\/[0-9a-f-]{36})?$/.test(url.pathname),
             handler: 'NetworkFirst',
             options: {
               cacheName: 'api',
               networkTimeoutSeconds: 4,
+              // Servidor fora do ar (502/503): usa a cópia do aparelho, como se estivesse sem internet.
+              plugins: [
+                {
+                  fetchDidSucceed: async ({ response }) => {
+                    if (response.status >= 500) throw new Error(`Servidor respondeu ${response.status}`)
+                    return response
+                  },
+                },
+              ],
               expiration: { maxEntries: 500, maxAgeSeconds: 60 * 60 * 24 * 30 },
               cacheableResponse: { statuses: [200] },
             },
@@ -71,6 +85,16 @@ export default defineConfig({
               cacheName: 'scores',
               expiration: { maxEntries: 1500, maxAgeSeconds: 60 * 60 * 24 * 90 },
               cacheableResponse: { statuses: [200] },
+            },
+          },
+          {
+            // Capas de álbum (Cover Art Archive): guardadas para o repertório baixado ficar bonito sem internet.
+            urlPattern: ({ url }) => /(^|\.)(coverartarchive|archive)\.org$/.test(url.hostname),
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'covers',
+              expiration: { maxEntries: 600, maxAgeSeconds: 60 * 60 * 24 * 180 },
+              cacheableResponse: { statuses: [0, 200] },
             },
           },
           {

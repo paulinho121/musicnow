@@ -21,6 +21,7 @@ import { useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
 import { BandPanel } from '../components/setlist/BandPanel'
 import { ExportButton } from '../components/setlist/ExportButton'
+import { OfflineButton } from '../components/setlist/OfflineButton'
 import { HistoryPanel } from '../components/setlist/HistoryPanel'
 import { ShareSetlistDialog } from '../components/setlist/ShareSetlistDialog'
 import { SongsPanel } from '../components/setlist/SongsPanel'
@@ -163,6 +164,7 @@ export function SetlistDetail() {
           <Play className="size-4" /> {s.status === 'ensaio' ? 'Ensaiar' : 'Tocar'}
         </button>
         <ExportButton setlist={s} />
+        <OfflineButton setlist={s} />
         <button className="btn-ghost" onClick={() => setSharing(true)} disabled={!s.items.length}>
           <Megaphone className="size-4" /> Divulgar
         </button>

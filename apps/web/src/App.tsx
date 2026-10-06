@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { Navigate, Outlet, createBrowserRouter, type RouteObject, useLocation } from 'react-router'
 import { RouteError } from './components/AppError'
 import { Layout } from './components/Layout'
@@ -8,7 +9,7 @@ import { QuickStart } from './pages/QuickStart'
 import { Transposer } from './pages/Transposer'
 import { PublicTuner, TunerPage } from './pages/TunerPages'
 import { PageSpinner } from './components/ui'
-import { useSession } from './lib/auth'
+import { rememberedSession, rememberSession, useSession } from './lib/auth'
 import { useMe } from './lib/queries'
 import { AuthPage } from './pages/AuthPage'
 import { ChordDetect } from './pages/ChordDetect'
@@ -41,10 +42,16 @@ import { AdminUsers } from './pages/admin/AdminUsers'
 
 /** Exige login; quem ainda não preencheu o perfil vai para o onboarding. */
 function RequireAuth() {
-  const { data: session, isPending } = useSession()
+  const { data: session, isPending, error } = useSession()
   const location = useLocation()
   const me = useMe(Boolean(session))
+  useEffect(() => {
+    if (session) rememberSession(session.user.id)
+  }, [session])
+  // Sem internet ou servidor fora do ar: entra com o que está salvo no aparelho (palco sem sinal).
+  const offline = !session && Boolean(error) && Boolean(rememberedSession())
   if (isPending || (session && me.isLoading)) return <PageSpinner />
+  if (offline) return <Outlet />
   if (!session) return <Navigate to="/entrar" replace state={{ from: location.pathname + location.search }} />
   if (me.data && !me.data.onboarded && location.pathname !== '/perfil')
     return <Navigate to="/perfil" replace state={{ from: location.pathname + location.search }} />

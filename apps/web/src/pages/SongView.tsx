@@ -1,4 +1,15 @@
-import { atLeast, chordsInSheet, fileNameFor, guitarVoicings, normalizeOffset, parseChord, semitonesBetween, songInKey, toChordPro, transposeKey } from '@ensaio/shared'
+import {
+  atLeast,
+  chordsInSheet,
+  fileNameFor,
+  guitarVoicings,
+  normalizeOffset,
+  parseChord,
+  semitonesBetween,
+  songInKey,
+  toChordPro,
+  transposeKey,
+} from '@ensaio/shared'
 import clsx from 'clsx'
 import {
   ArrowLeft,
@@ -55,7 +66,33 @@ import { useLeaveSharedSong } from '../lib/songShare'
 import { useLocalState } from '../lib/storage'
 import type { SongMark } from '../lib/types'
 
-const VIEWER_DEFAULTS = { fontSize: 17, lineHeight: 1.45, speed: 3, showChords: true, chordStrip: false, wrap: true, view: 'chord' as 'chord' | 'score' }
+const VIEWER_DEFAULTS = {
+  fontSize: 17,
+  lineHeight: 1.45,
+  speed: 3,
+  /** Velocidade da rolagem lembrada por música (cada música tem o seu andamento). */
+  speeds: {} as Record<string, number>,
+  showChords: true,
+  chordStrip: false,
+  wrap: true,
+  view: 'chord' as 'chord' | 'score',
+  /** Pedal Bluetooth: rola a cifra (no fim, passa de música) ou troca de música direto. */
+  pedal: 'scroll' as 'scroll' | 'song',
+}
+
+/** Teclas que os pedais e controles Bluetooth enviam (modos mais comuns). */
+const NEXT_KEYS = new Set(['PageDown', 'ArrowRight', 'ArrowDown'])
+const PREV_KEYS = new Set(['PageUp', 'ArrowLeft', 'ArrowUp'])
+const KEY_LABEL: Record<string, string> = {
+  PageDown: 'PageDown',
+  PageUp: 'PageUp',
+  ArrowRight: 'seta →',
+  ArrowLeft: 'seta ←',
+  ArrowDown: 'seta ↓',
+  ArrowUp: 'seta ↑',
+  ' ': 'espaço',
+  Enter: 'Enter',
+}
 
 export interface BlockInfo {
   name: string
@@ -108,6 +145,7 @@ export function SongViewer({ songId, setlist }: { songId: string; setlist?: Setl
   const deleteMark = useDeleteMark(songId)
 
   const [prefs, setPrefs] = useLocalState('ef-viewer', VIEWER_DEFAULTS)
+  const pedal = prefs.pedal ?? 'scroll'
   const [offset, setOffset] = useState(0)
   const [pickerOpen, setPickerOpen] = useState(false)
   const [panelOpen, setPanelOpen] = useState(false)
@@ -197,7 +235,16 @@ export function SongViewer({ songId, setlist }: { songId: string; setlist?: Setl
   const next = setlist?.next
   const prev = setlist?.prev
 
-  useAutoScroll(scrolling, prefs.speed, () => setScrolling(false))
+  const speed = prefs.speeds?.[songId] ?? prefs.speed
+  const setSpeed = (v: number) =>
+    setPrefs((p) => {
+      // Guarda as últimas 300 músicas (não cresce sem fim).
+      const speeds = Object.fromEntries([...Object.entries({ ...p.speeds, [songId]: v })].slice(-300))
+      return { ...p, speed: v, speeds }
+    })
+  useAutoScroll(scrolling, speed, () => setScrolling(false))
+  // Último botão do pedal/teclado recebido (para testar o pedal nos ajustes).
+  const [lastKey, setLastKey] = useState<string | null>(null)
   const headerHidden = useHideOnScroll() && !markMode
   useWakeLock(Boolean(song))
 
@@ -214,23 +261,26 @@ export function SongViewer({ songId, setlist }: { songId: string; setlist?: Setl
     const atTop = () => window.scrollY <= 4
     const onKey = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement) return
-      if (e.key === ' ') {
+      if (KEY_LABEL[e.key]) setLastKey(e.key)
+      if (e.key === ' ' || e.key === 'Enter') {
+        // Enter só quando não há botão em foco (senão o Enter é do botão).
+        if (e.key === 'Enter' && e.target instanceof HTMLButtonElement) return
         e.preventDefault()
         setScrolling((s) => !s)
-      } else if (e.key === 'PageDown' || e.key === 'ArrowRight') {
+      } else if (NEXT_KEYS.has(e.key)) {
         e.preventDefault()
-        if (atBottom() && next) next.go()
+        if (next && (pedal === 'song' || atBottom())) next.go()
         else window.scrollBy({ top: window.innerHeight * 0.75, behavior: 'smooth' })
-      } else if (e.key === 'PageUp' || e.key === 'ArrowLeft') {
+      } else if (PREV_KEYS.has(e.key)) {
         e.preventDefault()
-        if (atTop() && prev) prev.go()
+        if (prev && (pedal === 'song' || atTop())) prev.go()
         else window.scrollBy({ top: -window.innerHeight * 0.75, behavior: 'smooth' })
       } else if (!locked && (e.key === '+' || e.key === '=')) shift(1)
       else if (!locked && e.key === '-') shift(-1)
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [locked, shift, next, prev])
+  }, [locked, shift, next, prev, pedal])
 
   if (isLoading) return <PageSpinner />
   if (error || !song)
@@ -278,7 +328,11 @@ export function SongViewer({ songId, setlist }: { songId: string; setlist?: Setl
       >
         {setlist && (
           <div className="flex items-center gap-1 border-b border-border bg-surface/60 px-2 py-1">
-            <button className="btn-icon size-9 shrink-0 border-transparent bg-transparent" onClick={setlist.onExit} aria-label="Voltar ao repertório">
+            <button
+              className="btn-icon size-9 shrink-0 border-transparent bg-transparent"
+              onClick={setlist.onExit}
+              aria-label="Voltar ao repertório"
+            >
               <ListMusic className="size-4" />
             </button>
             <p className="min-w-0 flex-1 truncate text-xs text-muted">
@@ -345,7 +399,11 @@ export function SongViewer({ songId, setlist }: { songId: string; setlist?: Setl
             </button>
           )}
           {song.canEdit && !setlist && (
-            <Link to={`/musicas/${song.id}/editar`} className="btn-icon hidden shrink-0 border-transparent bg-transparent sm:inline-flex" aria-label="Editar">
+            <Link
+              to={`/musicas/${song.id}/editar`}
+              className="btn-icon hidden shrink-0 border-transparent bg-transparent sm:inline-flex"
+              aria-label="Editar"
+            >
               <Pencil className="size-5" />
             </Link>
           )}
@@ -364,7 +422,11 @@ export function SongViewer({ songId, setlist }: { songId: string; setlist?: Setl
           )}
           {/* Celular: as ações menos usadas ficam num menu, para o título ter espaço. */}
           {!setlist && (
-            <button className="btn-icon shrink-0 border-transparent bg-transparent sm:hidden" aria-label="Mais opções" onClick={() => setMoreOpen(true)}>
+            <button
+              className="btn-icon shrink-0 border-transparent bg-transparent sm:hidden"
+              aria-label="Mais opções"
+              onClick={() => setMoreOpen(true)}
+            >
               <EllipsisVertical className="size-5" />
             </button>
           )}
@@ -408,7 +470,10 @@ export function SongViewer({ songId, setlist }: { songId: string; setlist?: Setl
             <div className="min-w-0 flex-1">
               {setlist?.block ? (
                 // No show: em que bloco a banda está (com a cor do bloco)
-                <p className="flex flex-wrap items-center gap-x-1.5 text-[11px] font-bold tracking-widest uppercase" style={{ color: setlist.block.color }}>
+                <p
+                  className="flex flex-wrap items-center gap-x-1.5 text-[11px] font-bold tracking-widest uppercase"
+                  style={{ color: setlist.block.color }}
+                >
                   {setlist.block.name}
                   <span className="font-semibold tracking-normal text-muted normal-case">
                     {[setlist.block.subtitle, `${setlist.block.song} de ${setlist.block.songs}`].filter(Boolean).join(' · ')}
@@ -417,8 +482,12 @@ export function SongViewer({ songId, setlist }: { songId: string; setlist?: Setl
               ) : (
                 <p className="text-[11px] font-bold tracking-widest text-muted uppercase">{song.style ?? 'Música'}</p>
               )}
-              <h2 className="mt-0.5 line-clamp-2 text-xl leading-tight font-extrabold tracking-tight break-words sm:text-3xl">{song.title}</h2>
-              <p className="mt-0.5 truncate text-sm text-muted">{[song.artist, song.composer && song.composer !== song.artist ? song.composer : null].filter(Boolean).join(' · ')}</p>
+              <h2 className="mt-0.5 line-clamp-2 text-xl leading-tight font-extrabold tracking-tight break-words sm:text-3xl">
+                {song.title}
+              </h2>
+              <p className="mt-0.5 truncate text-sm text-muted">
+                {[song.artist, song.composer && song.composer !== song.artist ? song.composer : null].filter(Boolean).join(' · ')}
+              </p>
               <div className="mt-3 flex flex-wrap gap-1.5 text-xs">
                 {setlist?.itemKey && (
                   <HeroChip>
@@ -608,11 +677,50 @@ export function SongViewer({ songId, setlist }: { songId: string; setlist?: Setl
             onPlus={() => setPrefs((p) => ({ ...p, lineHeight: Math.min(2.4, +(p.lineHeight + 0.1).toFixed(2)) }))}
           />
           <Stepper
-            label="Velocidade da rolagem"
-            value={String(prefs.speed)}
-            onMinus={() => setPrefs((p) => ({ ...p, speed: Math.max(1, p.speed - 1) }))}
-            onPlus={() => setPrefs((p) => ({ ...p, speed: Math.min(10, p.speed + 1) }))}
+            label="Velocidade da rolagem (desta música)"
+            value={String(speed)}
+            onMinus={() => setSpeed(Math.max(1, speed - 1))}
+            onPlus={() => setSpeed(Math.min(10, speed + 1))}
           />
+          <div className="border-y border-border py-3">
+            <p className="text-sm">Pedal Bluetooth ou teclado</p>
+            <div
+              className="mt-2 grid grid-cols-2 gap-1 rounded-xl border border-border p-1"
+              role="radiogroup"
+              aria-label="O que o pedal faz"
+            >
+              {(
+                [
+                  ['scroll', 'Rola a cifra'],
+                  ['song', 'Troca de música'],
+                ] as const
+              ).map(([id, label]) => (
+                <button
+                  key={id}
+                  role="radio"
+                  aria-checked={pedal === id}
+                  className={clsx(
+                    'h-8 rounded-lg text-xs font-semibold',
+                    pedal === id ? 'bg-accent text-accent-ink' : 'text-muted hover:text-text',
+                  )}
+                  onClick={() => setPrefs((p) => ({ ...p, pedal: id }))}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <p className="mt-2 text-xs text-muted">
+              {pedal === 'scroll'
+                ? 'Avançar rola a tela; no fim da música, passa para a próxima.'
+                : 'Avançar e voltar trocam de música no repertório.'}{' '}
+              Espaço liga/pausa a rolagem automática.{' '}
+              {lastKey ? (
+                <b className="text-ok">Pedal funcionando: recebido {KEY_LABEL[lastKey]} ✓</b>
+              ) : (
+                <span>Aperte o pedal para testar.</span>
+              )}
+            </p>
+          </div>
           <label className="flex h-11 items-center justify-between text-sm">
             Mostrar acordes
             <input
@@ -650,7 +758,11 @@ export function SongViewer({ songId, setlist }: { songId: string; setlist?: Setl
             >
               <FileDown className="size-4" /> ChordPro
             </button>
-            <Link className="btn-ghost" to={`/musicas/${song.id}/imprimir${offset ? `?st=${offset}` : ''}`} title="Imprimir ou salvar em PDF, no tom atual">
+            <Link
+              className="btn-ghost"
+              to={`/musicas/${song.id}/imprimir${offset ? `?st=${offset}` : ''}`}
+              title="Imprimir ou salvar em PDF, no tom atual"
+            >
               <Printer className="size-4" /> Imprimir/PDF
             </Link>
           </div>
@@ -669,7 +781,9 @@ export function SongViewer({ songId, setlist }: { songId: string; setlist?: Setl
               aria-label={`Tom atual ${currentKey ?? ''}. Escolher tom`}
             >
               <span className="text-lg">{currentKey ?? (offset > 0 ? `+${offset}` : offset || '—')}</span>
-              {offset !== 0 && <span className="mt-0.5 font-sans text-[10px] font-semibold text-muted">{offset > 0 ? `+${offset}` : offset} st</span>}
+              {offset !== 0 && (
+                <span className="mt-0.5 font-sans text-[10px] font-semibold text-muted">{offset > 0 ? `+${offset}` : offset} st</span>
+              )}
             </button>
             <button className="btn-icon" aria-label="Subir meio tom" onClick={() => shift(1)} disabled={!song.content}>
               <Plus className="size-5" />
@@ -785,7 +899,10 @@ export function SongViewer({ songId, setlist }: { songId: string; setlist?: Setl
               <FileUp className="size-5 text-muted" /> Anexar partitura
             </button>
           )}
-          <Link to={`/musicas/${song.id}/imprimir${offset ? `?st=${offset}` : ''}`} className="flex h-12 items-center gap-3 rounded-xl px-2 hover:bg-surface-2">
+          <Link
+            to={`/musicas/${song.id}/imprimir${offset ? `?st=${offset}` : ''}`}
+            className="flex h-12 items-center gap-3 rounded-xl px-2 hover:bg-surface-2"
+          >
             <Printer className="size-5 text-muted" /> Imprimir ou salvar PDF
           </Link>
           {song.canEdit && song.content.trim() && (
@@ -842,7 +959,11 @@ export function SongViewer({ songId, setlist }: { songId: string; setlist?: Setl
 }
 
 function HeroChip({ children }: { children: React.ReactNode }) {
-  return <span className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-black/25 px-2.5 py-1 backdrop-blur-sm">{children}</span>
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-black/25 px-2.5 py-1 backdrop-blur-sm">
+      {children}
+    </span>
+  )
 }
 
 /** "Acordes desta música": os desenhos de todos os acordes, no tom que está na tela. */
@@ -859,7 +980,11 @@ function SongChords({
 }) {
   return (
     <section className="mb-4">
-      <button className="flex items-center gap-1.5 text-sm font-semibold text-muted hover:text-text" onClick={onToggle} aria-expanded={open}>
+      <button
+        className="flex items-center gap-1.5 text-sm font-semibold text-muted hover:text-text"
+        onClick={onToggle}
+        aria-expanded={open}
+      >
         <ChevronDown className={clsx('size-4 transition', !open && '-rotate-90')} />
         Acordes desta música <span className="font-normal">({chords.length})</span>
       </button>
@@ -875,7 +1000,11 @@ function SongChords({
                 aria-label={`Como tocar ${c}`}
               >
                 <span className="font-mono font-bold text-chord">{c}</span>
-                {v ? <GuitarDiagram voicing={v} showNotes={false} className="h-24 w-auto" /> : <span className="py-8 text-xs text-muted">—</span>}
+                {v ? (
+                  <GuitarDiagram voicing={v} showNotes={false} className="h-24 w-auto" />
+                ) : (
+                  <span className="py-8 text-xs text-muted">—</span>
+                )}
               </button>
             )
           })}
