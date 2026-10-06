@@ -583,6 +583,31 @@ export const pageVisit = pgTable(
   (t) => [index().on(t.createdAt), index().on(t.path), index().on(t.userId)],
 )
 
+/** Pedidos de ajuda (aba Ajuda): problema, dúvida ou sugestão, com a tela e o aparelho. */
+export const supportTicket = pgTable(
+  'support_ticket',
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    userId: text()
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    /** problem | question | idea */
+    kind: text().notNull(),
+    message: text().notNull(),
+    /** Tela de onde a pessoa veio (ex.: /repertorios/…/tocar/3). */
+    page: text(),
+    userAgent: text(),
+    release: text(),
+    /** open | resolved */
+    status: text().notNull().default('open'),
+    /** Resposta/observação do suporte (a pessoa vê). */
+    reply: text(),
+    resolvedAt: timestamp({ withTimezone: true }),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index().on(t.userId), index().on(t.status)],
+)
+
 /**
  * E-mails automáticos já enviados (boas-vindas, fim do teste, pagamento, show amanhã).
  * A chave (pessoa, tipo, referência) garante que o mesmo e-mail nunca sai duas vezes.

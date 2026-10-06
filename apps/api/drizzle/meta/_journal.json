@@ -120,6 +120,13 @@
       "when": 1791300666140,
       "tag": "0016_parceiros",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1791327774894,
+      "tag": "0017_suporte",
+      "breakpoints": true
     }
   ]
 }

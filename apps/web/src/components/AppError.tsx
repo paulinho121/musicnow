@@ -1,4 +1,4 @@
-import { Home, RotateCw } from 'lucide-react'
+import { Home, LifeBuoy, RotateCw } from 'lucide-react'
 import { Component, type ReactNode, useEffect } from 'react'
 import { isRouteErrorResponse, useRouteError } from 'react-router'
 import { isChunkLoadError, reportError } from '../lib/errors'
@@ -38,6 +38,12 @@ export function ErrorScreen({ inline = false }: { inline?: boolean }) {
             <Home className="size-4" /> Ir para o início
           </a>
         </div>
+        <a
+          href={`/ajuda?tipo=erro&de=${encodeURIComponent(location.pathname)}`}
+          className="mt-4 inline-flex items-center gap-1.5 text-sm font-semibold text-accent hover:underline"
+        >
+          <LifeBuoy className="size-4" /> Contar o que aconteceu
+        </a>
       </div>
     </div>
   )

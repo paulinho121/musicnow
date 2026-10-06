@@ -24,6 +24,8 @@ export const env = {
   SMTP_USER: process.env.SMTP_USER,
   SMTP_PASS: process.env.SMTP_PASS,
   MAIL_FROM: process.env.MAIL_FROM,
+  /** Para onde vão os pedidos de ajuda (sem valor: o remetente dos e-mails). */
+  SUPPORT_INBOX: process.env.SUPPORT_INBOX,
   GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
   GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET,
   APPLE_CLIENT_ID: process.env.APPLE_CLIENT_ID,

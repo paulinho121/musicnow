@@ -5,6 +5,7 @@ import { HTTPException } from 'hono/http-exception'
 import { z } from 'zod'
 import { db, schema } from '../db'
 import { env } from '../env'
+import { sendMail } from '../mail'
 import { notFound, requireAdmin, validate, type AppEnv } from '../http'
 import { isPayable, isValidCode, normalizeCode, partnerStats } from '../partners'
 import { getGlobalOnlineUsers } from '../realtime'
@@ -540,3 +541,65 @@ export const adminRoutes = new Hono<AppEnv>()
     `)
     return c.json({ days, ...r })
   })
+
+  // 10. Pedidos de ajuda (aba Ajuda)
+  .get('/support', validate('query', z.object({ status: z.enum(['open', 'resolved', 'all']).default('open') })), async (c) => {
+    const { status } = c.req.valid('query')
+    const t = schema.supportTicket
+    const rows = await db
+      .select({
+        id: t.id,
+        kind: t.kind,
+        message: t.message,
+        page: t.page,
+        userAgent: t.userAgent,
+        release: t.release,
+        status: t.status,
+        reply: t.reply,
+        createdAt: t.createdAt,
+        resolvedAt: t.resolvedAt,
+        userName: user.name,
+        userEmail: user.email,
+      })
+      .from(t)
+      .innerJoin(user, eq(user.id, t.userId))
+      .where(status === 'all' ? sql`true` : eq(t.status, status))
+      .orderBy(desc(t.createdAt))
+      .limit(100)
+    return c.json({ tickets: rows })
+  })
+
+  // Responder e/ou marcar como resolvido. A resposta aparece para a pessoa na aba Ajuda (e vai por e-mail).
+  .patch(
+    '/support/:id',
+    validate('param', z.object({ id: z.string().uuid() })),
+    validate('json', z.object({ status: z.enum(['open', 'resolved']).optional(), reply: z.string().trim().max(4000).nullish() })),
+    async (c) => {
+      const t = schema.supportTicket
+      const { status, reply } = c.req.valid('json')
+      const [row] = await db
+        .update(t)
+        .set({
+          ...(status ? { status, resolvedAt: status === 'resolved' ? new Date() : null } : {}),
+          ...(reply !== undefined ? { reply: reply || null } : {}),
+        })
+        .where(eq(t.id, c.req.valid('param').id))
+        .returning()
+      if (!row) notFound('Pedido')
+      if (reply) {
+        const [u] = await db.select({ name: user.name, email: user.email }).from(user).where(eq(user.id, row.userId))
+        if (u)
+          sendMail({
+            to: u.email,
+            subject: 'Resposta do suporte do Ensaio Fácil',
+            text: `Olá, ${u.name}! Respondemos o seu pedido de ajuda:
+
+${reply}
+
+Veja também em ${env.APP_URL}/ajuda`,
+            html: `<p>Olá, ${u.name.replace(/[<>&]/g, '')}! Respondemos o seu pedido de ajuda:</p><blockquote style="border-left:3px solid #f5a524;padding-left:12px;white-space:pre-wrap">${reply.replace(/[<>&]/g, (ch) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' })[ch]!)}</blockquote><p><a href="${env.APP_URL}/ajuda">Abrir a Ajuda</a></p>`,
+          }).catch((e) => console.error('Suporte: falha ao enviar resposta', e))
+      }
+      return c.json({ ticket: row })
+    },
+  )

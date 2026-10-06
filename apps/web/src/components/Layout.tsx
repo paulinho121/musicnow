@@ -1,5 +1,5 @@
 import clsx from 'clsx'
-import { Gauge, Home, ListMusic, Music2, ShieldCheck, UserRound } from 'lucide-react'
+import { Gauge, Home, LifeBuoy, ListMusic, Music2, ShieldCheck, UserRound } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { Suspense, useEffect } from 'react'
 import { NavLink, Outlet } from 'react-router'
@@ -15,6 +15,8 @@ const BASE_NAV = [
   { to: '/musicas', label: 'Músicas', icon: Music2 },
   { to: '/repertorios', label: 'Repertórios', icon: ListMusic },
   { to: '/afinador', label: 'Afinador', icon: Gauge },
+  // No celular a Ajuda fica no Perfil (a barra de baixo não comporta tudo).
+  { to: '/ajuda', label: 'Ajuda', icon: LifeBuoy, desktopOnly: true },
   { to: '/perfil', label: 'Perfil', icon: UserRound },
 ]
 
@@ -34,6 +36,7 @@ export function Layout() {
   }, [qc, toast])
 
   const navItems = me?.isAdmin ? [...BASE_NAV, { to: '/admin', label: 'Gestão', icon: ShieldCheck }] : BASE_NAV
+  const mobileItems = navItems.filter((i) => !('desktopOnly' in i && i.desktopOnly))
 
   return (
     <div className="min-h-dvh md:flex">
@@ -69,10 +72,10 @@ export function Layout() {
       <nav
         className={clsx(
           'fixed inset-x-0 bottom-0 z-40 grid border-t border-border bg-bg/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden',
-          me?.isAdmin ? 'grid-cols-5' : 'grid-cols-4',
         )}
+        style={{ gridTemplateColumns: `repeat(${mobileItems.length}, minmax(0, 1fr))` }}
       >
-        {navItems.map(({ to, label, icon: Icon }) => (
+        {mobileItems.map(({ to, label, icon: Icon }) => (
           <NavLink
             key={to}
             to={to}
