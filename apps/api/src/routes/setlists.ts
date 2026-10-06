@@ -1054,7 +1054,7 @@ export const setlistsRoutes = new Hono<AppEnv>()
 // ---------------------------------------------------------------------------
 // Convites: prévia e aceite (a pessoa ainda não participa do repertório)
 
-async function loadValidInvite(code: string) {
+export async function loadValidInvite(code: string) {
   const [row] = await db
     .select({ invite, setlistName: setlist.name, eventDate: setlist.eventDate, location: setlist.location, groupName: setlist.groupName, ownerId: setlist.ownerId, ownerName: user.name })
     .from(invite)

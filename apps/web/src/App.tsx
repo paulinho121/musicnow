@@ -1,44 +1,64 @@
-import { useEffect } from 'react'
+import { type ComponentType, lazy, Suspense, useEffect } from 'react'
 import { Navigate, Outlet, createBrowserRouter, type RouteObject, useLocation } from 'react-router'
 import { RouteError } from './components/AppError'
 import { Layout } from './components/Layout'
 import { ChordPage, ChordsIndex } from './pages/PublicChords'
-import { PartnerDashboard } from './pages/PartnerDashboard'
 import { PartnerLink } from './pages/PartnerLink'
-import { QuickStart } from './pages/QuickStart'
 import { Transposer } from './pages/Transposer'
 import { PublicTuner, TunerPage } from './pages/TunerPages'
 import { PageSpinner } from './components/ui'
 import { rememberedSession, rememberSession, useSession } from './lib/auth'
 import { useMe } from './lib/queries'
 import { AuthPage } from './pages/AuthPage'
-import { ChordDetect } from './pages/ChordDetect'
-import { Dashboard } from './pages/Dashboard'
-import { FindSong } from './pages/FindSong'
-import { Importer } from './pages/Importer'
 import { Privacy, Terms } from './pages/Legal'
-import { InviteAccept } from './pages/InviteAccept'
-import { Library } from './pages/Library'
 import { ForgotPassword, ResetPassword } from './pages/PasswordReset'
-import { PrintSetlist, PrintSong, PrintStageSheet } from './pages/PrintView'
-import { Profile } from './pages/Profile'
-import { SetlistDetail } from './pages/SetlistDetail'
-import { SetlistForm } from './pages/SetlistForm'
-import { SetlistPlay } from './pages/SetlistPlay'
-import { SharedSongAccept } from './pages/SharedSongAccept'
-import { Setlists } from './pages/Setlists'
-import { SongEditor } from './pages/SongEditor'
-import { SongView } from './pages/SongView'
-import { Subscription } from './pages/Subscription'
 import { Welcome } from './pages/Welcome'
 
-import { AdminLayout } from './pages/admin/AdminLayout'
-import { AdminOverview } from './pages/admin/AdminOverview'
-import { AdminErrors } from './pages/admin/AdminErrors'
-import { AdminPartners } from './pages/admin/AdminPartners'
-import { AdminReports } from './pages/admin/AdminReports'
-import { AdminTraffic } from './pages/admin/AdminTraffic'
-import { AdminUsers } from './pages/admin/AdminUsers'
+/**
+ * Telas do app (com login): cada uma num arquivo separado, baixado só quando for aberta.
+ * A página inicial e as ferramentas públicas ficam no pacote principal (abrem na hora).
+ * Os pedaços também ficam guardados no aparelho pelo service worker (funcionam sem internet).
+ */
+function page<K extends string>(load: () => Promise<Record<K, ComponentType>>, name: K) {
+  return lazy(() => load().then((m) => ({ default: m[name] })))
+}
+const PartnerDashboard = page(() => import('./pages/PartnerDashboard'), 'PartnerDashboard')
+const QuickStart = page(() => import('./pages/QuickStart'), 'QuickStart')
+const ChordDetect = page(() => import('./pages/ChordDetect'), 'ChordDetect')
+const Dashboard = page(() => import('./pages/Dashboard'), 'Dashboard')
+const FindSong = page(() => import('./pages/FindSong'), 'FindSong')
+const Importer = page(() => import('./pages/Importer'), 'Importer')
+const InviteAccept = page(() => import('./pages/InviteAccept'), 'InviteAccept')
+const Library = page(() => import('./pages/Library'), 'Library')
+const PrintSetlist = page(() => import('./pages/PrintView'), 'PrintSetlist')
+const PrintSong = page(() => import('./pages/PrintView'), 'PrintSong')
+const PrintStageSheet = page(() => import('./pages/PrintView'), 'PrintStageSheet')
+const Profile = page(() => import('./pages/Profile'), 'Profile')
+const SetlistDetail = page(() => import('./pages/SetlistDetail'), 'SetlistDetail')
+const SetlistForm = page(() => import('./pages/SetlistForm'), 'SetlistForm')
+const SetlistPlay = page(() => import('./pages/SetlistPlay'), 'SetlistPlay')
+const SharedSongAccept = page(() => import('./pages/SharedSongAccept'), 'SharedSongAccept')
+const Setlists = page(() => import('./pages/Setlists'), 'Setlists')
+const SongEditor = page(() => import('./pages/SongEditor'), 'SongEditor')
+const SongView = page(() => import('./pages/SongView'), 'SongView')
+const Subscription = page(() => import('./pages/Subscription'), 'Subscription')
+const AdminLayout = page(() => import('./pages/admin/AdminLayout'), 'AdminLayout')
+const AdminOverview = page(() => import('./pages/admin/AdminOverview'), 'AdminOverview')
+const AdminErrors = page(() => import('./pages/admin/AdminErrors'), 'AdminErrors')
+const AdminFunnel = page(() => import('./pages/admin/AdminFunnel'), 'AdminFunnel')
+const AdminPartners = page(() => import('./pages/admin/AdminPartners'), 'AdminPartners')
+const AdminReports = page(() => import('./pages/admin/AdminReports'), 'AdminReports')
+const AdminTraffic = page(() => import('./pages/admin/AdminTraffic'), 'AdminTraffic')
+const AdminUsers = page(() => import('./pages/admin/AdminUsers'), 'AdminUsers')
+
+/** Mostra a tela carregando enquanto o pedaço dela chega. */
+export function LazyOutlet() {
+  return (
+    <Suspense fallback={<PageSpinner />}>
+      <Outlet />
+    </Suspense>
+  )
+}
 
 /** Exige login; quem ainda não preencheu o perfil vai para o onboarding. */
 function RequireAuth() {
@@ -86,6 +106,7 @@ const inApp = (children: RouteObject[]): RouteObject[] => [{ errorElement: <Rout
 export const router = createBrowserRouter([
   {
     errorElement: <RouteError />,
+    element: <LazyOutlet />,
     children: [
       {
         element: <PublicOnly />,
@@ -152,6 +173,7 @@ export const router = createBrowserRouter([
                       { path: 'denuncias', element: <AdminReports /> },
                       { path: 'erros', element: <AdminErrors /> },
                       { path: 'parceiros', element: <AdminPartners /> },
+                      { path: 'funil', element: <AdminFunnel /> },
                     ],
                   },
                 ],

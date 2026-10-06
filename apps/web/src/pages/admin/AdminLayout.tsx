@@ -1,9 +1,10 @@
 import clsx from 'clsx'
-import { Activity, AlertOctagon, BarChart3, Bug, Handshake, ShieldCheck, Users } from 'lucide-react'
+import { Activity, AlertOctagon, BarChart3, Bug, Filter, Handshake, ShieldCheck, Users } from 'lucide-react'
 import { NavLink, Outlet } from 'react-router'
 
 const TABS = [
   { to: '/admin', end: true, label: 'Visão Geral', icon: BarChart3 },
+  { to: '/admin/funil', label: 'Funil', icon: Filter },
   { to: '/admin/visitas', label: 'Fluxo de Visitas', icon: Activity },
   { to: '/admin/usuarios', label: 'Usuários Cadastrados', icon: Users },
   { to: '/admin/denuncias', label: 'Moderação & Denúncias', icon: AlertOctagon },

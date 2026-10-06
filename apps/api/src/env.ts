@@ -10,9 +10,14 @@ export const env = {
   /** URL pública do app (o mesmo endereço serve o front e a /api). */
   APP_URL: required('APP_URL'),
   /** Origens extras aceitas no login (ex.: http://localhost:4173 do vite preview), separadas por vírgula. */
-  EXTRA_TRUSTED_ORIGINS: (process.env.EXTRA_TRUSTED_ORIGINS ?? '').split(',').map((s) => s.trim()).filter(Boolean),
+  EXTRA_TRUSTED_ORIGINS: (process.env.EXTRA_TRUSTED_ORIGINS ?? '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean),
   PORT: Number(process.env.PORT ?? 3001),
   UPLOAD_DIR: process.env.UPLOAD_DIR ?? './uploads',
+  /** Pasta do app (index.html) para a prévia dos links; sem valor, procura nos lugares de costume. */
+  WEB_ROOT: process.env.WEB_ROOT,
   /** E-mail (recuperação de senha). Opcional: sem ele, o link vai para o log. */
   SMTP_HOST: process.env.SMTP_HOST,
   SMTP_PORT: Number(process.env.SMTP_PORT ?? 587),

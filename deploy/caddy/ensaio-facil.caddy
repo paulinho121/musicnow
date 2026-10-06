@@ -25,6 +25,14 @@ __DOMAIN__ {
 		}
 	}
 
+	# Links de convite e de música compartilhada: a API devolve a página do app com a prévia
+	# daquele repertório/música (título e descrição para o WhatsApp e as redes).
+	@preview path /convite/* /compartilhado/*
+	handle @preview {
+		rewrite * /api/og{uri}
+		reverse_proxy 127.0.0.1:3001
+	}
+
 	handle /api/* {
 		reverse_proxy 127.0.0.1:3001
 	}

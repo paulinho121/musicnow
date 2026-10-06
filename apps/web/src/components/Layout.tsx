@@ -1,14 +1,14 @@
 import clsx from 'clsx'
 import { Gauge, Home, ListMusic, Music2, ShieldCheck, UserRound } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
-import { useEffect } from 'react'
+import { Suspense, useEffect } from 'react'
 import { NavLink, Outlet } from 'react-router'
 import { redeemPendingCoupon } from '../lib/coupon'
 import { keys, useMe } from '../lib/queries'
 import { usePageTracking } from '../lib/usePageTracking'
 import { BillingBanner } from './BillingNotice'
 import { Logo } from './Logo'
-import { useToast } from './ui'
+import { PageSpinner, useToast } from './ui'
 
 const BASE_NAV = [
   { to: '/inicio', label: 'Início', icon: Home },
@@ -60,7 +60,10 @@ export function Layout() {
 
       <main className="mx-auto w-full min-w-0 max-w-4xl flex-1 px-4 pt-5 pb-28 md:px-8 md:pt-8 md:pb-10">
         <BillingBanner />
-        <Outlet />
+        {/* A tela carrega aqui dentro: o menu continua visível. */}
+        <Suspense fallback={<PageSpinner />}>
+          <Outlet />
+        </Suspense>
       </main>
 
       <nav

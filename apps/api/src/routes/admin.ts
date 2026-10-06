@@ -517,3 +517,26 @@ export const adminRoutes = new Hono<AppEnv>()
       .where(eq(schema.partnerReferral.userId, r.userId))
     return c.json({ ok: true })
   })
+
+  // 9. Funil: das pessoas que se cadastraram no período, quantas chegaram a cada passo.
+  .get('/funnel', validate('query', z.object({ days: z.coerce.number().int().min(1).max(365).default(30) })), async (c) => {
+    const { days } = c.req.valid('query')
+    const [r] = await db.execute<Record<string, number>>(sql`
+      with cohort as (
+        select id from "user"
+        where created_at >= now() - make_interval(days => ${days}) and coalesce(role, 'user') <> 'admin'
+      )
+      select
+        (select count(*) from cohort)::int as signups,
+        (select count(*) from cohort c join profile p on p.user_id = c.id where p.role is not null)::int as profile,
+        (select count(distinct s.user_id) from cohort c join song_user_state s on s.user_id = c.id where s.last_viewed_at is not null)::int as opened,
+        (select count(distinct sl.owner_id) from cohort c join setlist sl on sl.owner_id = c.id
+           where exists (select 1 from setlist_item i where i.setlist_id = sl.id))::int as setlist,
+        (select count(distinct sl.owner_id) from cohort c join setlist sl on sl.owner_id = c.id
+           where exists (select 1 from setlist_member m where m.setlist_id = sl.id and m.user_id <> sl.owner_id)
+              or exists (select 1 from invite v where v.setlist_id = sl.id))::int as band,
+        (select count(*) from cohort c join billing_account b on b.user_id = c.id where b.current_period_end is not null)::int as paid,
+        (select count(*) from cohort c join partner_referral pr on pr.user_id = c.id)::int as "viaPartner"
+    `)
+    return c.json({ days, ...r })
+  })

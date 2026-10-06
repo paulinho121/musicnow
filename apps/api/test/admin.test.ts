@@ -88,6 +88,15 @@ describe('acesso ao painel', () => {
     expect((await call(musico, 'GET', '/admin/overview')).status).toBe(403)
   })
 
+  it('funil: conta o músico novo e só o admin vê', async () => {
+    const r = await call(chefe, 'GET', '/admin/funnel?days=1')
+    expect(r.status).toBe(200)
+    expect(r.data.signups).toBeGreaterThanOrEqual(1)
+    for (const k of ['profile', 'opened', 'setlist', 'band', 'paid', 'viaPartner']) expect(typeof r.data[k]).toBe('number')
+    expect(r.data.paid).toBeLessThanOrEqual(r.data.signups)
+    expect((await call(musico, 'GET', '/admin/funnel')).status).toBe(403)
+  })
+
   it('o admin não se tranca fora', async () => {
     expect((await call(chefe, 'PATCH', `/admin/users/${chefe.id}/status`, { banned: true })).status).toBe(400)
     expect((await call(chefe, 'PATCH', `/admin/users/${chefe.id}/role`, { role: 'user' })).status).toBe(400)

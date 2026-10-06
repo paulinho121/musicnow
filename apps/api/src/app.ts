@@ -16,6 +16,7 @@ import { invitesRoutes, setlistsRoutes } from './routes/setlists'
 import { sharedSongRoutes, songsRoutes } from './routes/songs'
 import { analyticsRoutes } from './routes/analytics'
 import { errorsRoutes } from './routes/errors'
+import { ogRoutes } from './routes/og'
 import { partnersRoutes } from './routes/partners'
 import { recordError } from './errors'
 import { adminRoutes } from './routes/admin'
@@ -40,6 +41,7 @@ const api = new Hono<AppEnv>()
   .route('/analytics', analyticsRoutes)
   .route('/errors', errorsRoutes)
   .route('/partners', partnersRoutes)
+  .route('/og', ogRoutes)
   .route('/admin', adminRoutes)
 
 const KB = 1024
