@@ -13,7 +13,7 @@ export default defineConfig({
       // O app decide quando trocar de versão (src/lib/updates.ts): nunca no meio de uma música.
       registerType: 'prompt',
       injectRegister: false,
-      includeAssets: ['icon.svg', 'theme.js'],
+      includeAssets: ['icon.svg', 'apple-touch-icon.png', 'theme.js'],
       manifest: {
         name: 'Ensaio Fácil',
         short_name: 'Ensaio Fácil',
