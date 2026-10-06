@@ -4,11 +4,11 @@ import { NavLink, Outlet } from 'react-router'
 
 const TABS = [
   { to: '/admin', end: true, label: 'Visão Geral', icon: BarChart3 },
+  { to: '/admin/parceiros', label: 'Parceiros', icon: Handshake },
   { to: '/admin/funil', label: 'Funil', icon: Filter },
   { to: '/admin/visitas', label: 'Fluxo de Visitas', icon: Activity },
   { to: '/admin/usuarios', label: 'Usuários Cadastrados', icon: Users },
   { to: '/admin/denuncias', label: 'Moderação & Denúncias', icon: AlertOctagon },
-  { to: '/admin/parceiros', label: 'Parceiros', icon: Handshake },
   { to: '/admin/erros', label: 'Erros do App', icon: Bug },
 ]
 
@@ -27,7 +27,8 @@ export function AdminLayout() {
         </div>
       </div>
 
-      <nav className="flex gap-2 overflow-x-auto border-b border-border pb-2 scrollbar-none">
+      {/* Quebra em mais linhas quando não cabe (nenhuma aba fica escondida). */}
+      <nav className="flex flex-wrap gap-2 border-b border-border pb-2">
         {TABS.map(({ to, end, label, icon: Icon }) => (
           <NavLink
             key={to}
