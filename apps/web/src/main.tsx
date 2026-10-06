@@ -15,12 +15,16 @@ import { ApiError } from './lib/api'
 import { logout } from './lib/auth'
 import { openPaywall } from './lib/billing'
 import { setupErrorReporting } from './lib/errors'
+import { applyRouteMeta } from './lib/seo'
 import { onRouteChange, setupUpdates } from './lib/updates'
 
 setupErrorReporting()
 setupUpdates()
 clearReloadFlag()
 router.subscribe(onRouteChange)
+// Título, descrição e indexação de cada tela (Google).
+applyRouteMeta(router.state.location.pathname)
+router.subscribe((s) => applyRouteMeta(s.location.pathname))
 
 // Sessão que o servidor não reconhece mais (expirou, conta removida, outro dispositivo saiu):
 // limpa o login local e volta para a tela de entrada, em vez de ficar preso num erro.

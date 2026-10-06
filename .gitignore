@@ -12,3 +12,4 @@ uploads
 /*.gp5
 /*.gpx
 /test-gp.mjs
+dist-ssr

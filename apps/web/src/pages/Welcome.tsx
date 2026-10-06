@@ -55,7 +55,7 @@ const STEPS = [
   { title: 'Toque no Modo Palco', text: 'Você comanda a música e o tom; todo mundo acompanha na mesma hora.' },
 ]
 
-const FAQ = [
+export const FAQ = [
   {
     q: 'Preciso de cartão para testar?',
     a: `Não. São ${TRIAL_DAYS} dias grátis com tudo liberado, sem cartão. Depois, você escolhe se quer assinar.`,

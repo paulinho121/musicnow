@@ -1,7 +1,25 @@
 import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
-import { defineConfig } from 'vite'
+import { defineConfig, type Plugin } from 'vite'
 import { VitePWA } from 'vite-plugin-pwa'
+import { robotsTxt, sitemapXml } from './src/seo-pages'
+
+// Endereço público do site: prévias de link, canonical, sitemap e robots.txt.
+// Ao trocar de domínio, troque aqui (ou defina VITE_SITE_URL no build).
+const SITE_URL = (process.env.VITE_SITE_URL ?? 'https://ensaio.152-67-63-31.sslip.io').replace(/\/$/, '')
+process.env.VITE_SITE_URL = SITE_URL
+
+/** robots.txt e sitemap.xml gerados no build, sempre com o endereço certo. */
+function seoFiles(): Plugin {
+  return {
+    name: 'ensaio-seo-files',
+    apply: 'build',
+    generateBundle() {
+      this.emitFile({ type: 'asset', fileName: 'robots.txt', source: robotsTxt(SITE_URL) })
+      this.emitFile({ type: 'asset', fileName: 'sitemap.xml', source: sitemapXml(SITE_URL, new Date().toISOString().slice(0, 10)) })
+    },
+  }
+}
 
 export default defineConfig({
   // Versão do app (commit), enviada junto com os avisos de erro.
@@ -9,6 +27,7 @@ export default defineConfig({
   plugins: [
     react(),
     tailwindcss(),
+    seoFiles(),
     VitePWA({
       // O app decide quando trocar de versão (src/lib/updates.ts): nunca no meio de uma música.
       registerType: 'prompt',
@@ -42,7 +61,8 @@ export default defineConfig({
           'alphatab/**',
         ],
         navigateFallback: '/index.html',
-        navigateFallbackDenylist: [/^\/api\//],
+        // API e arquivos para robôs (robots.txt, sitemap, imagem de prévia) nunca viram o app.
+        navigateFallbackDenylist: [/^\/api\//, /^\/(robots\.txt|sitemap\.xml|og-image\.jpg)$/],
         runtimeCaching: [
           {
             // Músicas já abertas continuam disponíveis sem internet (palco sem sinal).

@@ -9,8 +9,11 @@ const START_MS = 3000
 /** Duração máxima depois de começar (o vídeo tem ~4,5 s). */
 const PLAY_MS = 5500
 
-/** Telas em que a abertura atrapalharia: palco (link aberto na hora do show) e impressão. */
-const SKIP_ROUTES = /\/(tocar|imprimir|folha)(\/|$)/
+/**
+ * Telas em que a abertura atrapalharia: palco (link aberto na hora do show), impressão e as
+ * páginas públicas (quem chega pelo Google ou por um link precisa ver o conteúdo na hora).
+ */
+const SKIP_ROUTES = /\/(tocar|imprimir|folha)(\/|$)|^\/(entrar|criar-conta|termos|privacidade|esqueci-senha|redefinir-senha)?$/
 
 function shouldShow() {
   if (SKIP_ROUTES.test(window.location.pathname)) return false

@@ -59,7 +59,9 @@ function RequireAdmin() {
 function PublicOnly() {
   const { data: session, isPending } = useSession()
   const location = useLocation()
-  if (isPending) return <PageSpinner />
+  // Enquanto confere o login, já mostra a página (sem tela de carregando): quem chega pelo
+  // Google vê o conteúdo na hora; quem já está logado é levado ao app logo em seguida.
+  if (isPending) return <Outlet />
   // Assim que a sessão existe (login/cadastro), volta para onde a pessoa ia (ex.: um convite).
   if (session) return <Navigate to={(location.state as { from?: string } | null)?.from ?? '/inicio'} replace />
   return <Outlet />
