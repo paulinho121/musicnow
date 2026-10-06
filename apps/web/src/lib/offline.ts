@@ -1,5 +1,5 @@
 // "Baixar para o show": guarda no aparelho o repertório inteiro (lista, cada música no tom do
-// repertório, partituras e capas) para tocar sem internet. Quem guarda é o service worker
+// repertório e partituras) para tocar sem internet. Quem guarda é o service worker
 // (vite.config.ts → runtimeCaching): aqui só pedimos cada endereço uma vez, como o app pediria.
 import { useEffect, useState } from 'react'
 import { scorePageUrl } from './scores'
@@ -71,8 +71,8 @@ export async function downloadSetlist(setlist: SetlistDetail, onProgress: (done:
         for (let n = 0; n < part.pages.length; n++) await get(scorePageUrl(part.id, n))
         bytes += part.totalBytes
       }
-      // Capa (outro site): melhor esforço; sem ela o app desenha a capa colorida.
-      if (song.coverUrl) await fetch(song.coverUrl, { mode: 'no-cors' }).catch(() => null)
+      // Capa (outro site): o navegador guarda no cache dele ao carregar a imagem.
+      if (song.coverUrl) new Image().src = song.coverUrl
       bytes += song.content.length
       onProgress(++done, total)
     }
