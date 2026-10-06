@@ -1,13 +1,14 @@
 import { Navigate, Outlet, createBrowserRouter, type RouteObject, useLocation } from 'react-router'
 import { RouteError } from './components/AppError'
 import { Layout } from './components/Layout'
+import { ChordPage, ChordsIndex } from './pages/PublicChords'
 import { QuickStart } from './pages/QuickStart'
+import { Transposer } from './pages/Transposer'
 import { PageSpinner } from './components/ui'
 import { useSession } from './lib/auth'
 import { useMe } from './lib/queries'
 import { AuthPage } from './pages/AuthPage'
 import { ChordDetect } from './pages/ChordDetect'
-import { ChordsPage } from './pages/ChordsPage'
 import { Dashboard } from './pages/Dashboard'
 import { FindSong } from './pages/FindSong'
 import { Importer } from './pages/Importer'
@@ -89,6 +90,10 @@ export const router = createBrowserRouter([
       // Termos e privacidade: abertos para todos (antes de criar conta e dentro do app).
       { path: '/termos', element: <Terms /> },
       { path: '/privacidade', element: <Privacy /> },
+      // Ferramentas grátis (para o Google e para quem ainda não tem conta).
+      { path: '/acordes', element: <ChordsIndex /> },
+      { path: '/acordes/:slug', element: <ChordPage /> },
+      { path: '/transpor-cifra', element: <Transposer /> },
       {
         element: <RequireAuth />,
         children: [
@@ -108,7 +113,6 @@ export const router = createBrowserRouter([
               { path: '/musicas/importar', element: <Importer /> },
               { path: '/musicas/detectar', element: <ChordDetect /> },
               { path: '/musicas/encontrar', element: <FindSong /> },
-              { path: '/acordes', element: <ChordsPage /> },
               { path: '/musicas/:id/editar', element: <SongEditor /> },
               { path: '/repertorios', element: <Setlists /> },
               { path: '/repertorios/novo', element: <SetlistForm /> },

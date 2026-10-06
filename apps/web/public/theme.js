@@ -6,5 +6,5 @@ try {
 } catch (e) {
   document.documentElement.dataset.theme = 'dark'
 }
-// Página inicial: mostra o conteúdo pré-gerado (para o Google) enquanto o app carrega.
-document.documentElement.toggleAttribute('data-home', location.pathname === '/')
+// Conteúdo pré-gerado (para o Google): aparece só na página a que pertence, enquanto o app carrega.
+document.documentElement.dataset.path = location.pathname

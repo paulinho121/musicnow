@@ -38,7 +38,8 @@ __DOMAIN__ {
 		# Vídeo da abertura: o Caddy entrega .webm como audio/webm; para <video> o certo é video/webm.
 		@webm path *.webm
 		header @webm >Content-Type video/webm
-		try_files {path} /index.html
+		# Páginas públicas pré-geradas (acordes, transpositor...) saem prontas; o resto é o app.
+		try_files {path} {path}/index.html /index.html
 		file_server
 	}
 }

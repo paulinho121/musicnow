@@ -15,7 +15,7 @@ import {
   Users,
 } from 'lucide-react'
 import { Link } from 'react-router'
-import { Logo } from '../components/Logo'
+import { PublicFooter, PublicHeader } from '../components/PublicChrome'
 
 const FEATURES = [
   { icon: Radio, title: 'Modo Palco ao vivo', text: 'Quem lidera troca a música e o tom; a banda toda vê na hora, no celular de cada um.' },
@@ -84,25 +84,7 @@ export function Welcome() {
 
   return (
     <div className="min-h-dvh bg-bg">
-      {/* Topo */}
-      <header className="sticky top-0 z-20 border-b border-border/60 bg-bg/80 backdrop-blur">
-        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-5">
-          <Link to="/" aria-label="Ensaio Fácil">
-            <Logo />
-          </Link>
-          <nav className="flex items-center gap-2">
-            <a href="#precos" className="hidden px-3 text-sm font-medium text-muted hover:text-text sm:block">
-              Preços
-            </a>
-            <Link to="/entrar" className="px-3 text-sm font-semibold text-muted hover:text-text">
-              Entrar
-            </Link>
-            <Link to="/criar-conta" className="btn-primary h-10 px-4">
-              Testar grátis
-            </Link>
-          </nav>
-        </div>
-      </header>
+      <PublicHeader />
 
       {/* Destaque */}
       <section className="relative overflow-hidden">
@@ -252,23 +234,7 @@ export function Welcome() {
         </div>
       </section>
 
-      <footer className="border-t border-border">
-        <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 px-5 py-8 text-sm text-muted sm:flex-row">
-          <Logo />
-          <p className="flex flex-wrap justify-center gap-4">
-            <span>© {new Date().getFullYear()} Ensaio Fácil</span>
-            <Link to="/termos" className="hover:text-text">
-              Termos de uso
-            </Link>
-            <Link to="/privacidade" className="hover:text-text">
-              Privacidade
-            </Link>
-            <Link to="/entrar" className="hover:text-text">
-              Entrar
-            </Link>
-          </p>
-        </div>
-      </footer>
+      <PublicFooter />
     </div>
   )
 }

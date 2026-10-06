@@ -1,6 +1,6 @@
 // Título, descrição, endereço oficial (canonical) e indexação de cada tela.
 // Só as páginas públicas entram no Google; as telas do app ficam com "noindex".
-import { PUBLIC_PAGES } from '../seo-pages'
+import { PUBLIC_PAGES, publicPageFor } from '../seo-pages'
 
 const SITE_URL: string = import.meta.env.VITE_SITE_URL ?? location.origin
 const APP_TITLE = 'Ensaio Fácil'
@@ -16,9 +16,10 @@ function meta(name: string, content: string, attr: 'name' | 'property' = 'name')
 }
 
 export function applyRouteMeta(pathname: string) {
-  const page = PUBLIC_PAGES[pathname]
+  const page = publicPageFor(pathname)
   const canonical = document.head.querySelector<HTMLLinkElement>('link[rel="canonical"]')
-  document.documentElement.toggleAttribute('data-home', pathname === '/')
+  // Mostra o conteúdo pré-gerado só na página a que ele pertence (ver theme.js e index.html).
+  document.documentElement.dataset.path = pathname
   if (page) {
     document.title = page.title
     meta('description', page.description)

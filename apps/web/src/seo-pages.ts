@@ -1,6 +1,7 @@
 // Páginas públicas (as únicas que o Google deve indexar): título, descrição e prioridade no
-// sitemap. Usado no build (sitemap.xml, robots.txt) e no app (título e canonical de cada tela).
-// Sem import.meta aqui: o vite.config.ts também lê este arquivo.
+// sitemap. Usado no build (páginas pré-geradas, sitemap.xml, robots.txt) e no app (título e
+// canonical de cada tela). Sem import.meta e sem window: também roda no build (Node).
+import { allChordPages, chordFromSlug, chordInfo, noteNamePt } from '@ensaio/shared'
 
 export interface PublicPage {
   title: string
@@ -30,6 +31,20 @@ export const PUBLIC_PAGES: Record<string, PublicPage> = {
     priority: 0.5,
     changefreq: 'yearly',
   },
+  '/acordes': {
+    title: 'Dicionário de acordes para violão, guitarra e teclado · Ensaio Fácil',
+    description:
+      'Dicionário de acordes grátis: maiores, menores, com sétima, nona, diminutos e mais, com diagramas de violão, guitarra e teclado em várias posições.',
+    priority: 0.9,
+    changefreq: 'monthly',
+  },
+  '/transpor-cifra': {
+    title: 'Transpor cifra online grátis: mude o tom da música · Ensaio Fácil',
+    description:
+      'Cole a cifra, escolha o novo tom e pronto: transpositor de cifras online e grátis, com sugestão de capotraste. Funciona no celular, sem cadastro.',
+    priority: 0.9,
+    changefreq: 'monthly',
+  },
   '/termos': {
     title: 'Termos de uso · Ensaio Fácil',
     description: 'Termos de uso do Ensaio Fácil: assinatura, teste grátis, cancelamento e regras de uso.',
@@ -44,6 +59,40 @@ export const PUBLIC_PAGES: Record<string, PublicPage> = {
   },
 }
 
+/** Nome por extenso: "Fá sustenido menor com sétima". */
+export function chordNamePt(symbol: string) {
+  const info = chordInfo(symbol)
+  if (!info) return null
+  const name = `${noteNamePt(info.notes[0])} ${info.quality}`
+  return info.bassNote ? `${name}, com baixo em ${noteNamePt(info.bassNote)}` : name
+}
+
+function chordPage(symbol: string): PublicPage {
+  const name = chordNamePt(symbol) ?? symbol
+  return {
+    title: `Acorde ${symbol} (${name}): como tocar no violão e teclado · Ensaio Fácil`,
+    description: `Como fazer o acorde ${symbol} (${name}) no violão, na guitarra e no teclado, em várias posições. Notas: ${chordInfo(symbol)?.notes.join(', ')}.`,
+    priority: 0.6,
+    changefreq: 'yearly',
+  }
+}
+
+/** A página pública deste endereço (inclui as de acorde), ou null se for tela do app. */
+export function publicPageFor(path: string): PublicPage | null {
+  if (PUBLIC_PAGES[path]) return PUBLIC_PAGES[path]
+  const m = /^\/acordes\/([a-z0-9-]+)$/.exec(path)
+  const symbol = m && chordFromSlug(m[1])
+  return symbol ? chordPage(symbol) : null
+}
+
+/** Todas as páginas públicas, com o endereço (build: pré-geração e sitemap). */
+export function allPublicPages(): (PublicPage & { path: string })[] {
+  return [
+    ...Object.entries(PUBLIC_PAGES).map(([path, p]) => ({ path, ...p })),
+    ...allChordPages().map((c) => ({ path: `/acordes/${c.slug}`, ...chordPage(c.symbol) })),
+  ]
+}
+
 /**
  * Telas do app (com login): fora do Google (robots.txt + noindex). Convites e músicas
  * compartilhadas não entram aqui de propósito: os robôs de prévia (WhatsApp, Facebook)
@@ -54,7 +103,6 @@ export const PRIVATE_PREFIXES = [
   '/comecar',
   '/musicas',
   '/repertorios',
-  '/acordes',
   '/perfil',
   '/assinatura',
   '/admin',
@@ -63,9 +111,9 @@ export const PRIVATE_PREFIXES = [
 ]
 
 export function sitemapXml(siteUrl: string, lastmod: string) {
-  const urls = Object.entries(PUBLIC_PAGES)
+  const urls = allPublicPages()
     .map(
-      ([path, p]) =>
+      ({ path, ...p }) =>
         `  <url><loc>${siteUrl}${path}</loc><lastmod>${lastmod}</lastmod><changefreq>${p.changefreq}</changefreq><priority>${p.priority.toFixed(1)}</priority></url>`,
     )
     .join('\n')
