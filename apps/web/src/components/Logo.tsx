@@ -1,9 +1,15 @@
 import clsx from 'clsx'
 
-export function Logo({ size = 'md' }: { size?: 'md' | 'lg' }) {
+const SIZES = {
+  md: { text: 'text-lg', mark: 'h-8' },
+  lg: { text: 'text-3xl', mark: 'h-12' },
+  xl: { text: 'text-4xl sm:text-5xl', mark: 'h-16 sm:h-20' },
+}
+
+export function Logo({ size = 'md' }: { size?: keyof typeof SIZES }) {
   return (
-    <span className={clsx('inline-flex items-center gap-2.5 font-bold tracking-tight', size === 'lg' ? 'text-3xl' : 'text-lg')}>
-      <img src="/icon.svg" alt="" className={size === 'lg' ? 'size-12' : 'size-8'} />
+    <span className={clsx('inline-flex items-center gap-3 font-extrabold tracking-tight', SIZES[size].text)}>
+      <img src="/logo-mark.svg" alt="" className={clsx('w-auto shrink-0', SIZES[size].mark)} />
       <span>
         Ensaio <span className="text-accent">Fácil</span>
       </span>
