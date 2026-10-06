@@ -4,6 +4,8 @@ import { defineConfig } from 'vite'
 import { VitePWA } from 'vite-plugin-pwa'
 
 export default defineConfig({
+  // Versão do app (commit), enviada junto com os avisos de erro.
+  define: { __RELEASE__: JSON.stringify(process.env.GITHUB_SHA?.slice(0, 7) ?? 'dev') },
   plugins: [
     react(),
     tailwindcss(),

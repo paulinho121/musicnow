@@ -26,6 +26,7 @@ export async function logout() {
 // Better Auth devolve códigos em inglês; aqui viram mensagens para o usuário.
 const MESSAGES: Record<string, string> = {
   INVALID_EMAIL_OR_PASSWORD: 'E-mail ou senha incorretos.',
+  INVALID_PASSWORD: 'Senha incorreta.',
   USER_ALREADY_EXISTS: 'Já existe uma conta com este e-mail. Tente entrar.',
   USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL: 'Já existe uma conta com este e-mail. Tente entrar.',
   PASSWORD_TOO_SHORT: 'A senha precisa ter pelo menos 8 caracteres.',

@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from './api'
-import type { AdminOverview, AdminReport, AdminTraffic, AdminUsersResponse } from './types'
+import type { AdminAppError, AdminOverview, AdminReport, AdminTraffic, AdminUsersResponse } from './types'
 
 export const adminKeys = {
   overview: ['admin', 'overview'] as const,
@@ -8,6 +8,7 @@ export const adminKeys = {
   traffic: (days: number) => ['admin', 'traffic', days] as const,
   users: (params: { q?: string; role?: string; page?: number; limit?: number }) => ['admin', 'users', params] as const,
   reports: ['admin', 'reports'] as const,
+  errors: ['admin', 'errors'] as const,
 }
 
 export function useAdminOverview() {
@@ -93,6 +94,26 @@ export function useResolveReport() {
       }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: adminKeys.reports })
+      qc.invalidateQueries({ queryKey: adminKeys.overview })
+    },
+  })
+}
+
+export function useAdminErrors() {
+  return useQuery({
+    queryKey: adminKeys.errors,
+    queryFn: () => api<{ errors: AdminAppError[] }>('/admin/errors'),
+    refetchInterval: 60_000,
+  })
+}
+
+/** Marcar como resolvido (id) ou limpar tudo (sem id). */
+export function useResolveError() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id?: string) => api<{ ok: boolean }>(id ? `/admin/errors/${id}` : '/admin/errors', { method: 'DELETE' }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: adminKeys.errors })
       qc.invalidateQueries({ queryKey: adminKeys.overview })
     },
   })

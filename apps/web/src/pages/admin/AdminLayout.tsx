@@ -1,5 +1,5 @@
 import clsx from 'clsx'
-import { Activity, AlertOctagon, BarChart3, ShieldCheck, Users } from 'lucide-react'
+import { Activity, AlertOctagon, BarChart3, Bug, ShieldCheck, Users } from 'lucide-react'
 import { NavLink, Outlet } from 'react-router'
 
 const TABS = [
@@ -7,6 +7,7 @@ const TABS = [
   { to: '/admin/visitas', label: 'Fluxo de Visitas', icon: Activity },
   { to: '/admin/usuarios', label: 'Usuários Cadastrados', icon: Users },
   { to: '/admin/denuncias', label: 'Moderação & Denúncias', icon: AlertOctagon },
+  { to: '/admin/erros', label: 'Erros do App', icon: Bug },
 ]
 
 export function AdminLayout() {
@@ -33,9 +34,7 @@ export function AdminLayout() {
             className={({ isActive }) =>
               clsx(
                 'flex items-center gap-2 rounded-lg px-3.5 py-2 text-sm font-medium transition whitespace-nowrap',
-                isActive
-                  ? 'bg-accent/15 text-accent shadow-xs'
-                  : 'text-muted hover:bg-surface hover:text-text',
+                isActive ? 'bg-accent/15 text-accent shadow-xs' : 'text-muted hover:bg-surface hover:text-text',
               )
             }
           >

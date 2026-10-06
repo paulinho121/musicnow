@@ -4,6 +4,7 @@ import clsx from 'clsx'
 import { Check, ChevronRight, Crown, LogOut, Moon, Star, Sun } from 'lucide-react'
 import { type FormEvent, useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router'
+import { DeleteAccount } from '../components/DeleteAccount'
 import { ErrorState, PageSpinner, useToast } from '../components/ui'
 import { logout as endSession } from '../lib/auth'
 import { useMe, useSaveProfile } from '../lib/queries'
@@ -48,8 +49,7 @@ export function Profile() {
       return [...list, { instrument: i, primary: list.length === 0 }]
     })
 
-  const makePrimary = (i: Instrument) =>
-    setInstruments((list) => list.map((x) => ({ ...x, primary: x.instrument === i })))
+  const makePrimary = (i: Instrument) => setInstruments((list) => list.map((x) => ({ ...x, primary: x.instrument === i })))
 
   const submit = (e: FormEvent) => {
     e.preventDefault()
@@ -89,7 +89,13 @@ export function Profile() {
         </label>
         <label className="block">
           <span className="label">Cidade</span>
-          <input className="input" value={city} onChange={(e) => setCity(e.target.value)} placeholder="Ex.: Fortaleza, CE" maxLength={120} />
+          <input
+            className="input"
+            value={city}
+            onChange={(e) => setCity(e.target.value)}
+            placeholder="Ex.: Fortaleza, CE"
+            maxLength={120}
+          />
         </label>
         <p className="text-sm text-muted md:col-span-2">
           E-mail: <span className="text-text">{me.email}</span>
@@ -190,6 +196,8 @@ export function Profile() {
           {save.isPending ? 'Salvando...' : onboarding ? 'Começar' : 'Salvar perfil'}
         </button>
       </div>
+
+      {!onboarding && <DeleteAccount />}
     </form>
   )
 }

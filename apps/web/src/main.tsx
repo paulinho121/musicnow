@@ -6,6 +6,7 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { RouterProvider } from 'react-router'
 import { router } from './App'
+import { AppErrorBoundary, clearReloadFlag } from './components/AppError'
 import { PaywallDialog } from './components/BillingNotice'
 import { IntroSplash } from './components/IntroSplash'
 import { ToastProvider } from './components/ui'
@@ -13,9 +14,12 @@ import { UpdateBanner } from './components/UpdateBanner'
 import { ApiError } from './lib/api'
 import { logout } from './lib/auth'
 import { openPaywall } from './lib/billing'
+import { setupErrorReporting } from './lib/errors'
 import { onRouteChange, setupUpdates } from './lib/updates'
 
+setupErrorReporting()
 setupUpdates()
+clearReloadFlag()
 router.subscribe(onRouteChange)
 
 // Sessão que o servidor não reconhece mais (expirou, conta removida, outro dispositivo saiu):
@@ -49,13 +53,15 @@ const queryClient: QueryClient = new QueryClient({
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <QueryClientProvider client={queryClient}>
-      <ToastProvider>
-        <RouterProvider router={router} />
-        <UpdateBanner />
-        <IntroSplash />
-        <PaywallDialog />
-      </ToastProvider>
-    </QueryClientProvider>
+    <AppErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <ToastProvider>
+          <RouterProvider router={router} />
+          <UpdateBanner />
+          <IntroSplash />
+          <PaywallDialog />
+        </ToastProvider>
+      </QueryClientProvider>
+    </AppErrorBoundary>
   </StrictMode>,
 )

@@ -99,6 +99,13 @@
       "when": 1791240041204,
       "tag": "0013_imagens_inicio",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1791247276619,
+      "tag": "0014_erros_do_app",
+      "breakpoints": true
     }
   ]
 }

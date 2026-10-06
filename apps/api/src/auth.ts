@@ -6,6 +6,7 @@ import { eq } from 'drizzle-orm'
 import { db, schema } from './db'
 import { env } from './env'
 import { sendPasswordChangedEmail, sendPasswordResetEmail } from './mail'
+import { beforeDeleteAccount } from './account-delete'
 import { createWelcomeSong } from './welcome-song'
 
 // Login social só é ativado quando as credenciais existem no ambiente.
@@ -62,6 +63,7 @@ export const auth = betterAuth({
       '/sign-up/email': { window: 60 * 60, max: 10 },
       '/request-password-reset': { window: 15 * 60, max: 3 },
       '/reset-password': { window: 15 * 60, max: 5 },
+      '/delete-user': { window: 15 * 60, max: 5 },
     },
   },
   socialProviders,
@@ -70,6 +72,11 @@ export const auth = betterAuth({
     additionalFields: {
       role: { type: 'string', input: false, defaultValue: 'user' },
       banned: { type: 'boolean', input: false, defaultValue: false },
+    },
+    // Excluir a conta (LGPD): pede a senha (ou login recente, para quem entrou com Google).
+    deleteUser: {
+      enabled: true,
+      beforeDelete: async (u) => beforeDeleteAccount(u.id),
     },
   },
   databaseHooks: {

@@ -1,5 +1,5 @@
 import { formatBRL } from '@ensaio/shared'
-import { AlertCircle, Eye, FileMusic, Music, Shield, TrendingUp, Users } from 'lucide-react'
+import { AlertCircle, Bug, Eye, FileMusic, Music, Shield, TrendingUp, Users } from 'lucide-react'
 import { Link } from 'react-router'
 import { ErrorState, PageSpinner } from '../../components/ui'
 import { useAdminOverview } from '../../lib/admin'
@@ -18,7 +18,7 @@ export function AdminOverview() {
   if (isLoading) return <PageSpinner />
   if (error || !data) return <ErrorState error={error} onRetry={() => refetch()} />
 
-  const { users, songs, setlists, scores, reports, visits, activeUsers, online } = data
+  const { users, songs, setlists, scores, reports, errors, visits, activeUsers, online } = data
   const onlineList = online?.users ?? []
   const onlineCount = online?.count ?? 0
 
@@ -43,10 +43,7 @@ export function AdminOverview() {
             </div>
           </div>
 
-          <Link
-            to="/admin/usuarios"
-            className="flex items-center gap-1 text-xs font-semibold text-emerald-400 hover:underline"
-          >
+          <Link to="/admin/usuarios" className="flex items-center gap-1 text-xs font-semibold text-emerald-400 hover:underline">
             Ver todos os usuários &rarr;
           </Link>
         </div>
@@ -59,19 +56,13 @@ export function AdminOverview() {
                 className="flex items-center gap-3 rounded-xl border border-emerald-500/20 bg-surface/80 p-2.5 backdrop-blur shadow-xs"
               >
                 <div className="relative grid size-9 shrink-0 place-items-center rounded-full bg-surface-2 font-bold text-xs uppercase text-emerald-300 border border-emerald-500/30">
-                  {u.image ? (
-                    <img src={u.image} alt={u.name} className="size-full rounded-full object-cover" />
-                  ) : (
-                    u.name.slice(0, 2)
-                  )}
+                  {u.image ? <img src={u.image} alt={u.name} className="size-full rounded-full object-cover" /> : u.name.slice(0, 2)}
                   <span className="absolute bottom-0 right-0 size-2.5 rounded-full bg-emerald-500 ring-2 ring-surface" />
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-xs font-bold text-text">{u.name}</p>
                   <p className="truncate text-[10px] text-muted">{u.email}</p>
-                  <p className="truncate font-mono text-[10px] text-emerald-400/90 mt-0.5">
-                    Navegando: {u.path}
-                  </p>
+                  <p className="truncate font-mono text-[10px] text-emerald-400/90 mt-0.5">Navegando: {u.path}</p>
                 </div>
               </div>
             ))}
@@ -80,6 +71,25 @@ export function AdminOverview() {
           <p className="mt-3 text-xs text-muted italic">Nenhum outro usuário ativo no momento.</p>
         )}
       </div>
+
+      {/* Erros do app nas últimas 24 h */}
+      {errors?.last24h > 0 && (
+        <Link
+          to="/admin/erros"
+          className="flex items-center justify-between gap-3 rounded-xl border border-danger/30 bg-danger/10 p-4 text-danger transition hover:bg-danger/15"
+        >
+          <span className="flex items-center gap-3">
+            <Bug className="size-5 shrink-0" />
+            <span>
+              <span className="block text-sm font-semibold">
+                {errors.last24h} {errors.last24h === 1 ? 'erro diferente' : 'erros diferentes'} nas últimas 24 h
+              </span>
+              <span className="block text-xs opacity-80">Veja onde aconteceu e quantas vezes.</span>
+            </span>
+          </span>
+          <span className="text-xs font-semibold">Ver erros →</span>
+        </Link>
+      )}
 
       {/* Alerta de moderação se houver denúncias abertas */}
       {reports.open > 0 && (
@@ -212,7 +222,8 @@ export function AdminOverview() {
             </Link>
           </div>
           <p className="text-xs text-muted">
-            Acompanhe o volume de acessos diários, as páginas mais visualizadas (músicas, repertórios, etc.) e o perfil de dispositivos dos músicos.
+            Acompanhe o volume de acessos diários, as páginas mais visualizadas (músicas, repertórios, etc.) e o perfil de dispositivos dos
+            músicos.
           </p>
           <div className="rounded-xl bg-surface-2 p-3 text-xs space-y-1.5">
             <div className="flex justify-between">
@@ -241,7 +252,8 @@ export function AdminOverview() {
             </Link>
           </div>
           <p className="text-xs text-muted">
-            Visualize a lista de todos os usuários registrados, busque por nome ou e-mail, promova administradores e controle o status da conta.
+            Visualize a lista de todos os usuários registrados, busque por nome ou e-mail, promova administradores e controle o status da
+            conta.
           </p>
           <div className="rounded-xl bg-surface-2 p-3 text-xs space-y-1.5">
             <div className="flex justify-between">

@@ -1,4 +1,5 @@
-import { Navigate, Outlet, createBrowserRouter, useLocation } from 'react-router'
+import { Navigate, Outlet, createBrowserRouter, type RouteObject, useLocation } from 'react-router'
+import { RouteError } from './components/AppError'
 import { Layout } from './components/Layout'
 import { PageSpinner } from './components/ui'
 import { useSession } from './lib/auth'
@@ -27,6 +28,7 @@ import { Welcome } from './pages/Welcome'
 
 import { AdminLayout } from './pages/admin/AdminLayout'
 import { AdminOverview } from './pages/admin/AdminOverview'
+import { AdminErrors } from './pages/admin/AdminErrors'
 import { AdminReports } from './pages/admin/AdminReports'
 import { AdminTraffic } from './pages/admin/AdminTraffic'
 import { AdminUsers } from './pages/admin/AdminUsers'
@@ -62,67 +64,77 @@ function PublicOnly() {
   return <Outlet />
 }
 
+// Erro em qualquer tela: tela amigável (e aviso ao servidor) no lugar da tela branca.
+// Dentro do app (inApp) o menu continua visível; só o conteúdo vira a tela de erro.
+const inApp = (children: RouteObject[]): RouteObject[] => [{ errorElement: <RouteError inline />, children }]
+
 export const router = createBrowserRouter([
   {
-    element: <PublicOnly />,
+    errorElement: <RouteError />,
     children: [
-      { path: '/', element: <Welcome /> },
-      { path: '/entrar', element: <AuthPage mode="login" /> },
-      { path: '/criar-conta', element: <AuthPage mode="signup" /> },
-      { path: '/esqueci-senha', element: <ForgotPassword /> },
-    ],
-  },
-  // Aberta mesmo logado: o link do e-mail pode ser aberto em qualquer aparelho.
-  { path: '/redefinir-senha', element: <ResetPassword /> },
-  // Termos e privacidade: abertos para todos (antes de criar conta e dentro do app).
-  { path: '/termos', element: <Terms /> },
-  { path: '/privacidade', element: <Privacy /> },
-  {
-    element: <RequireAuth />,
-    children: [
-      // A tela da música ocupa a tela toda (sem menu), para leitura no palco.
-      { path: '/musicas/:id', element: <SongView /> },
-      { path: '/repertorios/:id/tocar/:pos', element: <SetlistPlay /> },
-      { path: '/musicas/:id/imprimir', element: <PrintSong /> },
-      { path: '/repertorios/:id/imprimir', element: <PrintSetlist /> },
-      { path: '/repertorios/:id/folha', element: <PrintStageSheet /> },
       {
-        element: <Layout />,
+        element: <PublicOnly />,
         children: [
-          { path: '/inicio', element: <Dashboard /> },
-          { path: '/musicas', element: <Library /> },
-          { path: '/musicas/nova', element: <SongEditor /> },
-          { path: '/musicas/importar', element: <Importer /> },
-          { path: '/musicas/detectar', element: <ChordDetect /> },
-          { path: '/musicas/encontrar', element: <FindSong /> },
-          { path: '/acordes', element: <ChordsPage /> },
-          { path: '/musicas/:id/editar', element: <SongEditor /> },
-          { path: '/repertorios', element: <Setlists /> },
-          { path: '/repertorios/novo', element: <SetlistForm /> },
-          { path: '/repertorios/:id', element: <SetlistDetail /> },
-          { path: '/repertorios/:id/editar', element: <SetlistForm /> },
-          { path: '/convite/:code', element: <InviteAccept /> },
-          { path: '/compartilhado/:code', element: <SharedSongAccept /> },
-          { path: '/perfil', element: <Profile /> },
-          { path: '/assinatura', element: <Subscription /> },
+          { path: '/', element: <Welcome /> },
+          { path: '/entrar', element: <AuthPage mode="login" /> },
+          { path: '/criar-conta', element: <AuthPage mode="signup" /> },
+          { path: '/esqueci-senha', element: <ForgotPassword /> },
+        ],
+      },
+      // Aberta mesmo logado: o link do e-mail pode ser aberto em qualquer aparelho.
+      { path: '/redefinir-senha', element: <ResetPassword /> },
+      // Termos e privacidade: abertos para todos (antes de criar conta e dentro do app).
+      { path: '/termos', element: <Terms /> },
+      { path: '/privacidade', element: <Privacy /> },
+      {
+        element: <RequireAuth />,
+        children: [
+          // A tela da música ocupa a tela toda (sem menu), para leitura no palco.
+          { path: '/musicas/:id', element: <SongView /> },
+          { path: '/repertorios/:id/tocar/:pos', element: <SetlistPlay /> },
+          { path: '/musicas/:id/imprimir', element: <PrintSong /> },
+          { path: '/repertorios/:id/imprimir', element: <PrintSetlist /> },
+          { path: '/repertorios/:id/folha', element: <PrintStageSheet /> },
           {
-            element: <RequireAdmin />,
-            children: [
+            element: <Layout />,
+            children: inApp([
+              { path: '/inicio', element: <Dashboard /> },
+              { path: '/musicas', element: <Library /> },
+              { path: '/musicas/nova', element: <SongEditor /> },
+              { path: '/musicas/importar', element: <Importer /> },
+              { path: '/musicas/detectar', element: <ChordDetect /> },
+              { path: '/musicas/encontrar', element: <FindSong /> },
+              { path: '/acordes', element: <ChordsPage /> },
+              { path: '/musicas/:id/editar', element: <SongEditor /> },
+              { path: '/repertorios', element: <Setlists /> },
+              { path: '/repertorios/novo', element: <SetlistForm /> },
+              { path: '/repertorios/:id', element: <SetlistDetail /> },
+              { path: '/repertorios/:id/editar', element: <SetlistForm /> },
+              { path: '/convite/:code', element: <InviteAccept /> },
+              { path: '/compartilhado/:code', element: <SharedSongAccept /> },
+              { path: '/perfil', element: <Profile /> },
+              { path: '/assinatura', element: <Subscription /> },
               {
-                path: '/admin',
-                element: <AdminLayout />,
+                element: <RequireAdmin />,
                 children: [
-                  { index: true, element: <AdminOverview /> },
-                  { path: 'visitas', element: <AdminTraffic /> },
-                  { path: 'usuarios', element: <AdminUsers /> },
-                  { path: 'denuncias', element: <AdminReports /> },
+                  {
+                    path: '/admin',
+                    element: <AdminLayout />,
+                    children: [
+                      { index: true, element: <AdminOverview /> },
+                      { path: 'visitas', element: <AdminTraffic /> },
+                      { path: 'usuarios', element: <AdminUsers /> },
+                      { path: 'denuncias', element: <AdminReports /> },
+                      { path: 'erros', element: <AdminErrors /> },
+                    ],
+                  },
                 ],
               },
-            ],
+            ]),
           },
         ],
       },
+      { path: '*', element: <Navigate to="/" replace /> },
     ],
   },
-  { path: '*', element: <Navigate to="/" replace /> },
 ])

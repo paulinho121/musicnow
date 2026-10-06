@@ -20,13 +20,18 @@ function LegalPage({ title, children }: { title: string; children: ReactNode }) 
         <Link to="/" aria-label="Início">
           <Logo />
         </Link>
-        <button className="btn-ghost h-9 px-3 text-sm" onClick={() => (window.history.length > 1 ? window.history.back() : window.location.assign('/'))}>
+        <button
+          className="btn-ghost h-9 px-3 text-sm"
+          onClick={() => (window.history.length > 1 ? window.history.back() : window.location.assign('/'))}
+        >
           <ArrowLeft className="size-4" /> Voltar
         </button>
       </div>
       <h1 className="text-2xl font-bold">{title}</h1>
       <p className="mt-1 text-sm text-muted">Atualizado em {UPDATED}</p>
-      <div className="legal mt-6 space-y-4 text-[15px] leading-relaxed [&_h2]:mt-8 [&_h2]:text-lg [&_h2]:font-bold [&_li]:ml-5 [&_li]:list-disc">{children}</div>
+      <div className="legal mt-6 space-y-4 text-[15px] leading-relaxed [&_h2]:mt-8 [&_h2]:text-lg [&_h2]:font-bold [&_li]:ml-5 [&_li]:list-disc">
+        {children}
+      </div>
     </div>
   )
 }
@@ -35,8 +40,8 @@ export function Terms() {
   return (
     <LegalPage title="Termos de uso">
       <p>
-        O Ensaio Fácil é um app para músicos organizarem cifras, partituras e repertórios e tocarem juntos. Ele é oferecido por {COMPANY.name},
-        CNPJ {COMPANY.document}. Ao criar uma conta, você concorda com estes termos.
+        O Ensaio Fácil é um app para músicos organizarem cifras, partituras e repertórios e tocarem juntos. Ele é oferecido por{' '}
+        {COMPANY.name}, CNPJ {COMPANY.document}. Ao criar uma conta, você concorda com estes termos.
       </p>
 
       <h2>1. Conta</h2>
@@ -72,32 +77,36 @@ export function Terms() {
       <h2>4. O que você coloca no app</h2>
       <ul>
         <li>
-          Cifras, letras, partituras e arquivos que você cadastra continuam sendo seus (ou de quem detém os direitos). Você só deve cadastrar
-          conteúdo que tem direito de usar.
+          Cifras, letras, partituras e arquivos que você cadastra continuam sendo seus (ou de quem detém os direitos). Você só deve
+          cadastrar conteúdo que tem direito de usar.
         </li>
         <li>
           Músicas novas são privadas: só você e os músicos dos seus repertórios veem. Publicar para todos exige informar a licença (obra
           própria, domínio público ou licenciada).
         </li>
-        <li>Podemos remover conteúdo que viole direitos de terceiros, após denúncia ou aviso. Há um botão de denúncia em cada música pública.</li>
+        <li>
+          Podemos remover conteúdo que viole direitos de terceiros, após denúncia ou aviso. Há um botão de denúncia em cada música pública.
+        </li>
       </ul>
 
       <h2>5. Uso aceitável</h2>
-      <p>Não é permitido usar o app para enviar conteúdo ilegal, tentar acessar contas de outras pessoas ou sobrecarregar o serviço. Contas que fizerem isso podem ser bloqueadas.</p>
+      <p>
+        Não é permitido usar o app para enviar conteúdo ilegal, tentar acessar contas de outras pessoas ou sobrecarregar o serviço. Contas
+        que fizerem isso podem ser bloqueadas.
+      </p>
 
       <h2>6. Disponibilidade</h2>
       <p>
-        Trabalhamos para o app estar sempre no ar, mas falhas podem acontecer. Recomendamos abrir as músicas do repertório antes do show (elas ficam guardadas no aparelho). Não nos
-        responsabilizamos por perdas causadas por indisponibilidade, na medida permitida pela lei.
+        Trabalhamos para o app estar sempre no ar, mas falhas podem acontecer. Recomendamos abrir as músicas do repertório antes do show
+        (elas ficam guardadas no aparelho). Não nos responsabilizamos por perdas causadas por indisponibilidade, na medida permitida pela
+        lei.
       </p>
 
       <h2>7. Mudanças nestes termos</h2>
       <p>Se mudarmos estes termos, avisaremos no app. Continuar usando depois do aviso significa concordar com a nova versão.</p>
 
       <h2>8. Contato e foro</h2>
-      <p>
-        Dúvidas: {COMPANY.email}. Fica eleito o foro do domicílio do consumidor, conforme o Código de Defesa do Consumidor.
-      </p>
+      <p>Dúvidas: {COMPANY.email}. Fica eleito o foro do domicílio do consumidor, conforme o Código de Defesa do Consumidor.</p>
     </LegalPage>
   )
 }
@@ -130,6 +139,10 @@ export function Privacy() {
           <b>Uso do app:</b> páginas visitadas, navegador e uma impressão irreversível do endereço IP (não guardamos o IP em si), para
           estatísticas e segurança. Esses registros são apagados depois de 90 dias. Também mostramos quem está online no momento.
         </li>
+        <li>
+          <b>Erros do app:</b> quando uma tela falha, registramos a mensagem técnica, a página e o navegador para corrigir o problema (sem o
+          que você digitou). Apagados depois de 30 dias sem se repetir.
+        </li>
       </ul>
 
       <h2>Para que usamos</h2>
@@ -143,15 +156,18 @@ export function Privacy() {
       <h2>Com quem compartilhamos</h2>
       <ul>
         <li>Músicos dos repertórios em que você está (veem o que for compartilhado no repertório).</li>
-        <li>Asaas, para a cobrança. Oracle Cloud, onde o app e os dados ficam hospedados. O provedor de e-mail, para os e-mails da conta.</li>
+        <li>
+          Asaas, para a cobrança. Oracle Cloud, onde o app e os dados ficam hospedados. O provedor de e-mail, para os e-mails da conta.
+        </li>
         <li>Capas de álbum são buscadas no Cover Art Archive/MusicBrainz pelo título e artista (sem dados pessoais).</li>
         <li>Não vendemos os seus dados.</li>
       </ul>
 
       <h2>Por quanto tempo</h2>
       <p>
-        Enquanto a sua conta existir. Ao excluir a conta, apagamos os seus dados, exceto o que a lei manda guardar (como registros fiscais
-        dos pagamentos). Cópias de segurança são substituídas em até 7 dias.
+        Enquanto a sua conta existir. Você mesmo exclui a conta em <b>Perfil &gt; Excluir minha conta</b>: apagamos na hora os seus dados,
+        exceto o que a lei manda guardar (como registros fiscais dos pagamentos). Músicas suas que estão no repertório de outras pessoas
+        continuam lá como cópia delas, sem o seu nome. Cópias de segurança são substituídas em até 7 dias.
       </p>
 
       <h2>Seus direitos</h2>

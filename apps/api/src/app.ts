@@ -15,6 +15,8 @@ import { scoresRoutes } from './routes/scores'
 import { invitesRoutes, setlistsRoutes } from './routes/setlists'
 import { sharedSongRoutes, songsRoutes } from './routes/songs'
 import { analyticsRoutes } from './routes/analytics'
+import { errorsRoutes } from './routes/errors'
+import { recordError } from './errors'
 import { adminRoutes } from './routes/admin'
 
 const api = new Hono<AppEnv>()
@@ -35,6 +37,7 @@ const api = new Hono<AppEnv>()
   .route('/scores', scoresRoutes)
   .route('/billing', billingRoutes)
   .route('/analytics', analyticsRoutes)
+  .route('/errors', errorsRoutes)
   .route('/admin', adminRoutes)
 
 const KB = 1024
@@ -64,6 +67,16 @@ app.onError((err, c) => {
     return c.json({ error: err.message }, err.status)
   }
   console.error(err)
+  // Erro inesperado: vai para o painel do administrador (rota sem ids, para agrupar).
+  recordError({
+    source: 'api',
+    message: `${c.req.method} ${c.req.routePath}: ${err.message}`,
+    stack: err.stack,
+    url: c.req.path,
+    userAgent: c.req.header('user-agent'),
+    release: process.env.RELEASE ?? null,
+    userId: (c.var as { user?: { id: string } }).user?.id ?? null,
+  }).catch(() => {})
   return c.json({ error: 'Erro interno. Tente novamente em instantes.' }, 500)
 })
 

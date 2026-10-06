@@ -12,7 +12,7 @@ import { env } from '../env'
 
 /** Limite simples por chave (IP), em memória: rota sem login não pode encher o banco. */
 const hits = new Map<string, { n: number; reset: number }>()
-function allow(key: string, max: number, windowMs = 60_000) {
+export function allow(key: string, max: number, windowMs = 60_000) {
   const now = Date.now()
   const h = hits.get(key)
   if (!h || now > h.reset) {

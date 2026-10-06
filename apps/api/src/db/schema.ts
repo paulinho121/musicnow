@@ -1,17 +1,5 @@
 import { relations, sql } from 'drizzle-orm'
-import {
-  boolean,
-  index,
-  integer,
-  jsonb,
-  pgEnum,
-  pgTable,
-  primaryKey,
-  text,
-  timestamp,
-  uniqueIndex,
-  uuid,
-} from 'drizzle-orm/pg-core'
+import { boolean, index, integer, jsonb, pgEnum, pgTable, primaryKey, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core'
 
 const timestamps = {
   createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
@@ -84,9 +72,7 @@ export const verification = pgTable('verification', {
 // Perfil musical
 
 export const musicianRole = pgEnum('musician_role', ['musico', 'artista', 'lider', 'regente'])
-export const instrument = pgEnum('instrument', [
-  'voz', 'violao', 'guitarra', 'teclado', 'baixo', 'bateria', 'percussao', 'sopro', 'cordas',
-])
+export const instrument = pgEnum('instrument', ['voz', 'violao', 'guitarra', 'teclado', 'baixo', 'bateria', 'percussao', 'sopro', 'cordas'])
 
 export const profile = pgTable('profile', {
   userId: text()
@@ -141,7 +127,10 @@ export const song = pgTable(
     timeSignature: text(),
     style: text(),
     notes: text(),
-    tags: text().array().notNull().default(sql`'{}'::text[]`),
+    tags: text()
+      .array()
+      .notNull()
+      .default(sql`'{}'::text[]`),
     /** Cifra em texto: acordes sobre a letra, seções entre colchetes. */
     content: text().notNull().default(''),
     /** Gravação de referência (link do YouTube), tocada no player oficial do YouTube. */
@@ -171,11 +160,7 @@ export const song = pgTable(
     searchText: text().notNull().default(''),
     ...timestamps,
   },
-  (t) => [
-    index().on(t.ownerId),
-    index().on(t.visibility),
-    index('song_search_trgm').using('gin', sql`${t.searchText} gin_trgm_ops`),
-  ],
+  (t) => [index().on(t.ownerId), index().on(t.visibility), index('song_search_trgm').using('gin', sql`${t.searchText} gin_trgm_ops`)],
 )
 
 /** Denúncias de músicas públicas (direitos autorais, conteúdo errado...). */
@@ -308,8 +293,21 @@ export const songFile = pgTable(
 )
 
 export const markType = pgEnum('mark_type', [
-  'intro', 'verso', 'pre_refrao', 'refrao', 'ponte', 'solo', 'interludio', 'final',
-  'repeticao', 'entrada', 'saida', 'dinamica', 'parada', 'vocal', 'nota',
+  'intro',
+  'verso',
+  'pre_refrao',
+  'refrao',
+  'ponte',
+  'solo',
+  'interludio',
+  'final',
+  'repeticao',
+  'entrada',
+  'saida',
+  'dinamica',
+  'parada',
+  'vocal',
+  'nota',
 ])
 
 /**
@@ -531,6 +529,33 @@ export const pageVisit = pgTable(
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index().on(t.createdAt), index().on(t.path), index().on(t.userId)],
+)
+
+/**
+ * Erros do app (telas e API), agrupados: o mesmo erro só soma no contador.
+ * Aparecem no painel do administrador; não guardam IP nem dados digitados.
+ */
+export const appError = pgTable(
+  'app_error',
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    /** 'web' (tela do app) ou 'api' (servidor). */
+    source: text().notNull(),
+    /** Identifica o mesmo erro (origem + mensagem + primeira linha da pilha). */
+    fingerprint: text().notNull().unique(),
+    message: text().notNull(),
+    stack: text(),
+    /** Tela/rota onde aconteceu da última vez. */
+    url: text(),
+    userAgent: text(),
+    /** Versão do app que estava rodando. */
+    release: text(),
+    count: integer().notNull().default(1),
+    lastUserId: text().references(() => user.id, { onDelete: 'set null' }),
+    firstSeenAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+    lastSeenAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index().on(t.lastSeenAt)],
 )
 
 // ---------------------------------------------------------------------------

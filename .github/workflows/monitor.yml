@@ -1,0 +1,51 @@
+# Monitor de disponibilidade (grátis, sem conta em outro serviço):
+# a cada 15 minutos confere se o site e a API respondem e se o certificado HTTPS está em dia.
+# Se falhar, o GitHub manda e-mail (Settings > Notifications > Actions: "falhas").
+name: Monitor
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: monitor
+  cancel-in-progress: false
+
+env:
+  SITE: https://ensaio.152-67-63-31.sslip.io
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: API responde (com o banco)
+        run: |
+          # 3 tentativas: um soluço de rede não vira alarme falso.
+          for i in 1 2 3; do
+            if curl -fsS --max-time 15 "$SITE/api/health" | grep -q '"ok":true'; then echo "API ok"; exit 0; fi
+            sleep 20
+          done
+          echo "::error::A API não respondeu em $SITE/api/health"
+          exit 1
+
+      - name: Site abre
+        run: |
+          for i in 1 2 3; do
+            if curl -fsS --max-time 15 -o /dev/null "$SITE/"; then echo "Site ok"; exit 0; fi
+            sleep 20
+          done
+          echo "::error::O site não abriu em $SITE"
+          exit 1
+
+      - name: Certificado HTTPS válido por mais 14 dias
+        run: |
+          host="${SITE#https://}"
+          end=$(echo | openssl s_client -connect "$host:443" -servername "$host" 2>/dev/null | openssl x509 -noout -enddate | cut -d= -f2)
+          days=$(( ( $(date -d "$end" +%s) - $(date +%s) ) / 86400 ))
+          echo "Certificado vence em $days dias ($end)"
+          if [ "$days" -lt 14 ]; then echo "::error::O certificado HTTPS vence em $days dias"; exit 1; fi

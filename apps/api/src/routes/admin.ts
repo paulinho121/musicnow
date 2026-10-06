@@ -35,15 +35,7 @@ export const adminRoutes = new Hono<AppEnv>()
   .get('/overview', async (c) => {
     const onlineUsers = getGlobalOnlineUsers()
 
-    const [
-      userStats,
-      songStats,
-      setlistStats,
-      scoreStats,
-      reportStats,
-      visitsStats,
-      activeToday,
-    ] = await Promise.all([
+    const [userStats, songStats, setlistStats, scoreStats, reportStats, visitsStats, activeToday] = await Promise.all([
       db
         .select({
           total: sql<number>`count(*)::int`,
@@ -111,6 +103,12 @@ export const adminRoutes = new Hono<AppEnv>()
         expired: sql<number>`count(*) filter (where ${schema.billingAccount.trialEndsAt} <= now() and (${schema.billingAccount.currentPeriodEnd} is null or ${schema.billingAccount.currentPeriodEnd} < now() - interval '3 days'))::int`,
       })
       .from(schema.billingAccount)
+    const [errors] = await db
+      .select({
+        open: sql<number>`count(*)::int`,
+        last24h: sql<number>`count(*) filter (where ${schema.appError.lastSeenAt} > now() - interval '24 hours')::int`,
+      })
+      .from(schema.appError)
     const mrr = Math.round((billing.monthly * PLANS.monthly.price + (billing.yearly * PLANS.yearly.price) / 12) * 100) / 100
 
     return c.json({
@@ -120,6 +118,7 @@ export const adminRoutes = new Hono<AppEnv>()
       setlists: setlistStats[0],
       scores: scoreStats[0],
       reports: reportStats[0],
+      errors,
       visits: visitsStats[0],
       activeUsers: activeToday[0],
       online: {
@@ -215,13 +214,7 @@ export const adminRoutes = new Hono<AppEnv>()
 
       const where = []
       if (q) {
-        where.push(
-          or(
-            ilike(user.name, `%${q}%`),
-            ilike(user.email, `%${q}%`),
-            ilike(profile.city, `%${q}%`),
-          ),
-        )
+        where.push(or(ilike(user.name, `%${q}%`), ilike(user.email, `%${q}%`), ilike(profile.city, `%${q}%`)))
       }
       if (role) {
         where.push(eq(user.role, role))
@@ -289,8 +282,13 @@ export const adminRoutes = new Hono<AppEnv>()
       const { id } = c.req.valid('param')
       const { role } = c.req.valid('json')
       // Não deixa o admin se rebaixar sem querer (ficaria trancado fora do painel).
-      if (id === c.var.user.id && role !== 'admin') throw new HTTPException(400, { message: 'Você não pode tirar o seu próprio acesso de admin.' })
-      const [u] = await db.update(user).set({ role }).where(eq(user.id, id)).returning({ id: user.id, role: user.role, banned: user.banned })
+      if (id === c.var.user.id && role !== 'admin')
+        throw new HTTPException(400, { message: 'Você não pode tirar o seu próprio acesso de admin.' })
+      const [u] = await db
+        .update(user)
+        .set({ role })
+        .where(eq(user.id, id))
+        .returning({ id: user.id, role: user.role, banned: user.banned })
       if (!u) notFound('Usuário')
       return c.json({ ok: true, user: u })
     },
@@ -305,7 +303,11 @@ export const adminRoutes = new Hono<AppEnv>()
       const { id } = c.req.valid('param')
       const { banned } = c.req.valid('json')
       if (id === c.var.user.id && banned) throw new HTTPException(400, { message: 'Você não pode bloquear a sua própria conta.' })
-      const [u] = await db.update(user).set({ banned }).where(eq(user.id, id)).returning({ id: user.id, role: user.role, banned: user.banned })
+      const [u] = await db
+        .update(user)
+        .set({ banned })
+        .where(eq(user.id, id))
+        .returning({ id: user.id, role: user.role, banned: user.banned })
       if (!u) notFound('Usuário')
       // Bloqueou: encerra todas as sessões (a pessoa sai de todos os aparelhos).
       if (banned) await db.delete(schema.session).where(eq(schema.session.userId, id))
@@ -353,11 +355,7 @@ export const adminRoutes = new Hono<AppEnv>()
       const { id } = c.req.valid('param')
       const { status, hideSong } = c.req.valid('json')
 
-      const [r] = await db
-        .update(songReport)
-        .set({ status, resolvedAt: new Date() })
-        .where(eq(songReport.id, id))
-        .returning()
+      const [r] = await db.update(songReport).set({ status, resolvedAt: new Date() }).where(eq(songReport.id, id)).returning()
 
       if (!r) notFound('Denúncia')
 
@@ -368,3 +366,36 @@ export const adminRoutes = new Hono<AppEnv>()
       return c.json({ ok: true, report: r })
     },
   )
+
+  // 7. Erros do app (telas e API), os mais recentes primeiro
+  .get('/errors', async (c) => {
+    const rows = await db
+      .select({
+        id: schema.appError.id,
+        source: schema.appError.source,
+        message: schema.appError.message,
+        stack: schema.appError.stack,
+        url: schema.appError.url,
+        userAgent: schema.appError.userAgent,
+        release: schema.appError.release,
+        count: schema.appError.count,
+        firstSeenAt: schema.appError.firstSeenAt,
+        lastSeenAt: schema.appError.lastSeenAt,
+        lastUserName: user.name,
+      })
+      .from(schema.appError)
+      .leftJoin(user, eq(user.id, schema.appError.lastUserId))
+      .orderBy(desc(schema.appError.lastSeenAt))
+      .limit(100)
+    return c.json({ errors: rows })
+  })
+
+  // Resolvido: some da lista (se acontecer de novo, volta como novo).
+  .delete('/errors/:id', validate('param', z.object({ id: z.string().uuid() })), async (c) => {
+    await db.delete(schema.appError).where(eq(schema.appError.id, c.req.valid('param').id))
+    return c.json({ ok: true })
+  })
+  .delete('/errors', async (c) => {
+    await db.delete(schema.appError)
+    return c.json({ ok: true })
+  })

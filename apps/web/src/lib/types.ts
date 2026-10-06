@@ -21,8 +21,21 @@ export interface SongListItem {
 }
 
 export type MarkType =
-  | 'intro' | 'verso' | 'pre_refrao' | 'refrao' | 'ponte' | 'solo' | 'interludio' | 'final'
-  | 'repeticao' | 'entrada' | 'saida' | 'dinamica' | 'parada' | 'vocal' | 'nota'
+  | 'intro'
+  | 'verso'
+  | 'pre_refrao'
+  | 'refrao'
+  | 'ponte'
+  | 'solo'
+  | 'interludio'
+  | 'final'
+  | 'repeticao'
+  | 'entrada'
+  | 'saida'
+  | 'dinamica'
+  | 'parada'
+  | 'vocal'
+  | 'nota'
 
 export interface SongMark {
   id: string
@@ -346,6 +359,10 @@ export interface AdminOverview {
     open: number
     total: number
   }
+  errors: {
+    open: number
+    last24h: number
+  }
   visits: {
     today: number
     last7d: number
@@ -428,4 +445,18 @@ export interface AdminReport {
   reporterId: string
   reporterName: string
   reporterEmail: string
+}
+
+export interface AdminAppError {
+  id: string
+  source: 'web' | 'api'
+  message: string
+  stack: string | null
+  url: string | null
+  userAgent: string | null
+  release: string | null
+  count: number
+  firstSeenAt: string
+  lastSeenAt: string
+  lastUserName: string | null
 }
