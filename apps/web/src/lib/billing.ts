@@ -12,12 +12,33 @@ export function usePayments(enabled: boolean) {
   return useQuery({ queryKey: ['billing', 'payments'], queryFn: () => api<BillingPayment[]>('/billing/payments'), enabled })
 }
 
-/** Começa a assinatura e leva para a página de pagamento do Asaas (Pix, cartão ou boleto). */
+/** Começa a assinatura. A tela leva para a página de pagamento do app (Pix, boleto ou cartão). */
 export function useCheckout() {
   return useMutation({
     mutationFn: (body: { plan: PlanId; name: string; cpfCnpj: string }) =>
-      api<{ invoiceUrl: string }>('/billing/checkout', { method: 'POST', json: body }),
-    onSuccess: ({ invoiceUrl }) => window.location.assign(invoiceUrl),
+      api<{ invoiceUrl: string; paymentId: string }>('/billing/checkout', { method: 'POST', json: body }),
+  })
+}
+
+export interface CheckoutPayment {
+  id: string
+  status: string
+  paid: boolean
+  value: number
+  dueDate: string
+  description: string | null
+  plan: PlanId | null
+  pix: { image: string; payload: string; expiresAt: string | null } | null
+  boleto: { line: string; pdfUrl: string | null } | null
+  invoiceUrl: string
+}
+
+/** Cobrança para a página de pagamento; confere a cada 5 s até o pagamento cair. */
+export function useCheckoutPayment(id: string) {
+  return useQuery({
+    queryKey: ['billing', 'pay', id],
+    queryFn: () => api<CheckoutPayment>(`/billing/pay/${id}`),
+    refetchInterval: (q) => (q.state.data?.paid ? false : 5000),
   })
 }
 

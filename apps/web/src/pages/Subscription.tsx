@@ -2,7 +2,7 @@ import { formatBRL, isValidCpfCnpj, onlyDigits, PLANS, type PlanId } from '@ensa
 import clsx from 'clsx'
 import { ArrowLeft, Check, CreditCard, ExternalLink, Loader2, Lock, ShieldCheck } from 'lucide-react'
 import { type FormEvent, useState } from 'react'
-import { Link } from 'react-router'
+import { Link, useNavigate } from 'react-router'
 import { useToast } from '../components/ui'
 import { useCancelSubscription, useCheckout, usePayments } from '../lib/billing'
 import { useMe } from '../lib/queries'
@@ -42,6 +42,7 @@ export function Subscription() {
   const b = me?.billing
   const toast = useToast()
   const checkout = useCheckout()
+  const navigate = useNavigate()
   const cancel = useCancelSubscription()
   const payments = usePayments(Boolean(b?.configured))
   const [plan, setPlan] = useState<PlanId>(b?.plan ?? 'yearly')
@@ -54,7 +55,10 @@ export function Subscription() {
   const submit = (e: FormEvent) => {
     e.preventDefault()
     if (!isValidCpfCnpj(doc)) return toast('Confira o CPF ou CNPJ.', 'error')
-    checkout.mutate({ plan, name: name.trim(), cpfCnpj: doc }, { onError: (err) => toast(err.message, 'error') })
+    checkout.mutate(
+      { plan, name: name.trim(), cpfCnpj: doc },
+      { onSuccess: ({ paymentId }) => navigate(`/assinatura/pagar/${paymentId}`), onError: (err) => toast(err.message, 'error') },
+    )
   }
 
   const doCancel = () => {
@@ -166,9 +170,15 @@ export function Subscription() {
                     {p.paymentDate ? `pago em ${fmtDate(p.paymentDate)}` : `vence em ${fmtDate(p.dueDate)}`}
                   </span>
                 </span>
-                <a href={p.invoiceUrl} target="_blank" rel="noreferrer" className="btn-ghost h-9 shrink-0 px-3 text-xs">
-                  {p.status === 'PENDING' || p.status === 'OVERDUE' ? 'Pagar' : 'Recibo'} <ExternalLink className="size-3.5" />
-                </a>
+                {p.status === 'PENDING' || p.status === 'OVERDUE' ? (
+                  <Link to={`/assinatura/pagar/${p.id}`} className="btn-primary h-9 shrink-0 px-3 text-xs">
+                    Pagar
+                  </Link>
+                ) : (
+                  <a href={p.invoiceUrl} target="_blank" rel="noreferrer" className="btn-ghost h-9 shrink-0 px-3 text-xs">
+                    Recibo <ExternalLink className="size-3.5" />
+                  </a>
+                )}
               </li>
             ))}
           </ul>

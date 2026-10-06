@@ -171,7 +171,7 @@ export async function startCheckout(userId: string, input: { plan: PlanId; name:
   if (acc.asaasSubscriptionId && acc.status !== 'canceled') {
     if (acc.plan === input.plan) {
       const open = await pendingPayment(acc.asaasSubscriptionId)
-      if (open) return { invoiceUrl: open.invoiceUrl }
+      if (open) return { invoiceUrl: open.invoiceUrl, paymentId: open.id }
     }
     // Troca de plano: encerra a anterior (o período já pago continua valendo).
     await asaas(`/subscriptions/${acc.asaasSubscriptionId}`, { method: 'DELETE' }).catch(() => {})
@@ -215,7 +215,42 @@ export async function startCheckout(userId: string, input: { plan: PlanId; name:
 
   const first = await pendingPayment(sub.id)
   if (!first) throw new HTTPException(502, { message: 'A cobrança foi criada, mas o link de pagamento ainda não saiu. Tente de novo.' })
-  return { invoiceUrl: first.invoiceUrl }
+  return { invoiceUrl: first.invoiceUrl, paymentId: first.id }
+}
+
+/**
+ * Página de pagamento do próprio app: Pix (QR code e copia e cola) e boleto (linha digitável),
+ * sem mandar a pessoa para a fatura do Asaas. Cartão continua na página segura do Asaas
+ * (os dados do cartão nunca passam pelo nosso servidor). Só a dona da cobrança vê.
+ */
+export async function paymentForCheckout(userId: string, paymentId: string) {
+  const acc = await getAccount(userId)
+  if (!acc.asaasCustomerId) throw new HTTPException(404, { message: 'Cobrança não encontrada.' })
+  const p = await asaas<AsaasPayment & { description?: string; bankSlipUrl?: string | null }>(
+    `/payments/${encodeURIComponent(paymentId)}`,
+  ).catch(() => null)
+  if (!p || p.customer !== acc.asaasCustomerId) throw new HTTPException(404, { message: 'Cobrança não encontrada.' })
+  const paid = ['RECEIVED', 'CONFIRMED', 'RECEIVED_IN_CASH'].includes(p.status)
+  const open = p.status === 'PENDING' || p.status === 'OVERDUE'
+  const [pix, slip] = open
+    ? await Promise.all([
+        asaas<{ encodedImage: string; payload: string; expirationDate?: string }>(`/payments/${p.id}/pixQrCode`).catch(() => null),
+        asaas<{ identificationField: string }>(`/payments/${p.id}/identificationField`).catch(() => null),
+      ])
+    : [null, null]
+  return {
+    id: p.id,
+    status: p.status,
+    paid,
+    value: p.value,
+    dueDate: p.dueDate,
+    description: p.description ?? null,
+    plan: acc.plan,
+    pix: pix ? { image: `data:image/png;base64,${pix.encodedImage}`, payload: pix.payload, expiresAt: pix.expirationDate ?? null } : null,
+    boleto: slip ? { line: slip.identificationField, pdfUrl: p.bankSlipUrl ?? null } : null,
+    /** Página do Asaas (para pagar com cartão). */
+    invoiceUrl: p.invoiceUrl,
+  }
 }
 
 async function pendingPayment(subscriptionId: string) {

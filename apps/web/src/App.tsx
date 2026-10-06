@@ -42,6 +42,7 @@ const Setlists = page(() => import('./pages/Setlists'), 'Setlists')
 const SongEditor = page(() => import('./pages/SongEditor'), 'SongEditor')
 const SongView = page(() => import('./pages/SongView'), 'SongView')
 const Subscription = page(() => import('./pages/Subscription'), 'Subscription')
+const Checkout = page(() => import('./pages/Checkout'), 'Checkout')
 const AdminLayout = page(() => import('./pages/admin/AdminLayout'), 'AdminLayout')
 const AdminOverview = page(() => import('./pages/admin/AdminOverview'), 'AdminOverview')
 const AdminErrors = page(() => import('./pages/admin/AdminErrors'), 'AdminErrors')
@@ -159,6 +160,7 @@ export const router = createBrowserRouter([
               { path: '/compartilhado/:code', element: <SharedSongAccept /> },
               { path: '/perfil', element: <Profile /> },
               { path: '/assinatura', element: <Subscription /> },
+              { path: '/assinatura/pagar/:id', element: <Checkout /> },
               { path: '/parceiro', element: <PartnerDashboard /> },
               {
                 element: <RequireAdmin />,

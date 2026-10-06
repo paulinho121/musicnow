@@ -3,7 +3,15 @@ import { Hono } from 'hono'
 import { HTTPException } from 'hono/http-exception'
 import { timingSafeEqual } from 'node:crypto'
 import { z } from 'zod'
-import { billingSummary, cancelSubscription, handleWebhook, listPayments, startCheckout, type AsaasWebhook } from '../billing'
+import {
+  billingSummary,
+  cancelSubscription,
+  handleWebhook,
+  listPayments,
+  paymentForCheckout,
+  startCheckout,
+  type AsaasWebhook,
+} from '../billing'
 import { env } from '../env'
 import { requireUser, validate, type AppEnv } from '../http'
 
@@ -29,6 +37,10 @@ export const billingRoutes = new Hono<AppEnv>()
 
   .get('/payments', async (c) => c.json(await listPayments(c.var.user.id)))
 
+  // Página de pagamento do app (Pix e boleto sem sair do Ensaio Fácil).
+  .get('/pay/:id', validate('param', z.object({ id: z.string().regex(/^pay_[A-Za-z0-9]+$/) })), async (c) =>
+    c.json(await paymentForCheckout(c.var.user.id, c.req.valid('param').id)),
+  )
   .post(
     '/checkout',
     validate(
