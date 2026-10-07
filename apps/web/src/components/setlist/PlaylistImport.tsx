@@ -23,7 +23,29 @@ interface Playlist {
   truncated: boolean
 }
 
-const chunks = <T,>(list: T[], size: number) =>
+/**
+ * O Spotify não deixa apps lerem playlists de outras pessoas (regra de fev/2026). O caminho:
+ * copiar a playlist para o Deezer (grátis) e colar o link de lá.
+ */
+function SpotifyTip({ inline = false }: { inline?: boolean }) {
+  const steps = (
+    <>
+      Copie para o Deezer de graça no{' '}
+      <a href="https://www.tunemymusic.com/pt/transfer/spotify-to-deezer" target="_blank" rel="noopener noreferrer" className="text-accent underline">
+        TuneMyMusic
+      </a>{' '}
+      (ou no próprio Deezer: Biblioteca → Playlists → Importar) e cole aqui o link da playlist do Deezer.
+    </>
+  )
+  if (inline) return steps
+  return (
+    <div className="rounded-xl border border-accent/40 bg-accent/10 px-3 py-2 text-xs">
+      <b>Link do Spotify:</b> o Spotify não permite que apps leiam playlists de outras pessoas. {steps}
+    </div>
+  )
+}
+
+const chunks =<T,>(list: T[], size: number) =>
   Array.from({ length: Math.ceil(list.length / size) }, (_, i) => list.slice(i * size, i * size + size))
 
 /**
@@ -117,9 +139,8 @@ export function PlaylistImport({ open, onClose }: { open: boolean; onClose: () =
       {!playlist ? (
         <form onSubmit={load} className="space-y-4">
           <p className="text-sm text-muted">
-            Recebeu o repertório numa playlist? Cole o link do <b className="text-text">Spotify</b> ou do{' '}
-            <b className="text-text">Deezer</b>: o app monta o repertório na mesma ordem, com o link de cada versão. Cada músico ouve onde
-            preferir.
+            Recebeu o repertório numa playlist? Cole o link da playlist do <b className="text-text">Deezer</b>: o app monta o repertório na
+            mesma ordem, com o link de cada versão. Cada músico ouve onde preferir.
           </p>
           <input
             className="input"
@@ -127,11 +148,18 @@ export function PlaylistImport({ open, onClose }: { open: boolean; onClose: () =
             inputMode="url"
             value={url}
             onChange={(e) => setUrl(e.target.value)}
-            placeholder="https://open.spotify.com/playlist/…  ou  https://www.deezer.com/playlist/…"
+            placeholder="https://www.deezer.com/playlist/…"
             autoFocus
             required
           />
-          <p className="text-xs text-muted">No app: abra a playlist → Compartilhar → Copiar link. A playlist precisa ser pública.</p>
+          <p className="text-xs text-muted">No app do Deezer: abra a playlist → Compartilhar → Copiar link. A playlist precisa ser pública.</p>
+          {/spotify\.(com|link)|spotify\.app\.link/i.test(url) ? (
+            <SpotifyTip />
+          ) : (
+            <p className="text-xs text-muted">
+              A playlist está no Spotify? <SpotifyTip inline />
+            </p>
+          )}
           <button className="btn-primary w-full" disabled={loading || !url.trim()}>
             {loading ? <Loader2 className="size-4 animate-spin" /> : <ListMusic className="size-4" />} Ler a playlist
           </button>

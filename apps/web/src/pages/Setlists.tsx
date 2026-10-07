@@ -59,7 +59,7 @@ export function Setlists() {
             type="button"
             className="btn-ghost"
             onClick={() => setFromPlaylist(true)}
-            title="Monte o repertório a partir de uma playlist do Spotify ou do Deezer"
+            title="Monte o repertório a partir de uma playlist do Deezer"
           >
             <ListPlus className="size-4" /> <span className="sm:hidden">Playlist</span>
             <span className="hidden sm:inline">Da playlist</span>

@@ -122,7 +122,10 @@ let spotifyToken: { value: string; expires: number } | null = null
 
 async function spotifyAuth(): Promise<string> {
   if (!env.SPOTIFY_CLIENT_ID || !env.SPOTIFY_CLIENT_SECRET) {
-    return fail('A importação do Spotify ainda não foi ativada. Por enquanto, use uma playlist do Deezer.', 503)
+    // Desde fev/2026 o Spotify só libera, para apps comuns, as playlists da própria conta.
+    return fail(
+      'O Spotify não permite que apps leiam playlists de outras pessoas. Copie a playlist para o Deezer (grátis, em tunemymusic.com) e cole o link do Deezer.',
+    )
   }
   if (spotifyToken && spotifyToken.expires > Date.now()) return spotifyToken.value
   const { body } = await getJson<{ access_token?: string; expires_in?: number }>('https://accounts.spotify.com/api/token', {
