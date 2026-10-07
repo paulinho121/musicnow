@@ -29,6 +29,7 @@ import {
   ListMusic,
   ListPlus,
   Lock,
+  Mic,
   LogOut,
   Minus,
   MoveHorizontal,
@@ -67,7 +68,7 @@ import { CoverGlow, SongCover } from '../components/SongCover'
 import { UsageBadge } from '../components/UsageBadge'
 import { ErrorState, PageSpinner, useToast } from '../components/ui'
 import { useSession } from '../lib/auth'
-import { useDeleteMark, useSavePersonalKey, useSaveSong, useSong, useToggleFavorite } from '../lib/queries'
+import { useDeleteMark, useMe, useSavePersonalKey, useSaveSong, useSong, useToggleFavorite } from '../lib/queries'
 import { downloadText } from '../lib/download'
 import { useLeaveSharedSong } from '../lib/songShare'
 import { useLocalState } from '../lib/storage'
@@ -81,6 +82,8 @@ const VIEWER_DEFAULTS = {
   /** Velocidade da rolagem lembrada por música (cada música tem o seu andamento). */
   speeds: {} as Record<string, number>,
   showChords: true,
+  /** Modo cantor (só a letra). null = automático: liga para quem tem Voz como instrumento principal. */
+  singer: null as boolean | null,
   chordStrip: false,
   wrap: true,
   view: 'chord' as 'chord' | 'score',
@@ -154,6 +157,7 @@ export function SongViewer({ songId, setlist }: { songId: string; setlist?: Setl
   const savePersonal = useSavePersonalKey(songId)
   const deleteMark = useDeleteMark(songId)
   const saveSong = useSaveSong(songId)
+  const { data: me } = useMe()
 
   const [prefs, setPrefs] = useLocalState('ef-viewer', VIEWER_DEFAULTS)
   const pedal = prefs.pedal ?? 'scroll'
@@ -336,6 +340,13 @@ export function SongViewer({ songId, setlist }: { songId: string; setlist?: Setl
 
   const hideLyrics = song.lyricsHidden
   const uid = session?.user.id
+  // Modo cantor: só a letra, maior. Liga sozinho para quem canta (Voz como instrumento principal).
+  const isVoice = me?.instruments.find((i) => i.primary)?.instrument === 'voz'
+  const singer = !hideLyrics && Boolean(song.content.trim()) && (prefs.singer ?? isVoice)
+  const toggleSinger = () => {
+    setPrefs((p) => ({ ...p, singer: !singer }))
+    toast(singer ? 'Cifra completa de volta.' : 'Modo cantor: só a letra.')
+  }
   // Fora de repertório, oferece salvar o tom pessoal; dentro dele, o tom é o da banda.
   const personalDiffers = !setlist && currentKey !== (song.personalKey ?? original)
 
@@ -635,7 +646,7 @@ export function SongViewer({ songId, setlist }: { songId: string; setlist?: Setl
           </div>
         ) : (
           <>
-            {song.canEdit && song.content.trim() && !markMode && (
+            {song.canEdit && song.content.trim() && !markMode && !singer && (
               <Link
                 to={alignUrl}
                 className="mb-3 inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs font-medium text-muted hover:bg-surface-2 hover:text-text"
@@ -643,7 +654,7 @@ export function SongViewer({ songId, setlist }: { songId: string; setlist?: Setl
                 <MoveHorizontal className="size-3.5" /> Ajustar posição dos acordes
               </Link>
             )}
-            {songChords.length > 0 && prefs.showChords && (
+            {songChords.length > 0 && prefs.showChords && !singer && (
               <SongChords
                 chords={songChords}
                 open={prefs.chordStrip}
@@ -656,9 +667,10 @@ export function SongViewer({ songId, setlist }: { songId: string; setlist?: Setl
               <ChordSheet
                 lines={lines}
                 marks={song.marks}
-                fontSize={prefs.fontSize}
+                fontSize={singer ? Math.round(prefs.fontSize * 1.2) : prefs.fontSize}
                 lineHeight={prefs.lineHeight}
-                showChords={prefs.showChords}
+                showChords={prefs.showChords && !singer}
+                singer={singer}
                 wrap={prefs.wrap}
                 hideLyrics={hideLyrics}
                 currentUserId={uid}
@@ -852,6 +864,17 @@ export function SongViewer({ songId, setlist }: { songId: string; setlist?: Setl
               </button>
             )}
             <span className="mx-0.5 h-7 w-px bg-border" />
+            {!hideLyrics && (
+              <button
+                className={clsx('btn-icon', singer && 'border-accent bg-accent text-accent-ink hover:bg-accent')}
+                aria-label={singer ? 'Voltar para a cifra completa' : 'Modo cantor: só a letra'}
+                aria-pressed={singer}
+                title={singer ? 'Voltar para a cifra completa' : 'Modo cantor: só a letra'}
+                onClick={toggleSinger}
+              >
+                <Mic className="size-5" />
+              </button>
+            )}
             <button
               className={clsx('btn-icon', panelOpen && 'border-accent text-accent')}
               aria-label="Ajustes de leitura"

@@ -58,6 +58,8 @@ interface Props {
   showChords?: boolean
   /** Letra sem autorização de exibição: mostra só acordes e seções. */
   hideLyrics?: boolean
+  /** Modo cantor: só a letra, centralizada e em fonte comum. */
+  singer?: boolean
   currentUserId?: string
   /** Modo de marcar: as linhas viram botões para criar marcação; as marcações, para apagar. */
   markMode?: boolean
@@ -96,6 +98,7 @@ export const ChordSheet = memo(function ChordSheet({
   lineHeight,
   showChords = true,
   hideLyrics = false,
+  singer = false,
   currentUserId,
   markMode = false,
   onLineClick,
@@ -116,7 +119,11 @@ export const ChordSheet = memo(function ChordSheet({
   }, [marks, lines])
 
   return (
-    <div ref={ref} className={clsx('sheet relative pb-2', cols ? 'overflow-x-hidden' : 'overflow-x-auto')} style={{ fontSize, lineHeight }}>
+    <div
+      ref={ref}
+      className={clsx('sheet relative pb-2', singer ? 'sheet-singer' : cols ? 'overflow-x-hidden' : 'overflow-x-auto')}
+      style={{ fontSize, lineHeight }}
+    >
       {wrap && (
         <span ref={probe} aria-hidden className="pointer-events-none invisible absolute">
           {'0'.repeat(50)}
@@ -130,11 +137,18 @@ export const ChordSheet = memo(function ChordSheet({
         const pairedAbove =
           cols !== null && showChords && !hideLyrics && line.kind === 'lyrics' && lines[i - 1]?.kind === 'chords'
         const pair = pairedBelow ? (lines[i + 1] as { text: string }).text : null
-        const hidden = (hideLyrics && line.kind === 'blank' && lines[i + 1]?.kind !== 'section') || pairedAbove
+        const hidden =
+          (hideLyrics && line.kind === 'blank' && lines[i + 1]?.kind !== 'section') ||
+          pairedAbove ||
+          // Modo cantor: sem as linhas de acorde, sobram brancos repetidos; fica um só.
+          (singer && line.kind === 'blank' && (i === 0 || lines[i - 1]?.kind === 'blank'))
         return (
           <div key={i} id={`linha-${i}`} className="scroll-mt-28">
             {lineMarks && (
-              <div className="my-1.5 flex flex-wrap gap-1.5 font-sans whitespace-normal" style={{ fontSize: 13, lineHeight: 1.3 }}>
+              <div
+                className={clsx('my-1.5 flex flex-wrap gap-1.5 font-sans whitespace-normal', singer && 'justify-center')}
+                style={{ fontSize: singer ? 15 : 13, lineHeight: 1.3 }}
+              >
                 {lineMarks.map((m) => {
                   const chip = (
                     <>
@@ -172,10 +186,19 @@ export const ChordSheet = memo(function ChordSheet({
                   onClick={() => onLineClick(i)}
                   aria-label={`Marcar a linha ${i + 1}`}
                 >
-                  <Line line={line} showChords={showChords} hideLyrics={hideLyrics} cols={cols} pair={pair} />
+                  <Line line={line} showChords={showChords} hideLyrics={hideLyrics} singer={singer} cols={cols} pair={pair} />
                 </button>
               ) : (
-                <Line line={line} index={i} showChords={showChords} hideLyrics={hideLyrics} onChordClick={onChordClick} cols={cols} pair={pair} />
+                <Line
+                  line={line}
+                  index={i}
+                  showChords={showChords}
+                  hideLyrics={hideLyrics}
+                  singer={singer}
+                  onChordClick={onChordClick}
+                  cols={cols}
+                  pair={pair}
+                />
               ))}
           </div>
         )
@@ -189,6 +212,7 @@ function Line({
   index = 0,
   showChords,
   hideLyrics,
+  singer = false,
   onChordClick,
   cols = null,
   pair = null,
@@ -197,6 +221,7 @@ function Line({
   index?: number
   showChords: boolean
   hideLyrics: boolean
+  singer?: boolean
   onChordClick?: OnChordClick
   /** Colunas disponíveis (quebra ligada) ou null (linha inteira, com rolagem lateral). */
   cols?: number | null
@@ -207,7 +232,9 @@ function Line({
     case 'blank':
       return <div aria-hidden>{' '}</div>
     case 'lyrics':
-      return hideLyrics ? null : <div className={clsx(cols && 'whitespace-pre-wrap')}>{line.text}</div>
+      if (hideLyrics) return null
+      // No modo cantor a letra é centralizada: os espaços que alinhavam os acordes saem.
+      return <div className={clsx(cols && 'whitespace-pre-wrap')}>{singer ? line.text.trim() : line.text}</div>
     case 'chords':
       if (!showChords) return null
       if (cols) {
@@ -237,7 +264,7 @@ function Line({
       )
     case 'section':
       return (
-        <div className={clsx('mt-3 mb-1 flex items-baseline gap-x-3', cols && 'flex-wrap whitespace-pre-wrap')}>
+        <div className={clsx('mt-3 mb-1 flex items-baseline gap-x-3', cols && 'flex-wrap whitespace-pre-wrap', singer && 'justify-center')}>
           <span
             className={clsx(
               'rounded-md border-l-4 bg-surface-2 px-2 py-0.5 font-sans text-[0.8em] font-bold tracking-wide uppercase',

@@ -118,6 +118,14 @@ body {
   font-variant-ligatures: none;
 }
 
+/* Modo cantor: só a letra, em fonte comum, centralizada e quebrando a linha. */
+.sheet.sheet-singer {
+  font-family: var(--font-sans, ui-sans-serif, system-ui, sans-serif);
+  white-space: pre-wrap;
+  text-align: center;
+  font-weight: 500;
+}
+
 /* Impressão / PDF: sempre em cores claras, sem barras do app, cada música numa página. */
 @media print {
   :root,
