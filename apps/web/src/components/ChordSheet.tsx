@@ -1,6 +1,7 @@
 import { isChordLine, parseSheet, SECTION_LABELS, splitChordLine, wrapChordPair, type SectionType, type SheetLine } from '@ensaio/shared'
 import clsx from 'clsx'
 import { memo, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useAccidentals } from '../lib/accidentals'
 import type { MarkType, SongMark } from '../lib/types'
 
 const SECTION_COLOR: Record<SectionType, string> = {
@@ -36,8 +37,10 @@ export function sectionsOf(lines: SheetLine[]): SheetSection[] {
   return lines.flatMap((l, index) => (l.kind === 'section' ? [{ index, label: l.label, type: l.type }] : []))
 }
 
+/** Cifra pronta para mostrar: no tom escolhido e com sustenido/bemol do jeito do músico. */
 export function useSheet(content: string, semitones: number, targetKey: string | null) {
-  return useMemo(() => parseSheet(content, semitones, targetKey), [content, semitones, targetKey])
+  const accidentals = useAccidentals()
+  return useMemo(() => parseSheet(content, semitones, targetKey, accidentals), [content, semitones, targetKey, accidentals])
 }
 
 interface Props {

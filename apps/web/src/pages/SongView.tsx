@@ -8,6 +8,7 @@ import {
   semitonesBetween,
   songInKey,
   toChordPro,
+  spellKey,
   transposeKey,
 } from '@ensaio/shared'
 import clsx from 'clsx'
@@ -66,6 +67,7 @@ import { useDeleteMark, useSavePersonalKey, useSong, useToggleFavorite } from '.
 import { downloadText } from '../lib/download'
 import { useLeaveSharedSong } from '../lib/songShare'
 import { useLocalState } from '../lib/storage'
+import { useAccidentals } from '../lib/accidentals'
 import type { SongMark } from '../lib/types'
 
 const VIEWER_DEFAULTS = {
@@ -209,6 +211,7 @@ export function SongViewer({ songId, setlist }: { songId: string; setlist?: Setl
   const currentKey = original ? transposeKey(original, offset) : null
   const isMinor = original ? (parseChord(original)?.suffix ?? '').startsWith('m') : false
   const lines = useSheet(song?.content ?? '', offset, currentKey)
+  const accidentals = useAccidentals()
   // Partitura quando a pessoa escolheu ver partitura (ou a música só tem partitura, sem cifra).
   const hasScores = Boolean(song?.scores?.length)
   const viewMode: 'chord' | 'score' = hasScores && (prefs.view === 'score' || !song?.content.trim()) ? 'score' : 'chord'
@@ -510,7 +513,7 @@ export function SongViewer({ songId, setlist }: { songId: string; setlist?: Setl
                 )}
                 {original && (
                   <HeroChip>
-                    Original <b className="font-mono">{original}</b>
+                    Original <b className="font-mono">{spellKey(original, accidentals)}</b>
                   </HeroChip>
                 )}
                 {song.personalKey && !setlist && (
@@ -794,7 +797,7 @@ export function SongViewer({ songId, setlist }: { songId: string; setlist?: Setl
               onClick={() => setPickerOpen(true)}
               aria-label={`Tom atual ${currentKey ?? ''}. Escolher tom`}
             >
-              <span className="text-lg">{currentKey ?? (offset > 0 ? `+${offset}` : offset || '—')}</span>
+              <span className="text-lg">{currentKey ? spellKey(currentKey, accidentals) : (offset > 0 ? `+${offset}` : offset || '—')}</span>
               {offset !== 0 && (
                 <span className="mt-0.5 font-sans text-[10px] font-semibold text-muted">{offset > 0 ? `+${offset}` : offset} st</span>
               )}
@@ -843,7 +846,7 @@ export function SongViewer({ songId, setlist }: { songId: string; setlist?: Setl
           {original && personalDiffers && (
             <div className="mt-2 flex justify-center">
               <button className="chip chip-on h-8 bg-surface text-xs" onClick={savePersonalKey} disabled={savePersonal.isPending}>
-                {currentKey === original ? 'Usar o tom original como meu tom' : `Salvar ${currentKey} como meu tom`}
+                {currentKey === original ? 'Usar o tom original como meu tom' : `Salvar ${currentKey ? spellKey(currentKey, accidentals) : ''} como meu tom`}
               </button>
             </div>
           )}

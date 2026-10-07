@@ -70,10 +70,22 @@ function keySpelling(key: string | null | undefined): 'flat' | 'sharp' | null {
   return key[1] === '#' ? 'sharp' : null
 }
 
+/**
+ * Como escrever as notas com acidente: 'auto' segue o tom (Bb no tom de F, A# no tom de B);
+ * 'sharp' sempre com sustenido (A#); 'flat' sempre com bemol (Bb). Escolha de cada músico.
+ */
+export type Accidentals = 'auto' | 'sharp' | 'flat'
+
 /** Ajusta a linha ao tom: transpõe e/ou acerta a grafia (A# → Bb no tom de Bb). */
-function shiftLine(line: string, semitones: number, targetKey: string | null | undefined): string {
+function shiftLine(line: string, semitones: number, targetKey: string | null | undefined, accidentals: Accidentals): string {
+  if (accidentals !== 'auto') return transposeChordLine(line, semitones, accidentals === 'flat')
   if (semitones === 0 && !keySpelling(targetKey)) return line
   return transposeChordLine(line, semitones, prefersFlats(targetKey))
+}
+
+/** O nome do tom na grafia escolhida ("Bb" → "A#" para quem prefere sustenidos). */
+export function spellKey(key: string, accidentals: Accidentals): string {
+  return accidentals === 'auto' ? key : transposeChord(key, 0, accidentals === 'flat')
 }
 
 export function transposeChord(token: string, semitones: number, useFlats = false): string {
@@ -207,8 +219,8 @@ export type SheetLine =
   | { kind: 'blank' }
 
 /** Converte o texto da cifra em linhas classificadas, já transpostas. */
-export function parseSheet(content: string, semitones = 0, targetKey?: string | null): SheetLine[] {
-  const shift = (l: string) => shiftLine(l, semitones, targetKey)
+export function parseSheet(content: string, semitones = 0, targetKey?: string | null, accidentals: Accidentals = 'auto'): SheetLine[] {
+  const shift = (l: string) => shiftLine(l, semitones, targetKey, accidentals)
   return content.replace(/\r\n?/g, '\n').split('\n').map((raw): SheetLine => {
     const line = raw.replace(/\s+$/, '')
     if (line.trim() === '') return { kind: 'blank' }
@@ -228,7 +240,7 @@ export function parseSheet(content: string, semitones = 0, targetKey?: string | 
 }
 
 /** Transpõe o texto inteiro da cifra (para exportar ou salvar em outro tom). */
-export function transposeSheet(content: string, semitones: number, targetKey?: string | null): string {
+export function transposeSheet(content: string, semitones: number, targetKey?: string | null, accidentals: Accidentals = 'auto'): string {
   return content
     .replace(/\r\n?/g, '\n')
     .split('\n')
@@ -236,9 +248,9 @@ export function transposeSheet(content: string, semitones: number, targetKey?: s
       const sec = matchSection(line)
       if (sec && sec.rest && isChordLine(sec.rest)) {
         const head = line.slice(0, line.length - sec.rest.length)
-        return head + shiftLine(sec.rest, semitones, targetKey)
+        return head + shiftLine(sec.rest, semitones, targetKey, accidentals)
       }
-      return isChordLine(line) ? shiftLine(line, semitones, targetKey) : line
+      return isChordLine(line) ? shiftLine(line, semitones, targetKey, accidentals) : line
     })
     .join('\n')
 }

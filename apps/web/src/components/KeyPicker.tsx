@@ -1,7 +1,14 @@
-import { MAJOR_KEYS, MINOR_KEYS } from '@ensaio/shared'
+import { MAJOR_KEYS, MINOR_KEYS, spellKey, type Accidentals } from '@ensaio/shared'
 import clsx from 'clsx'
 import { X } from 'lucide-react'
 import { useEffect } from 'react'
+import { setAccidentals, useAccidentals } from '../lib/accidentals'
+
+const ACCIDENTAL_OPTIONS: [Accidentals, string][] = [
+  ['auto', 'Automático'],
+  ['sharp', 'Sustenido (A#)'],
+  ['flat', 'Bemol (Bb)'],
+]
 
 /** Folha inferior para escolher um tom diretamente (no celular abre de baixo, alcançável com o polegar). */
 export function KeyPicker({
@@ -23,6 +30,7 @@ export function KeyPicker({
   personalLabel?: string
   onPick: (key: string) => void
 }) {
+  const accidentals = useAccidentals()
   useEffect(() => {
     if (!open) return
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
@@ -56,7 +64,7 @@ export function KeyPicker({
                 k === current ? 'border-accent bg-accent text-accent-ink' : 'border-border bg-surface-2 text-text hover:border-accent/60',
               )}
             >
-              {k}
+              {spellKey(k, accidentals)}
               {(k === original || k === personal) && (
                 <span className="absolute inset-x-0 bottom-1 font-sans text-[9px] font-semibold tracking-wide uppercase opacity-70">
                   {k === original ? 'original' : personalLabel}
@@ -65,6 +73,29 @@ export function KeyPicker({
             </button>
           ))}
         </div>
+        <p className="mt-4 text-sm">Escrever os acordes com</p>
+        <div className="mt-2 grid grid-cols-3 gap-1 rounded-xl border border-border p-1" role="radiogroup" aria-label="Sustenido ou bemol">
+          {ACCIDENTAL_OPTIONS.map(([id, label]) => (
+            <button
+              key={id}
+              type="button"
+              role="radio"
+              aria-checked={accidentals === id}
+              className={clsx(
+                'h-9 rounded-lg text-xs font-semibold',
+                accidentals === id ? 'bg-accent text-accent-ink' : 'text-muted hover:text-text',
+              )}
+              onClick={() => setAccidentals(id)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        <p className="mt-2 text-xs text-muted">
+          {accidentals === 'auto'
+            ? 'Segue o tom: bemóis em Bb, F, Eb…; sustenidos em F#, B, E…'
+            : 'Vale para todas as músicas neste aparelho.'}
+        </p>
       </div>
     </div>
   )

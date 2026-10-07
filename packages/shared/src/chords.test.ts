@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  spellKey,
   guessKey,
   isChord,
   isChordLine,
@@ -210,5 +211,21 @@ describe('grafia do tom', () => {
     expect(parseSheet('Gb Db', 0, 'F#')[0]).toEqual({ kind: 'chords', text: 'F# C#' })
     expect(parseSheet('A# Bb', 0, 'C')[0]).toEqual({ kind: 'chords', text: 'A# Bb' })
     expect(parseSheet('A# Bb', 0, null)[0]).toEqual({ kind: 'chords', text: 'A# Bb' })
+  })
+})
+
+describe('sustenido ou bemol, à escolha do músico', () => {
+  it('força a grafia escolhida em qualquer tom', () => {
+    expect(parseSheet('Bb7+ Ebm7 Gb/Ab', 0, 'Bb', 'sharp')[0]).toEqual({ kind: 'chords', text: 'A#7+ D#m7 F#/G#' })
+    expect(parseSheet('A# C#m', 0, 'E', 'flat')[0]).toEqual({ kind: 'chords', text: 'Bb Dbm' })
+    // Transpondo também: de A para Bb com sustenidos.
+    expect(parseSheet('A D', 1, 'Bb', 'sharp')[0]).toEqual({ kind: 'chords', text: 'A# D#' })
+  })
+
+  it('nome do tom na grafia escolhida', () => {
+    expect(spellKey('Bb', 'sharp')).toBe('A#')
+    expect(spellKey('Bbm', 'sharp')).toBe('A#m')
+    expect(spellKey('F#', 'flat')).toBe('Gb')
+    expect(spellKey('Bb', 'auto')).toBe('Bb')
   })
 })

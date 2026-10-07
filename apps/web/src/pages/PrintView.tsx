@@ -6,6 +6,7 @@ import { Fragment, useEffect, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router'
 import { ChordSheet } from '../components/ChordSheet'
 import { ErrorState, PageSpinner } from '../components/ui'
+import { useAccidentals } from '../lib/accidentals'
 import { api } from '../lib/api'
 import { keys, useSong } from '../lib/queries'
 import { useSetlist } from '../lib/setlists'
@@ -113,7 +114,7 @@ function SongPage({
   showMarks: boolean
   index?: number
 }) {
-  const lines = parseSheet(song.content, semitones, targetKey)
+  const lines = parseSheet(song.content, semitones, targetKey, useAccidentals())
   return (
     <article className="print-song mx-auto max-w-3xl px-4 py-6">
       <header className="mb-4 border-b border-border pb-3">
