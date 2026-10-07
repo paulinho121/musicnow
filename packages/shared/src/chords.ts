@@ -60,6 +60,22 @@ export function prefersFlats(key: string | null | undefined): boolean {
   return FLAT_KEYS.has(key) || key[1] === 'b'
 }
 
+/**
+ * Grafia que o tom pede: 'flat' (Bb, F, Gm...), 'sharp' (F#, C#m...) ou null nos tons sem
+ * acidentes (C, G, D, A, E, B, Am...), em que a cifra fica como foi escrita.
+ */
+function keySpelling(key: string | null | undefined): 'flat' | 'sharp' | null {
+  if (!key) return null
+  if (prefersFlats(key)) return 'flat'
+  return key[1] === '#' ? 'sharp' : null
+}
+
+/** Ajusta a linha ao tom: transpõe e/ou acerta a grafia (A# → Bb no tom de Bb). */
+function shiftLine(line: string, semitones: number, targetKey: string | null | undefined): string {
+  if (semitones === 0 && !keySpelling(targetKey)) return line
+  return transposeChordLine(line, semitones, prefersFlats(targetKey))
+}
+
 export function transposeChord(token: string, semitones: number, useFlats = false): string {
   const c = parseChord(token)
   if (!c) return token
@@ -192,8 +208,7 @@ export type SheetLine =
 
 /** Converte o texto da cifra em linhas classificadas, já transpostas. */
 export function parseSheet(content: string, semitones = 0, targetKey?: string | null): SheetLine[] {
-  const useFlats = prefersFlats(targetKey)
-  const shift = (l: string) => (semitones === 0 ? l : transposeChordLine(l, semitones, useFlats))
+  const shift = (l: string) => shiftLine(l, semitones, targetKey)
   return content.replace(/\r\n?/g, '\n').split('\n').map((raw): SheetLine => {
     const line = raw.replace(/\s+$/, '')
     if (line.trim() === '') return { kind: 'blank' }
@@ -214,7 +229,6 @@ export function parseSheet(content: string, semitones = 0, targetKey?: string | 
 
 /** Transpõe o texto inteiro da cifra (para exportar ou salvar em outro tom). */
 export function transposeSheet(content: string, semitones: number, targetKey?: string | null): string {
-  const useFlats = prefersFlats(targetKey)
   return content
     .replace(/\r\n?/g, '\n')
     .split('\n')
@@ -222,9 +236,9 @@ export function transposeSheet(content: string, semitones: number, targetKey?: s
       const sec = matchSection(line)
       if (sec && sec.rest && isChordLine(sec.rest)) {
         const head = line.slice(0, line.length - sec.rest.length)
-        return head + transposeChordLine(sec.rest, semitones, useFlats)
+        return head + shiftLine(sec.rest, semitones, targetKey)
       }
-      return isChordLine(line) ? transposeChordLine(line, semitones, useFlats) : line
+      return isChordLine(line) ? shiftLine(line, semitones, targetKey) : line
     })
     .join('\n')
 }

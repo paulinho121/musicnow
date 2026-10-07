@@ -198,3 +198,17 @@ describe('seção escrita com dois-pontos', () => {
     expect(parseSheet('Solo: agora todos juntos')[0].kind).toBe('lyrics')
   })
 })
+
+describe('grafia do tom', () => {
+  it('no tom original, a cifra segue a grafia do tom (A# vira Bb no tom de Bb)', () => {
+    const lines = parseSheet('[Intro] A#7+ F#7+ D#m7 F#/G# D#/F\n  A#7+   D#m7\nWith all my heart', 0, 'Bb')
+    expect(lines[0]).toMatchObject({ kind: 'section', chords: 'Bb7+ Gb7+ Ebm7 Gb/Ab Eb/F' })
+    expect(lines[1]).toEqual({ kind: 'chords', text: '  Bb7+   Ebm7' })
+  })
+
+  it('tom com sustenidos troca bemóis por sustenidos; tom sem acidentes deixa como está', () => {
+    expect(parseSheet('Gb Db', 0, 'F#')[0]).toEqual({ kind: 'chords', text: 'F# C#' })
+    expect(parseSheet('A# Bb', 0, 'C')[0]).toEqual({ kind: 'chords', text: 'A# Bb' })
+    expect(parseSheet('A# Bb', 0, null)[0]).toEqual({ kind: 'chords', text: 'A# Bb' })
+  })
+})
