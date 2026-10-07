@@ -2,7 +2,7 @@
 // para o formato do Ensaio Fácil (acordes sobre a letra, seções entre colchetes).
 import { guessKey, isChord, isChordLine, parseChord, sectionTypeFromLabel, transposeKey } from './chords'
 
-export type ImportFormat = 'chordpro' | 'onsong' | 'opensong' | 'text' | 'guitarpro'
+export type ImportFormat = 'chordpro' | 'onsong' | 'opensong' | 'text' | 'guitarpro' | 'word'
 
 export interface ImportedSong {
   title: string
@@ -56,7 +56,10 @@ function toInt(v: string | null | undefined): number | null {
 
 function normalizeKey(v: string | null | undefined): string | null {
   if (!v) return null
-  const k = v.trim().replace(/maj(or)?$/i, '').replace(/\s*min(or)?$/i, 'm')
+  const k = v
+    .trim()
+    .replace(/maj(or)?$/i, '')
+    .replace(/\s*min(or)?$/i, 'm')
   const c = parseChord(k)
   if (!c) return null
   const minor = c.suffix.startsWith('m') && !c.suffix.startsWith('maj')
@@ -102,7 +105,12 @@ export function inlineToChordsOverLyrics(line: string): string[] {
   const lyricTrim = lyric.replace(/\s+$/, '')
   if (!lyricTrim.trim()) return [chords]
   // Sobrou só "(x2)", "|" etc.: isso faz parte da linha de acordes, não é letra.
-  if (lyricTrim.trim().split(/\s+/).every((t) => NOISE_TOKEN.test(t))) {
+  if (
+    lyricTrim
+      .trim()
+      .split(/\s+/)
+      .every((t) => NOISE_TOKEN.test(t))
+  ) {
     let merged = chords
     const re = /\S+/g
     let m: RegExpExecArray | null
@@ -141,17 +149,23 @@ function joinSectionChords(lines: string[]): string[] {
 const DIRECTIVE_RE = /^\s*\{\s*([a-z_]+)\s*(?::\s*(.*?))?\s*\}\s*$/i
 
 const SECTION_DIRECTIVES: Record<string, string> = {
-  start_of_chorus: 'Refrão', soc: 'Refrão',
-  start_of_verse: 'Verso', sov: 'Verso',
-  start_of_bridge: 'Ponte', sob: 'Ponte',
+  start_of_chorus: 'Refrão',
+  soc: 'Refrão',
+  start_of_verse: 'Verso',
+  sov: 'Verso',
+  start_of_bridge: 'Ponte',
+  sob: 'Ponte',
   start_of_intro: 'Intro',
   start_of_outro: 'Final',
-  start_of_tab: 'Tab', sot: 'Tab',
-  start_of_grid: 'Grade', sog: 'Grade',
+  start_of_tab: 'Tab',
+  sot: 'Tab',
+  start_of_grid: 'Grade',
+  sog: 'Grade',
 }
 
 // Metadados no topo de arquivos OnSong / texto: "Key: G", "Tom: G", "Tempo: 72"...
-const META_RE = /^\s*(title|título|titulo|artist|artista|author|autor|composer|compositor|key|tom|tempo|bpm|time|compasso|capo|capotraste|afinação|afinacao|tuning|ccli|copyright)\s*:\s*(.*)$/i
+const META_RE =
+  /^\s*(title|título|titulo|artist|artista|author|autor|composer|compositor|key|tom|tempo|bpm|time|compasso|capo|capotraste|afinação|afinacao|tuning|ccli|copyright)\s*:\s*(.*)$/i
 
 interface Meta {
   title?: string
@@ -256,7 +270,14 @@ function parseChordProLike(text: string, format: 'chordpro' | 'onsong', fileName
 // OpenSong (XML)
 
 const OPENSONG_CODES: Record<string, string> = {
-  V: 'Verso', C: 'Refrão', B: 'Ponte', P: 'Pré-refrão', I: 'Intro', O: 'Final', E: 'Final', T: 'Tag',
+  V: 'Verso',
+  C: 'Refrão',
+  B: 'Ponte',
+  P: 'Pré-refrão',
+  I: 'Intro',
+  O: 'Final',
+  E: 'Final',
+  T: 'Tag',
 }
 
 function xmlTag(xml: string, tag: string): string | null {
@@ -285,7 +306,8 @@ function parseOpenSong(xml: string, fileName?: string): ImportedSong {
     time: xmlTag(xml, 'time_sig') ?? undefined,
   }
   const capo = xmlTag(xml, 'capo')
-  if (capo && capo.trim() && capo.trim() !== '0') warnings.push(`Usa capotraste (${capo.trim()}). Os acordes foram mantidos como no original.`)
+  if (capo && capo.trim() && capo.trim() !== '0')
+    warnings.push(`Usa capotraste (${capo.trim()}). Os acordes foram mantidos como no original.`)
 
   const out: string[] = []
   for (const raw of (xmlTag(xml, 'lyrics') ?? '').replace(/\r\n?/g, '\n').split('\n')) {

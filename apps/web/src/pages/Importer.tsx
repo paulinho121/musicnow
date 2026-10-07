@@ -2,25 +2,41 @@ import {
   LICENSES,
   MAJOR_KEYS,
   MINOR_KEYS,
+  joinSongs,
   parseSongFile,
   PUBLIC_LICENSES,
+  splitSongAt,
   VISIBILITY,
   type ImportedSong,
   type License,
   type Visibility,
 } from '@ensaio/shared'
 import clsx from 'clsx'
-import { AlertTriangle, ArrowLeft, AudioLines, CheckCircle2, ChevronDown, ClipboardPaste, FileUp, Loader2, Trash2, Upload } from 'lucide-react'
+import {
+  AlertTriangle,
+  ArrowLeft,
+  AudioLines,
+  CheckCircle2,
+  ChevronDown,
+  ClipboardPaste,
+  FileUp,
+  ListMusic,
+  Loader2,
+  Trash2,
+  Upload,
+} from 'lucide-react'
 import { useEffect, useRef, useState, type DragEvent } from 'react'
-import { Link } from 'react-router'
+import { Link, useNavigate } from 'react-router'
 import { ChordSheet, useSheet } from '../components/ChordSheet'
 import { useToast } from '../components/ui'
+import { api } from '../lib/api'
 import { checkDuplicates, useImportSongs } from '../lib/queries'
 import type { ImportResult } from '../lib/types'
 
 const MAX_FILES = 100
 const MAX_BYTES = 512 * 1024
-const ACCEPT = '.cho,.chopro,.chordpro,.crd,.pro,.txt,.onsong,.xml,.gp,.gp3,.gp4,.gp5,.gpx,text/plain'
+const ACCEPT =
+  '.cho,.chopro,.chordpro,.crd,.pro,.txt,.onsong,.xml,.gp,.gp3,.gp4,.gp5,.gpx,.docx,text/plain,application/vnd.openxmlformats-officedocument.wordprocessingml.document'
 
 const FORMAT_LABEL: Record<ImportedSong['format'], string> = {
   chordpro: 'ChordPro',
@@ -28,6 +44,7 @@ const FORMAT_LABEL: Record<ImportedSong['format'], string> = {
   opensong: 'OpenSong',
   text: 'Texto',
   guitarpro: 'Guitar Pro',
+  word: 'Word',
 }
 
 interface Item {
@@ -37,6 +54,8 @@ interface Item {
   include: boolean
   duplicateOf: string | null
   file?: File
+  /** Caderno do Word de onde veio (nome do arquivo): vira o nome do repertório. */
+  book?: string
 }
 
 let nextUid = 1
@@ -63,6 +82,8 @@ export function Importer() {
   const [result, setResult] = useState<ImportResult | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [attachingScores, setAttachingScores] = useState(false)
+  /** Caderno do Word importado: as músicas na ordem do arquivo, para virar um repertório. */
+  const [book, setBook] = useState<{ name: string; songIds: string[] } | null>(null)
 
   // Marca as que já existem na biblioteca sempre que a lista (ou um título) muda.
   const dupSignature = items.map((i) => `${i.song.title}|${i.song.artist ?? ''}`).join('\n')
@@ -95,12 +116,30 @@ export function Importer() {
     const parsed: Item[] = []
     for (const f of list.slice(0, Math.max(0, room))) {
       const isGp = /\.(gp|gp3|gp4|gp5|gpx)$/i.test(f.name)
-      const maxSize = isGp ? 10 * 1024 * 1024 : MAX_BYTES
+      const maxSize = isGp || /\.docx$/i.test(f.name) ? 10 * 1024 * 1024 : MAX_BYTES
       if (f.size > maxSize) {
         bad.push(`${f.name}: maior que ${isGp ? '10 MB' : '512 KB'}`)
         continue
       }
-      if (/\.(pdf|docx?|jpe?g|png)$/i.test(f.name)) {
+      if (/\.docx$/i.test(f.name)) {
+        try {
+          const { readSongBook } = await import('../lib/docx')
+          const songs = await readSongBook(f)
+          if (!songs.length) bad.push(`${f.name}: não achamos cifras neste arquivo`)
+          const book = f.name.replace(/\.docx$/i, '')
+          songs.forEach((song, i) =>
+            parsed.push({ uid: nextUid++, source: `${f.name} · ${i + 1}ª música`, song, include: true, duplicateOf: null, book }),
+          )
+        } catch (e) {
+          bad.push(`${f.name}: ${(e as Error).message || 'não foi possível ler o arquivo do Word'}`)
+        }
+        continue
+      }
+      if (/\.doc$/i.test(f.name)) {
+        bad.push(`${f.name}: formato antigo do Word. Abra no Word e use "Salvar como" → .docx`)
+        continue
+      }
+      if (/\.(pdf|jpe?g|png)$/i.test(f.name)) {
         bad.push(`${f.name}: formato não suportado (PDF e imagens entram como anexo na próxima etapa)`)
         continue
       }
@@ -132,10 +171,7 @@ export function Importer() {
 
   const addPasted = () => {
     if (!pasted.trim()) return
-    setItems((prev) => [
-      ...prev,
-      { uid: nextUid++, source: 'Texto colado', song: parseSongFile(pasted), include: true, duplicateOf: null },
-    ])
+    setItems((prev) => [...prev, { uid: nextUid++, source: 'Texto colado', song: parseSongFile(pasted), include: true, duplicateOf: null }])
     setPasted('')
     setResult(null)
   }
@@ -148,6 +184,27 @@ export function Importer() {
 
   const update = (uid: number, patch: Partial<ImportedSong>) =>
     setItems((list) => list.map((i) => (i.uid === uid ? { ...i, song: { ...i.song, ...patch } } : i)))
+
+  // Caderno do Word: separar uma música em duas (na linha escolhida) ou juntar com a anterior.
+  const splitItem = (uid: number, line: number) =>
+    setItems((list) =>
+      list.flatMap((i) => {
+        if (i.uid !== uid) return [i]
+        const [a, b] = splitSongAt(i.song, line)
+        return [
+          { ...i, song: a, duplicateOf: null },
+          { ...i, uid: nextUid++, song: b, duplicateOf: null, include: true, source: `${i.source} (separada)` },
+        ]
+      }),
+    )
+  const joinWithPrevious = (uid: number) =>
+    setItems((list) => {
+      const idx = list.findIndex((i) => i.uid === uid)
+      if (idx < 1) return list
+      const prev = list[idx - 1]
+      const joined = { ...prev, song: joinSongs(prev.song, list[idx].song) }
+      return [...list.slice(0, idx - 1), joined, ...list.slice(idx + 1)]
+    })
 
   const selected = items.filter((i) => i.include)
   const needsLicense = visibility === 'public' && !PUBLIC_LICENSES.includes(license)
@@ -221,13 +278,29 @@ export function Importer() {
             }
             setAttachingScores(false)
           }
+          // Caderno do Word: ordem do arquivo; as que já existiam entram com a música da biblioteca.
+          const bookItems = items.filter((i) => i.book && (i.include || i.duplicateOf))
+          if (bookItems.length) {
+            const used = new Set<string>()
+            const songIds = bookItems
+              .map((i) => {
+                if (!i.include) return i.duplicateOf
+                const c = res.created.find((x) => !used.has(x.id) && x.title.toLowerCase() === i.song.title.trim().toLowerCase())
+                if (c) used.add(c.id)
+                return c?.id ?? i.duplicateOf
+              })
+              .filter((id): id is string => Boolean(id))
+            setBook(songIds.length ? { name: bookItems[0].book!, songIds } : null)
+          } else setBook(null)
           setResult(res)
           setItems([])
           toast(
             [
               `${res.created.length} ${res.created.length === 1 ? 'música importada' : 'músicas importadas'}`,
               attached ? `${attached} com partitura anexada` : null,
-              failedScores.length ? `não foi possível desenhar a partitura de: ${failedScores.join(', ')} (anexe pelo botão "Anexar partitura")` : null,
+              failedScores.length
+                ? `não foi possível desenhar a partitura de: ${failedScores.join(', ')} (anexe pelo botão "Anexar partitura")`
+                : null,
             ]
               .filter(Boolean)
               .join(' · ') + '.',
@@ -239,7 +312,7 @@ export function Importer() {
     )
   }
 
-  if (result) return <ImportDone result={result} onMore={() => setResult(null)} />
+  if (result) return <ImportDone result={result} book={book} onMore={() => setResult(null)} />
 
   return (
     <div className="space-y-6">
@@ -249,14 +322,13 @@ export function Importer() {
         </Link>
         <div>
           <h1 className="text-xl sm:text-2xl font-bold">Importar cifras</h1>
-          <p className="text-sm text-muted">ChordPro, OnSong, OpenSong ou texto copiado de qualquer lugar.</p>
+          <p className="text-sm text-muted">
+            ChordPro, OnSong, OpenSong, caderno de cifras do Word (.docx) ou texto copiado de qualquer lugar.
+          </p>
         </div>
       </div>
 
-      <Link
-        to="/musicas/detectar"
-        className="card flex items-center gap-3 border-accent/30 p-4 transition hover:border-accent/60"
-      >
+      <Link to="/musicas/detectar" className="card flex items-center gap-3 border-accent/30 p-4 transition hover:border-accent/60">
         <AudioLines className="size-6 shrink-0 text-accent" />
         <span className="min-w-0 flex-1">
           <span className="block font-semibold">
@@ -283,7 +355,9 @@ export function Importer() {
         >
           <FileUp className="size-8 text-accent" />
           <span className="font-semibold">Arraste arquivos ou toque para escolher</span>
-          <span className="text-xs text-muted">.cho, .pro, .crd, .onsong, .txt, .gp, .gp5 e arquivos do OpenSong · até {MAX_FILES} por vez</span>
+          <span className="text-xs text-muted">
+            .cho, .pro, .crd, .onsong, .txt, .gp, .gp5, OpenSong e Word (.docx) · até {MAX_FILES} por vez
+          </span>
         </button>
         <input
           ref={fileRef}
@@ -339,10 +413,12 @@ export function Importer() {
               </button>
             </div>
             <div className="card divide-y divide-border">
-              {items.map((it) => (
+              {items.map((it, idx) => (
                 <ImportRow
                   key={it.uid}
                   item={it}
+                  onSplit={it.book ? (line) => splitItem(it.uid, line) : undefined}
+                  onJoinPrevious={it.book && idx > 0 && items[idx - 1].book === it.book ? () => joinWithPrevious(it.uid) : undefined}
                   onToggle={() => setItems((l) => l.map((x) => (x.uid === it.uid ? { ...x, include: !x.include } : x)))}
                   onChange={(patch) => update(it.uid, patch)}
                   onRemove={() => setItems((l) => l.filter((x) => x.uid !== it.uid))}
@@ -401,8 +477,8 @@ export function Importer() {
               </span>
             </label>
             <p className="rounded-xl bg-surface-2 px-3 py-2 text-xs text-muted">
-              Importe apenas cifras que você tem direito de usar. Músicas públicas podem ser denunciadas por detentores de
-              direitos e removidas.
+              Importe apenas cifras que você tem direito de usar. Músicas públicas podem ser denunciadas por detentores de direitos e
+              removidas.
             </p>
           </section>
 
@@ -438,13 +514,19 @@ function ImportRow({
   onToggle,
   onChange,
   onRemove,
+  onSplit,
+  onJoinPrevious,
 }: {
   item: Item
   onToggle: () => void
   onChange: (patch: Partial<ImportedSong>) => void
   onRemove: () => void
+  /** Caderno do Word: separar em duas músicas a partir desta linha. */
+  onSplit?: (line: number) => void
+  onJoinPrevious?: () => void
 }) {
   const [open, setOpen] = useState(false)
+  const [splitting, setSplitting] = useState(false)
   const { song } = item
   const lines = useSheet(open ? song.content : '', 0, song.originalKey)
   return (
@@ -484,7 +566,12 @@ function ImportRow({
             ))}
           </select>
         </div>
-        <button type="button" className="btn-icon size-10 shrink-0 border-transparent bg-transparent" onClick={onRemove} aria-label="Remover da lista">
+        <button
+          type="button"
+          className="btn-icon size-10 shrink-0 border-transparent bg-transparent"
+          onClick={onRemove}
+          aria-label="Remover da lista"
+        >
           <Trash2 className="size-4" />
         </button>
       </div>
@@ -502,7 +589,29 @@ function ImportRow({
             </Link>
           </span>
         )}
-        <button type="button" className="ml-auto inline-flex items-center gap-1 text-muted hover:text-text" onClick={() => setOpen((o) => !o)} aria-expanded={open}>
+        {onJoinPrevious && (
+          <button type="button" className="text-muted underline-offset-4 hover:text-text hover:underline" onClick={onJoinPrevious}>
+            Juntar com a anterior
+          </button>
+        )}
+        {onSplit && (
+          <button
+            type="button"
+            className={clsx('underline-offset-4 hover:underline', splitting ? 'font-semibold text-accent' : 'text-muted hover:text-text')}
+            onClick={() => {
+              setSplitting((v) => !v)
+              setOpen(true)
+            }}
+          >
+            {splitting ? 'Cancelar separação' : 'Separar em duas'}
+          </button>
+        )}
+        <button
+          type="button"
+          className="ml-auto inline-flex items-center gap-1 text-muted hover:text-text"
+          onClick={() => setOpen((o) => !o)}
+          aria-expanded={open}
+        >
           {open ? 'Ocultar cifra' : 'Ver cifra'} <ChevronDown className={clsx('size-4 transition', open && 'rotate-180')} />
         </button>
       </div>
@@ -517,7 +626,33 @@ function ImportRow({
         </ul>
       )}
 
-      {open && (
+      {open && splitting && onSplit && (
+        <div className="mt-3 max-h-96 overflow-auto rounded-xl border border-accent/40 bg-bg p-2 md:ml-8">
+          <p className="px-2 pb-2 text-xs font-semibold text-accent">Toque na linha onde começa a outra música:</p>
+          {song.content.split('\n').map((line, i) =>
+            i === 0 ? (
+              <div key={i} className="sheet px-2 text-sm whitespace-pre text-muted">
+                {line || ' '}
+              </div>
+            ) : (
+              <button
+                key={i}
+                type="button"
+                className="sheet block w-full rounded-md px-2 text-left text-sm whitespace-pre hover:bg-accent/15"
+                onClick={() => {
+                  onSplit(i)
+                  setSplitting(false)
+                }}
+                title="Começar outra música aqui"
+              >
+                {line || ' '}
+              </button>
+            ),
+          )}
+        </div>
+      )}
+
+      {open && !splitting && (
         <div className="mt-3 max-h-96 overflow-auto rounded-xl bg-bg p-3 md:ml-8">
           {song.content.trim() ? (
             <ChordSheet lines={lines} fontSize={14} lineHeight={1.4} wrap />
@@ -530,7 +665,32 @@ function ImportRow({
   )
 }
 
-function ImportDone({ result, onMore }: { result: ImportResult; onMore: () => void }) {
+function ImportDone({
+  result,
+  book,
+  onMore,
+}: {
+  result: ImportResult
+  book: { name: string; songIds: string[] } | null
+  onMore: () => void
+}) {
+  const navigate = useNavigate()
+  const toast = useToast()
+  const [creating, setCreating] = useState(false)
+  // Caderno do Word → repertório com as músicas na ordem do arquivo.
+  const createSetlist = async () => {
+    if (!book) return
+    setCreating(true)
+    try {
+      const { id } = await api<{ id: string }>('/setlists', { method: 'POST', json: { name: book.name } })
+      for (const songId of book.songIds) await api(`/setlists/${id}/items`, { method: 'POST', json: { songId } })
+      toast(`Repertório "${book.name}" criado com ${book.songIds.length} músicas.`)
+      navigate(`/repertorios/${id}`)
+    } catch (e) {
+      toast((e as Error).message, 'error')
+      setCreating(false)
+    }
+  }
   return (
     <div className="space-y-5">
       <div className="card flex flex-col items-center gap-3 px-6 py-10 text-center">
@@ -539,6 +699,17 @@ function ImportDone({ result, onMore }: { result: ImportResult; onMore: () => vo
           {result.created.length} {result.created.length === 1 ? 'música importada' : 'músicas importadas'}
         </h1>
         {result.skipped.length > 0 && <p className="text-sm text-muted">{result.skipped.length} ignorada(s) por já existirem.</p>}
+        {book && (
+          <div className="mt-2 w-full max-w-md rounded-2xl border border-accent/40 bg-accent/10 p-4">
+            <p className="font-semibold">Montar o repertório deste caderno?</p>
+            <p className="mt-1 text-sm text-muted">
+              “{book.name}” com as {book.songIds.length} músicas, na ordem do arquivo.
+            </p>
+            <button type="button" className="btn-primary mt-3 w-full" onClick={createSetlist} disabled={creating}>
+              {creating ? <Loader2 className="size-4 animate-spin" /> : <ListMusic className="size-4" />} Criar repertório
+            </button>
+          </div>
+        )}
         <div className="mt-2 flex flex-col gap-2 sm:flex-row">
           <Link to="/musicas?escopo=mine" className="btn-primary">
             Ver minhas músicas

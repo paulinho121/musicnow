@@ -61,7 +61,7 @@ const importInput = z.object({
   songs: z
     .array(
       songFields
-        .extend({ importedFrom: z.enum(['chordpro', 'onsong', 'opensong', 'text', 'guitarpro']).nullish() })
+        .extend({ importedFrom: z.enum(['chordpro', 'onsong', 'opensong', 'text', 'guitarpro', 'word']).nullish() })
         .refine(publicNeedsLicense, PUBLIC_LICENSE_MSG),
     )
     .min(1, 'Nenhuma música para importar')
@@ -81,9 +81,7 @@ const markInput = z.object({
 type SearchFields = Pick<z.infer<typeof songFields>, 'title' | 'artist' | 'composer' | 'style' | 'originalKey' | 'tags'>
 
 function buildSearchText(s: SearchFields) {
-  return normalizeSearch(
-    [s.title, s.artist, s.composer, s.style, s.originalKey, ...(s.tags ?? [])].filter(Boolean).join(' '),
-  )
+  return normalizeSearch([s.title, s.artist, s.composer, s.style, s.originalKey, ...(s.tags ?? [])].filter(Boolean).join(' '))
 }
 
 /** Músicas que o usuário pode ver: dele, públicas, ou em repertórios de que participa. */
@@ -92,22 +90,19 @@ export function canViewSong(userId: string): SQL {
     eq(song.ownerId, userId),
     eq(song.visibility, 'public'),
     // Compartilhada com a pessoa pelo link da música.
-    exists(db.select({ one: sql`1` }).from(songShare).where(and(eq(songShare.songId, song.id), eq(songShare.userId, userId)))),
+    exists(
+      db
+        .select({ one: sql`1` })
+        .from(songShare)
+        .where(and(eq(songShare.songId, song.id), eq(songShare.userId, userId))),
+    ),
     exists(
       db
         .select({ one: sql`1` })
         .from(setlistItem)
         .innerJoin(setlist, eq(setlist.id, setlistItem.setlistId))
-        .leftJoin(
-          setlistMember,
-          and(eq(setlistMember.setlistId, setlistItem.setlistId), eq(setlistMember.userId, userId)),
-        )
-        .where(
-          and(
-            eq(setlistItem.songId, song.id),
-            or(eq(setlist.ownerId, userId), eq(setlistMember.userId, userId)),
-          ),
-        ),
+        .leftJoin(setlistMember, and(eq(setlistMember.setlistId, setlistItem.setlistId), eq(setlistMember.userId, userId)))
+        .where(and(eq(setlistItem.songId, song.id), or(eq(setlist.ownerId, userId), eq(setlistMember.userId, userId)))),
     ),
   )!
 }
@@ -185,7 +180,10 @@ export const sharedSongRoutes = new Hono<AppEnv>()
       .innerJoin(user, eq(user.id, song.ownerId))
       .where(eq(song.shareCode, code))
     if (!row) notFound('Link de música')
-    const [has] = await db.select({ one: sql`1` }).from(songShare).where(and(eq(songShare.songId, row.id), eq(songShare.userId, uid)))
+    const [has] = await db
+      .select({ one: sql`1` })
+      .from(songShare)
+      .where(and(eq(songShare.songId, row.id), eq(songShare.userId, uid)))
     const { ownerId, ...preview } = row
     return c.json({ ...preview, isOwner: ownerId === uid, alreadyHas: ownerId === uid || Boolean(has) })
   })
@@ -221,7 +219,14 @@ export const songsRoutes = new Hono<AppEnv>()
       if (scope === 'public') where.push(eq(song.visibility, 'public'))
       if (scope === 'favorites') where.push(isFavoriteExpr(uid))
       if (scope === 'shared')
-        where.push(exists(db.select({ one: sql`1` }).from(songShare).where(and(eq(songShare.songId, song.id), eq(songShare.userId, uid)))))
+        where.push(
+          exists(
+            db
+              .select({ one: sql`1` })
+              .from(songShare)
+              .where(and(eq(songShare.songId, song.id), eq(songShare.userId, uid))),
+          ),
+        )
       if (key) where.push(eq(song.originalKey, key))
       if (style) where.push(ilike(song.style, style))
       const terms = q ? normalizeSearch(q).split(' ').filter(Boolean) : []
@@ -299,9 +304,7 @@ export const songsRoutes = new Hono<AppEnv>()
         created.push(row)
       }
       if (created.length) {
-        await tx.insert(changeLog).values(
-          created.map((s) => ({ entityType: 'song', entityId: s.id, userId: uid, action: 'import' })),
-        )
+        await tx.insert(changeLog).values(created.map((s) => ({ entityType: 'song', entityId: s.id, userId: uid, action: 'import' })))
       }
     })
     return c.json({ created, skipped }, 201)
@@ -313,75 +316,79 @@ export const songsRoutes = new Hono<AppEnv>()
     // setlistId: a música está sendo vista dentro de um repertório (traz as marcações da banda).
     validate('query', z.object({ setlistId: z.string().uuid().optional() })),
     async (c) => {
-    const uid = c.var.user.id
-    const { id } = c.req.valid('param')
-    const access = c.req.valid('query').setlistId ? await getRole(c.req.valid('query').setlistId!, uid) : null
-    const setlistId = access ? c.req.valid('query').setlistId! : null
-    const [row] = await db
-      .select({
-        song,
-        ownerName: user.name,
-        isFavorite: isFavoriteExpr(uid),
-      })
-      .from(song)
-      .innerJoin(user, eq(user.id, song.ownerId))
-      .where(and(eq(song.id, id), canViewSong(uid)))
-      .limit(1)
-    if (!row) notFound('Música')
+      const uid = c.var.user.id
+      const { id } = c.req.valid('param')
+      const access = c.req.valid('query').setlistId ? await getRole(c.req.valid('query').setlistId!, uid) : null
+      const setlistId = access ? c.req.valid('query').setlistId! : null
+      const [row] = await db
+        .select({
+          song,
+          ownerName: user.name,
+          isFavorite: isFavoriteExpr(uid),
+        })
+        .from(song)
+        .innerJoin(user, eq(user.id, song.ownerId))
+        .where(and(eq(song.id, id), canViewSong(uid)))
+        .limit(1)
+      if (!row) notFound('Música')
 
-    const [state] = await db
-      .insert(songUserState)
-      .values({ userId: uid, songId: id, lastViewedAt: new Date(), viewCount: 1 })
-      .onConflictDoUpdate({
-        target: [songUserState.userId, songUserState.songId],
-        set: { lastViewedAt: new Date(), viewCount: sql`${songUserState.viewCount} + 1` },
-      })
-      .returning()
+      const [state] = await db
+        .insert(songUserState)
+        .values({ userId: uid, songId: id, lastViewedAt: new Date(), viewCount: 1 })
+        .onConflictDoUpdate({
+          target: [songUserState.userId, songUserState.songId],
+          set: { lastViewedAt: new Date(), viewCount: sql`${songUserState.viewCount} + 1` },
+        })
+        .returning()
 
-    // Marcações visíveis: as minhas (gerais ou deste repertório), as compartilhadas pela
-    // dona da música e, dentro de um repertório, as compartilhadas com a banda.
-    const marks = await db
-      .select({ mark: songMark, authorName: user.name })
-      .from(songMark)
-      .innerJoin(user, eq(user.id, songMark.authorId))
-      .where(
-        and(
-          eq(songMark.songId, id),
-          or(
-            and(
-              eq(songMark.authorId, uid),
-              setlistId ? or(isNull(songMark.setlistId), eq(songMark.setlistId, setlistId)) : isNull(songMark.setlistId),
+      // Marcações visíveis: as minhas (gerais ou deste repertório), as compartilhadas pela
+      // dona da música e, dentro de um repertório, as compartilhadas com a banda.
+      const marks = await db
+        .select({ mark: songMark, authorName: user.name })
+        .from(songMark)
+        .innerJoin(user, eq(user.id, songMark.authorId))
+        .where(
+          and(
+            eq(songMark.songId, id),
+            or(
+              and(
+                eq(songMark.authorId, uid),
+                setlistId ? or(isNull(songMark.setlistId), eq(songMark.setlistId, setlistId)) : isNull(songMark.setlistId),
+              ),
+              and(eq(songMark.shared, true), isNull(songMark.setlistId), eq(songMark.authorId, row.song.ownerId)),
+              setlistId ? and(eq(songMark.shared, true), eq(songMark.setlistId, setlistId)) : undefined,
             ),
-            and(eq(songMark.shared, true), isNull(songMark.setlistId), eq(songMark.authorId, row.song.ownerId)),
-            setlistId ? and(eq(songMark.shared, true), eq(songMark.setlistId, setlistId)) : undefined,
           ),
-        ),
-      )
-      .orderBy(asc(songMark.lineIndex), asc(songMark.createdAt))
-    const scores = await scoresOfSong(id)
-    const [shared] = await db.select({ one: sql`1` }).from(songShare).where(and(eq(songShare.songId, id), eq(songShare.userId, uid)))
+        )
+        .orderBy(asc(songMark.lineIndex), asc(songMark.createdAt))
+      const scores = await scoresOfSong(id)
+      const [shared] = await db
+        .select({ one: sql`1` })
+        .from(songShare)
+        .where(and(eq(songShare.songId, id), eq(songShare.userId, uid)))
 
-    const { searchText: _omit, shareCode: _code, ...data } = row.song
-    const isOwner = row.song.ownerId === uid
-    // Letra sem autorização só sai para quem cadastrou; os outros recebem apenas acordes e seções.
-    const lyricsHidden = !row.song.lyricsAuthorized && !isOwner
-    return c.json({
-      ...data,
-      content: lyricsHidden ? stripLyrics(data.content) : data.content,
-      lyricsHidden,
-      ownerName: row.ownerName,
-      isFavorite: row.isFavorite,
-      canEdit: isOwner,
-      personalKey: state?.personalKey ?? null,
-      marks: marks.map((m) => ({ ...m.mark, authorName: m.authorName })),
-      scores,
-      /** Recebida pelo link de compartilhamento (pode sair dela). */
-      sharedWithMe: Boolean(shared),
-      setlistRole: access?.role ?? null,
-      // Fora de repertório só a dona compartilha marcações; dentro, quem tem permissão de marcar.
-      canShareMarks: access ? atLeast(access.role, 'mark') : isOwner,
-    })
-  })
+      const { searchText: _omit, shareCode: _code, ...data } = row.song
+      const isOwner = row.song.ownerId === uid
+      // Letra sem autorização só sai para quem cadastrou; os outros recebem apenas acordes e seções.
+      const lyricsHidden = !row.song.lyricsAuthorized && !isOwner
+      return c.json({
+        ...data,
+        content: lyricsHidden ? stripLyrics(data.content) : data.content,
+        lyricsHidden,
+        ownerName: row.ownerName,
+        isFavorite: row.isFavorite,
+        canEdit: isOwner,
+        personalKey: state?.personalKey ?? null,
+        marks: marks.map((m) => ({ ...m.mark, authorName: m.authorName })),
+        scores,
+        /** Recebida pelo link de compartilhamento (pode sair dela). */
+        sharedWithMe: Boolean(shared),
+        setlistRole: access?.role ?? null,
+        // Fora de repertório só a dona compartilha marcações; dentro, quem tem permissão de marcar.
+        canShareMarks: access ? atLeast(access.role, 'mark') : isOwner,
+      })
+    },
+  )
 
   .post('/', validate('json', songInput), async (c) => {
     const uid = c.var.user.id
@@ -418,7 +425,8 @@ export const songsRoutes = new Hono<AppEnv>()
       .where(eq(song.id, id))
     // Guarda a versão anterior da cifra: permite restaurar e auditar alterações.
     const changed = Object.keys(input).filter(
-      (k) => JSON.stringify((before as Record<string, unknown>)[k] ?? null) !== JSON.stringify((input as Record<string, unknown>)[k] ?? null),
+      (k) =>
+        JSON.stringify((before as Record<string, unknown>)[k] ?? null) !== JSON.stringify((input as Record<string, unknown>)[k] ?? null),
     )
     if (changed.length) {
       await db.insert(changeLog).values({
@@ -479,18 +487,14 @@ export const songsRoutes = new Hono<AppEnv>()
   })
 
   // Tirar o acesso de alguém (a dona) ou sair da música compartilhada (a própria pessoa).
-  .delete(
-    '/:id/share/:userId',
-    validate('param', z.object({ id: z.string().uuid(), userId: z.string().min(1) })),
-    async (c) => {
-      const uid = c.var.user.id
-      const { id, userId } = c.req.valid('param')
-      const target = userId === 'eu' ? uid : userId
-      if (target !== uid) await loadOwnSong(id, uid)
-      await db.delete(songShare).where(and(eq(songShare.songId, id), eq(songShare.userId, target)))
-      return c.body(null, 204)
-    },
-  )
+  .delete('/:id/share/:userId', validate('param', z.object({ id: z.string().uuid(), userId: z.string().min(1) })), async (c) => {
+    const uid = c.var.user.id
+    const { id, userId } = c.req.valid('param')
+    const target = userId === 'eu' ? uid : userId
+    if (target !== uid) await loadOwnSong(id, uid)
+    await db.delete(songShare).where(and(eq(songShare.songId, id), eq(songShare.userId, target)))
+    return c.body(null, 204)
+  })
 
   .post(
     '/:id/report',
@@ -527,7 +531,10 @@ export const songsRoutes = new Hono<AppEnv>()
   .post('/:id/favorite', validate('param', z.object({ id: z.string().uuid() })), async (c) => {
     const uid = c.var.user.id
     const { id } = c.req.valid('param')
-    const [visible] = await db.select({ id: song.id }).from(song).where(and(eq(song.id, id), canViewSong(uid)))
+    const [visible] = await db
+      .select({ id: song.id })
+      .from(song)
+      .where(and(eq(song.id, id), canViewSong(uid)))
     if (!visible) notFound('Música')
     await db.insert(favorite).values({ userId: uid, songId: id }).onConflictDoNothing()
     return c.json({ isFavorite: true })
@@ -548,7 +555,10 @@ export const songsRoutes = new Hono<AppEnv>()
       const uid = c.var.user.id
       const { id } = c.req.valid('param')
       const { personalKey } = c.req.valid('json')
-      const [visible] = await db.select({ id: song.id }).from(song).where(and(eq(song.id, id), canViewSong(uid)))
+      const [visible] = await db
+        .select({ id: song.id })
+        .from(song)
+        .where(and(eq(song.id, id), canViewSong(uid)))
       if (!visible) notFound('Música')
       await db
         .insert(songUserState)
@@ -561,56 +571,50 @@ export const songsRoutes = new Hono<AppEnv>()
     },
   )
 
-  .post(
-    '/:id/marks',
-    validate('param', z.object({ id: z.string().uuid() })),
-    validate('json', markInput),
-    async (c) => {
-      const uid = c.var.user.id
-      const { id } = c.req.valid('param')
-      const input = c.req.valid('json')
-      const [visible] = await db
-        .select({ id: song.id, ownerId: song.ownerId })
-        .from(song)
-        .where(and(eq(song.id, id), canViewSong(uid)))
-      if (!visible) notFound('Música')
-      if (input.setlistId) {
-        const access = await getRole(input.setlistId, uid)
-        if (!access) notFound('Repertório')
-        const [inSetlist] = await db
-          .select({ id: setlistItem.id })
-          .from(setlistItem)
-          .where(and(eq(setlistItem.setlistId, input.setlistId), eq(setlistItem.songId, id)))
-        if (!inSetlist) notFound('Música do repertório')
-        if (input.shared && !atLeast(access.role, 'mark')) {
-          forbidden('Sua permissão neste repertório só permite marcações pessoais.')
-        }
-      } else if (input.shared && visible.ownerId !== uid) {
-        forbidden('Só quem cadastrou a música pode criar marcações compartilhadas fora de um repertório.')
+  .post('/:id/marks', validate('param', z.object({ id: z.string().uuid() })), validate('json', markInput), async (c) => {
+    const uid = c.var.user.id
+    const { id } = c.req.valid('param')
+    const input = c.req.valid('json')
+    const [visible] = await db
+      .select({ id: song.id, ownerId: song.ownerId })
+      .from(song)
+      .where(and(eq(song.id, id), canViewSong(uid)))
+    if (!visible) notFound('Música')
+    if (input.setlistId) {
+      const access = await getRole(input.setlistId, uid)
+      if (!access) notFound('Repertório')
+      const [inSetlist] = await db
+        .select({ id: setlistItem.id })
+        .from(setlistItem)
+        .where(and(eq(setlistItem.setlistId, input.setlistId), eq(setlistItem.songId, id)))
+      if (!inSetlist) notFound('Música do repertório')
+      if (input.shared && !atLeast(access.role, 'mark')) {
+        forbidden('Sua permissão neste repertório só permite marcações pessoais.')
       }
-      const [mark] = await db.insert(songMark).values({ ...input, songId: id, authorId: uid }).returning()
-      // Marcação da banda: os aparelhos com o repertório aberto atualizam a cifra na hora.
-      if (mark.setlistId && mark.shared) publish(mark.setlistId, 'marks', { songId: id })
-      return c.json(mark, 201)
-    },
-  )
+    } else if (input.shared && visible.ownerId !== uid) {
+      forbidden('Só quem cadastrou a música pode criar marcações compartilhadas fora de um repertório.')
+    }
+    const [mark] = await db
+      .insert(songMark)
+      .values({ ...input, songId: id, authorId: uid })
+      .returning()
+    // Marcação da banda: os aparelhos com o repertório aberto atualizam a cifra na hora.
+    if (mark.setlistId && mark.shared) publish(mark.setlistId, 'marks', { songId: id })
+    return c.json(mark, 201)
+  })
 
-  .delete(
-    '/:id/marks/:markId',
-    validate('param', z.object({ id: z.string().uuid(), markId: z.string().uuid() })),
-    async (c) => {
-      const uid = c.var.user.id
-      const { id, markId } = c.req.valid('param')
-      const [mark] = await db
-        .select({ authorId: songMark.authorId, setlistId: songMark.setlistId })
-        .from(songMark)
-        .where(and(eq(songMark.id, markId), eq(songMark.songId, id)))
-      if (!mark) notFound('Marcação')
-      // Quem criou apaga; num repertório, quem administra também pode apagar a de qualquer um.
-      const access = mark.setlistId ? await getRole(mark.setlistId, uid) : null
-      if (mark.authorId !== uid && !atLeast(access?.role, 'admin')) notFound('Marcação')
-      await db.delete(songMark).where(eq(songMark.id, markId))
-      if (mark.setlistId) publish(mark.setlistId, 'marks', { songId: id })
-      return c.body(null, 204)
-    },
-  )
+  .delete('/:id/marks/:markId', validate('param', z.object({ id: z.string().uuid(), markId: z.string().uuid() })), async (c) => {
+    const uid = c.var.user.id
+    const { id, markId } = c.req.valid('param')
+    const [mark] = await db
+      .select({ authorId: songMark.authorId, setlistId: songMark.setlistId })
+      .from(songMark)
+      .where(and(eq(songMark.id, markId), eq(songMark.songId, id)))
+    if (!mark) notFound('Marcação')
+    // Quem criou apaga; num repertório, quem administra também pode apagar a de qualquer um.
+    const access = mark.setlistId ? await getRole(mark.setlistId, uid) : null
+    if (mark.authorId !== uid && !atLeast(access?.role, 'admin')) notFound('Marcação')
+    await db.delete(songMark).where(eq(songMark.id, markId))
+    if (mark.setlistId) publish(mark.setlistId, 'marks', { songId: id })
+    return c.body(null, 204)
+  })
