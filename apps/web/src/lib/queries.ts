@@ -20,7 +20,7 @@ export function useDashboard() {
   return useQuery({ queryKey: keys.dashboard, queryFn: () => api<Dashboard>('/me/dashboard') })
 }
 
-export function useSongs(params: { q?: string; scope?: string; key?: string; style?: string }) {
+export function useSongs(params: { q?: string; scope?: string; key?: string; style?: string; limit?: string }) {
   const clean = Object.fromEntries(Object.entries(params).filter(([, v]) => v)) as Record<string, string>
   return useQuery({
     queryKey: keys.songs(clean),
@@ -95,8 +95,7 @@ export function useDeleteSong() {
 export function useToggleFavorite() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ id, value }: { id: string; value: boolean }) =>
-      api(`/songs/${id}/favorite`, { method: value ? 'POST' : 'DELETE' }),
+    mutationFn: ({ id, value }: { id: string; value: boolean }) => api(`/songs/${id}/favorite`, { method: value ? 'POST' : 'DELETE' }),
     onMutate: async ({ id, value }) => {
       qc.setQueriesData<SongDetail>({ queryKey: ['song', id] }, (s) => (s ? { ...s, isFavorite: value } : s))
       qc.setQueriesData<SongListItem[]>({ queryKey: ['songs'] }, (list) =>
@@ -146,7 +145,6 @@ export function useImportSongs() {
 
 export function useReportSong(id: string) {
   return useMutation({
-    mutationFn: (body: { reason: ReportReason; details: string | null }) =>
-      api(`/songs/${id}/report`, { method: 'POST', json: body }),
+    mutationFn: (body: { reason: ReportReason; details: string | null }) => api(`/songs/${id}/report`, { method: 'POST', json: body }),
   })
 }

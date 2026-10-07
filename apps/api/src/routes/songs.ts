@@ -128,6 +128,9 @@ export const songListColumns = {
   ownerId: song.ownerId,
   ownerName: user.name,
   updatedAt: song.updatedAt,
+  createdAt: song.createdAt,
+  /** false = só nome e tom (ainda sem cifra). */
+  hasContent: sql<boolean>`length(trim(${song.content})) > 0`,
   coverUrl: song.coverUrl,
   usageSetlists: song.usageSetlists,
   usagePeople: song.usagePeople,
@@ -208,7 +211,7 @@ export const songsRoutes = new Hono<AppEnv>()
         key: z.string().optional(),
         style: z.string().optional(),
         scope: z.enum(['all', 'mine', 'favorites', 'public', 'shared']).default('all'),
-        limit: z.coerce.number().int().min(1).max(100).default(50),
+        limit: z.coerce.number().int().min(1).max(1000).default(50),
       }),
     ),
     async (c) => {

@@ -3,6 +3,7 @@ import clsx from 'clsx'
 import { FileUp, Globe, Music2, Plus, Search, Share2, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router'
+import { LibraryShelf } from '../components/LibraryShelf'
 import { SongRow } from '../components/SongRow'
 import { EmptyState, ErrorState, Skeleton } from '../components/ui'
 import { useFacets, useSongs } from '../lib/queries'
@@ -43,9 +44,10 @@ export function Library() {
     setParams(next, { replace: true })
   }
 
-  const { data: songs, isLoading, error, refetch, isFetching } = useSongs({ q, scope, key, style })
-  const { data: facets } = useFacets()
   const filtered = Boolean(q || key || style || scope !== 'all')
+  // Sem busca: a estante precisa da biblioteca inteira; com busca, os primeiros resultados bastam.
+  const { data: songs, isLoading, error, refetch, isFetching } = useSongs({ q, scope, key, style, limit: filtered ? '200' : '1000' })
+  const { data: facets } = useFacets()
 
   return (
     <div className="space-y-5">
@@ -73,21 +75,28 @@ export function Library() {
         </Link>
       </div>
 
-      <div className="relative">
-        <Search className="pointer-events-none absolute top-1/2 left-3 size-5 -translate-y-1/2 text-muted" />
-        <input
-          type="search"
-          className="input h-12 pr-10 pl-10"
-          placeholder="Título, artista, estilo, tom ou tag"
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          aria-label="Buscar músicas"
-        />
-        {text && (
-          <button className="absolute top-1/2 right-2 grid size-8 -translate-y-1/2 place-items-center text-muted" onClick={() => setText('')} aria-label="Limpar busca">
-            <X className="size-4" />
-          </button>
-        )}
+      {/* Busca fixa no topo ao rolar (a biblioteca pode ser longa). */}
+      <div className="sticky top-0 z-20 -mx-4 bg-bg/95 px-4 py-2 backdrop-blur md:mx-0 md:px-0">
+        <div className="relative">
+          <Search className="pointer-events-none absolute top-1/2 left-3 size-5 -translate-y-1/2 text-muted" />
+          <input
+            type="search"
+            className="input h-12 pr-10 pl-10"
+            placeholder="Título, artista, estilo, tom ou tag"
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            aria-label="Buscar músicas"
+          />
+          {text && (
+            <button
+              className="absolute top-1/2 right-2 grid size-8 -translate-y-1/2 place-items-center text-muted"
+              onClick={() => setText('')}
+              aria-label="Limpar busca"
+            >
+              <X className="size-4" />
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Filtros: no celular, uma linha que desliza para o lado (não ocupa meia tela). */}
@@ -97,14 +106,24 @@ export function Library() {
             {s.label}
           </button>
         ))}
-        <select className="chip appearance-none pr-3" value={key} onChange={(e) => setParam('tom', e.target.value)} aria-label="Filtrar por tom">
+        <select
+          className="chip appearance-none pr-3"
+          value={key}
+          onChange={(e) => setParam('tom', e.target.value)}
+          aria-label="Filtrar por tom"
+        >
           <option value="">Qualquer tom</option>
           {[...MAJOR_KEYS, ...MINOR_KEYS].map((k) => (
             <option key={k}>{k}</option>
           ))}
         </select>
         {Boolean(facets?.styles.length) && (
-          <select className="chip appearance-none pr-3" value={style} onChange={(e) => setParam('estilo', e.target.value)} aria-label="Filtrar por estilo">
+          <select
+            className="chip appearance-none pr-3"
+            value={style}
+            onChange={(e) => setParam('estilo', e.target.value)}
+            aria-label="Filtrar por estilo"
+          >
             <option value="">Qualquer estilo</option>
             {facets!.styles.map((s) => (
               <option key={s}>{s}</option>
@@ -121,6 +140,8 @@ export function Library() {
             <Skeleton key={i} className="h-12" />
           ))}
         </div>
+      ) : songs && songs.length > 0 && !filtered ? (
+        <LibraryShelf songs={songs} />
       ) : songs && songs.length > 0 ? (
         <>
           <p className="text-sm text-muted" aria-live="polite">

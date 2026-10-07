@@ -13,6 +13,9 @@ export interface SongListItem {
   ownerName: string
   isFavorite: boolean
   updatedAt: string
+  createdAt: string
+  /** false = só nome e tom (ainda sem cifra). */
+  hasContent: boolean
   /** Capa do álbum (Cover Art Archive); null/'' = capa gerada pelo app. */
   coverUrl: string | null
   /** Prova social: repertórios de outras pessoas em que a música entrou, e quantas pessoas. */
