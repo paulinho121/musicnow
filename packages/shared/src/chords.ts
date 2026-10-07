@@ -212,6 +212,67 @@ export function transposeChordLine(line: string, semitones: number, useFlats: bo
   return out
 }
 
+/**
+ * Reescreve os acordes de uma linha (os outros tokens ficam), mantendo a coluna de cada um;
+ * se um acorde cresce, empurra só o necessário. `fn` recebe o acorde e a sua ordem na linha.
+ */
+function mapChordsInLine(line: string, fn: (chord: string, index: number) => string): string {
+  let out = ''
+  let k = 0
+  const re = /\S+/g
+  let m: RegExpExecArray | null
+  while ((m = re.exec(line))) {
+    const token = m[0]
+    const lead = token.startsWith('(') ? '(' : ''
+    const trail = token.endsWith(')') && !isChord(token) ? ')' : ''
+    const core = token.slice(lead.length, token.length - trail.length)
+    const next = isChord(core) ? lead + fn(core, k++) + trail : token
+    const col = Math.max(m.index, out.length === 0 ? 0 : out.length + 1)
+    out = out.padEnd(col, ' ') + next
+  }
+  return out
+}
+
+/** Aplica `fn` às linhas de acordes da cifra (inclusive os acordes ao lado do nome da seção). */
+function mapChordLines(content: string, fn: (line: string, lineIndex: number) => string): string {
+  return content
+    .replace(/\r\n?/g, '\n')
+    .split('\n')
+    .map((line, i) => {
+      const sec = matchSection(line)
+      if (sec && sec.rest && isChordLine(sec.rest)) return line.slice(0, line.length - sec.rest.length) + fn(sec.rest, i)
+      return isChordLine(line) ? fn(line, i) : line
+    })
+    .join('\n')
+}
+
+/** Mesmo acorde, em qualquer grafia (A#m7 = Bbm7). */
+export function sameChord(a: string, b: string): boolean {
+  const x = parseChord(a)
+  const y = parseChord(b)
+  if (!x || !y) return false
+  const bass = (c: ParsedChord) => (c.bass ? NOTE_INDEX[c.bass] : null)
+  return NOTE_INDEX[x.root] === NOTE_INDEX[y.root] && x.suffix === y.suffix && bass(x) === bass(y)
+}
+
+/** Troca um acorde num lugar só: linha `lineIndex`, o `occurrence`-ésimo acorde dela. */
+export function replaceChordAt(content: string, lineIndex: number, occurrence: number, chord: string): string {
+  return mapChordLines(content, (line, i) => (i === lineIndex ? mapChordsInLine(line, (c, k) => (k === occurrence ? chord : c)) : line))
+}
+
+/** Troca um acorde em toda a música (cada vez que ele aparece, em qualquer grafia). */
+export function replaceChordEverywhere(content: string, from: string, to: string): { content: string; count: number } {
+  let count = 0
+  const next = mapChordLines(content, (line) =>
+    mapChordsInLine(line, (c) => {
+      if (!sameChord(c, from)) return c
+      count++
+      return to
+    }),
+  )
+  return { content: next, count }
+}
+
 export type SheetLine =
   | { kind: 'section'; label: string; type: SectionType | null; chords?: string }
   | { kind: 'chords'; text: string }

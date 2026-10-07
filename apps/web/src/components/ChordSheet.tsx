@@ -38,6 +38,13 @@ export function sectionsOf(lines: SheetLine[]): SheetSection[] {
 }
 
 /** Cifra pronta para mostrar: no tom escolhido e com sustenido/bemol do jeito do músico. */
+/** Onde está o acorde tocado: linha da cifra e a ordem dele entre os acordes da linha. */
+export interface ChordAt {
+  line: number
+  occurrence: number
+}
+export type OnChordClick = (chord: string, at: ChordAt) => void
+
 export function useSheet(content: string, semitones: number, targetKey: string | null) {
   const accidentals = useAccidentals()
   return useMemo(() => parseSheet(content, semitones, targetKey, accidentals), [content, semitones, targetKey, accidentals])
@@ -57,7 +64,7 @@ interface Props {
   onLineClick?: (lineIndex: number) => void
   onMarkClick?: (mark: SongMark) => void
   /** Toque num acorde (fora do modo de marcar): abre o dicionário. */
-  onChordClick?: (chord: string) => void
+  onChordClick?: OnChordClick
   /** Quebra as linhas longas para caber na tela (acorde e letra juntos), sem rolagem lateral. */
   wrap?: boolean
 }
@@ -168,7 +175,7 @@ export const ChordSheet = memo(function ChordSheet({
                   <Line line={line} showChords={showChords} hideLyrics={hideLyrics} cols={cols} pair={pair} />
                 </button>
               ) : (
-                <Line line={line} showChords={showChords} hideLyrics={hideLyrics} onChordClick={onChordClick} cols={cols} pair={pair} />
+                <Line line={line} index={i} showChords={showChords} hideLyrics={hideLyrics} onChordClick={onChordClick} cols={cols} pair={pair} />
               ))}
           </div>
         )
@@ -179,6 +186,7 @@ export const ChordSheet = memo(function ChordSheet({
 
 function Line({
   line,
+  index = 0,
   showChords,
   hideLyrics,
   onChordClick,
@@ -186,9 +194,10 @@ function Line({
   pair = null,
 }: {
   line: SheetLine
+  index?: number
   showChords: boolean
   hideLyrics: boolean
-  onChordClick?: (chord: string) => void
+  onChordClick?: OnChordClick
   /** Colunas disponíveis (quebra ligada) ou null (linha inteira, com rolagem lateral). */
   cols?: number | null
   /** Letra que vai embaixo desta linha de acordes (quebrada junto com ela). */
@@ -202,20 +211,28 @@ function Line({
     case 'chords':
       if (!showChords) return null
       if (cols) {
+        // Cada pedaço da linha quebrada continua a contagem dos acordes do anterior.
+        let before = 0
         return (
           <>
-            {wrapChordPair(line.text, pair, cols).map((row, k) => (
-              <div key={k}>
-                <div className="font-bold text-chord">{row.chords ? <Chords text={row.chords} onChordClick={onChordClick} /> : ' '}</div>
-                {row.lyrics !== null && <div>{row.lyrics || ' '}</div>}
-              </div>
-            ))}
+            {wrapChordPair(line.text, pair, cols).map((row, k) => {
+              const start = before
+              before += row.chords ? splitChordLine(row.chords).filter((p) => p.chord).length : 0
+              return (
+                <div key={k}>
+                  <div className="font-bold text-chord">
+                    {row.chords ? <Chords text={row.chords} line={index} start={start} onChordClick={onChordClick} /> : ' '}
+                  </div>
+                  {row.lyrics !== null && <div>{row.lyrics || ' '}</div>}
+                </div>
+              )
+            })}
           </>
         )
       }
       return (
         <div className="font-bold text-chord">
-          <Chords text={line.text} onChordClick={onChordClick} />
+          <Chords text={line.text} line={index} onChordClick={onChordClick} />
         </div>
       )
     case 'section':
@@ -231,7 +248,7 @@ function Line({
           </span>
           {line.chords && showChords && (
             <span className="font-bold text-chord">
-              {isChordLine(line.chords) ? <Chords text={line.chords} onChordClick={onChordClick} /> : line.chords}
+              {isChordLine(line.chords) ? <Chords text={line.chords} line={index} onChordClick={onChordClick} /> : line.chords}
             </span>
           )}
         </div>
@@ -240,25 +257,37 @@ function Line({
 }
 
 /** Acordes como botões, sem mudar a largura de nada: as colunas da cifra continuam alinhadas. */
-function Chords({ text, onChordClick }: { text: string; onChordClick?: (chord: string) => void }) {
+function Chords({
+  text,
+  line,
+  start = 0,
+  onChordClick,
+}: {
+  text: string
+  line: number
+  /** Quantos acordes da mesma linha vieram antes deste pedaço (linha quebrada). */
+  start?: number
+  onChordClick?: OnChordClick
+}) {
   if (!onChordClick) return <>{text}</>
+  let occurrence = start
   return (
     <>
-      {splitChordLine(text).map((p, i) =>
-        p.chord ? (
+      {splitChordLine(text).map((p, i) => {
+        if (!p.chord) return <span key={i}>{p.text}</span>
+        const at = { line, occurrence: occurrence++ }
+        return (
           <button
             key={i}
             type="button"
             className="cursor-pointer rounded-sm underline decoration-chord/30 decoration-dotted underline-offset-4 hover:bg-chord/15 hover:decoration-chord focus-visible:bg-chord/15"
-            onClick={() => onChordClick(p.chord!)}
+            onClick={() => onChordClick(p.chord!, at)}
             title={`Como tocar ${p.chord}`}
           >
             {p.text}
           </button>
-        ) : (
-          <span key={i}>{p.text}</span>
-        ),
-      )}
+        )
+      })}
     </>
   )
 }

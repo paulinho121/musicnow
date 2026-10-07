@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import {
   spellKey,
+  replaceChordAt,
+  replaceChordEverywhere,
+  sameChord,
   guessKey,
   isChord,
   isChordLine,
@@ -227,5 +230,28 @@ describe('sustenido ou bemol, à escolha do músico', () => {
     expect(spellKey('Bbm', 'sharp')).toBe('A#m')
     expect(spellKey('F#', 'flat')).toBe('Gb')
     expect(spellKey('Bb', 'auto')).toBe('Bb')
+  })
+})
+
+describe('corrigir um acorde da cifra', () => {
+  const song = '[Intro] Am  F  C\n\n Am          F\nLetra da música aqui\n   Am     G/B\nOutra linha'
+
+  it('troca num lugar só, sem desalinhar os acordes seguintes', () => {
+    const out = replaceChordAt(song, 2, 0, 'C')
+    expect(out.split('\n')[2]).toBe(' C           F')
+    expect(out.split('\n')[4]).toBe('   Am     G/B')
+    // Acorde maior: empurra só o necessário.
+    expect(replaceChordAt(song, 4, 0, 'Am7(9)').split('\n')[4]).toBe('   Am7(9) G/B')
+    // Acordes ao lado do nome da seção.
+    expect(replaceChordAt(song, 0, 2, 'C/E').split('\n')[0]).toBe('[Intro] Am  F  C/E')
+  })
+
+  it('troca em toda a música, reconhecendo a outra grafia', () => {
+    const { content, count } = replaceChordEverywhere(song, 'Am', 'Am/C')
+    expect(count).toBe(3)
+    expect(content.split('\n')[0]).toBe('[Intro] Am/C F C')
+    expect(sameChord('A#m7', 'Bbm7')).toBe(true)
+    expect(sameChord('Am', 'Am7')).toBe(false)
+    expect(replaceChordEverywhere('Bb  F', 'A#', 'Bb/D').content).toBe('Bb/D F')
   })
 })

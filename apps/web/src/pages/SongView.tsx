@@ -5,10 +5,14 @@ import {
   guitarVoicings,
   normalizeOffset,
   parseChord,
+  prefersFlats,
+  replaceChordAt,
+  replaceChordEverywhere,
   semitonesBetween,
   songInKey,
   toChordPro,
   spellKey,
+  transposeChord,
   transposeKey,
 } from '@ensaio/shared'
 import clsx from 'clsx'
@@ -46,8 +50,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router'
 import { AddToSetlistButton } from '../components/AddToSetlist'
 import { GuitarDiagram } from '../components/ChordDiagrams'
-import { ChordDialog } from '../components/ChordDictionary'
-import { ChordSheet, sectionsOf, useSheet } from '../components/ChordSheet'
+import { ChordDialog, type ChordFixScope } from '../components/ChordDictionary'
+import { ChordSheet, sectionsOf, useSheet, type ChordAt } from '../components/ChordSheet'
 import { FindLinks } from '../components/FindLinks'
 import { KeyPicker } from '../components/KeyPicker'
 import { LiveStrip, type LiveControls } from '../components/LiveStrip'
@@ -63,7 +67,7 @@ import { CoverGlow, SongCover } from '../components/SongCover'
 import { UsageBadge } from '../components/UsageBadge'
 import { ErrorState, PageSpinner, useToast } from '../components/ui'
 import { useSession } from '../lib/auth'
-import { useDeleteMark, useSavePersonalKey, useSong, useToggleFavorite } from '../lib/queries'
+import { useDeleteMark, useSavePersonalKey, useSaveSong, useSong, useToggleFavorite } from '../lib/queries'
 import { downloadText } from '../lib/download'
 import { useLeaveSharedSong } from '../lib/songShare'
 import { useLocalState } from '../lib/storage'
@@ -149,6 +153,7 @@ export function SongViewer({ songId, setlist }: { songId: string; setlist?: Setl
   const fav = useToggleFavorite()
   const savePersonal = useSavePersonalKey(songId)
   const deleteMark = useDeleteMark(songId)
+  const saveSong = useSaveSong(songId)
 
   const [prefs, setPrefs] = useLocalState('ef-viewer', VIEWER_DEFAULTS)
   const pedal = prefs.pedal ?? 'scroll'
@@ -160,7 +165,8 @@ export function SongViewer({ songId, setlist }: { songId: string; setlist?: Setl
   const [fullscreen, setFullscreen] = useState(false)
   const [markMode, setMarkMode] = useState(false)
   const [markLine, setMarkLine] = useState<number | null>(null)
-  const [chordOpen, setChordOpen] = useState<string | null>(null)
+  // Acorde aberto no dicionário e, se veio de um toque na cifra, onde ele está.
+  const [chordOpen, setChordOpen] = useState<{ symbol: string; at?: ChordAt } | null>(null)
   const [addOpen, setAddOpen] = useState(false)
   const [moreOpen, setMoreOpen] = useState(false)
   const [shareOpen, setShareOpen] = useState(false)
@@ -217,6 +223,36 @@ export function SongViewer({ songId, setlist }: { songId: string; setlist?: Setl
   const viewMode: 'chord' | 'score' = hasScores && (prefs.view === 'score' || !song?.content.trim()) ? 'score' : 'chord'
   const sections = sectionsOf(lines)
   const songChords = useMemo(() => chordsInSheet(lines), [lines])
+
+  // Corrigir um acorde direto na cifra (quem cadastrou a música). A pessoa vê a cifra no tom
+  // escolhido; o acorde volta para o tom em que a cifra está salva antes de gravar.
+  const fixChord = async (next: string, scope: ChordFixScope) => {
+    if (!song || !chordOpen) return
+    const toSaved = (c: string) => (offset === 0 ? c : transposeChord(c, -offset, prefersFlats(original)))
+    let content: string
+    let count = 1
+    if (scope === 'here' && chordOpen.at) {
+      content = replaceChordAt(song.content, chordOpen.at.line, chordOpen.at.occurrence, toSaved(next))
+    } else {
+      ;({ content, count } = replaceChordEverywhere(song.content, toSaved(chordOpen.symbol), toSaved(next)))
+    }
+    if (content === song.content) {
+      toast('Nada para trocar.', 'error')
+      return
+    }
+    const { title, artist, composer, originalKey, bpm, timeSignature, style, notes, tags, lyricsAuthorized, visibility, license, referenceUrl, coverUrl } =
+      song
+    try {
+      await saveSong.mutateAsync({
+        ...{ title, artist, composer, originalKey, bpm, timeSignature, style, notes, tags, lyricsAuthorized, visibility, license, referenceUrl, coverUrl },
+        content,
+      })
+      toast(count > 1 ? `${count} acordes ${chordOpen.symbol} trocados por ${next}.` : `Acorde trocado por ${next}.`)
+      setChordOpen({ symbol: next, at: scope === 'here' ? chordOpen.at : undefined })
+    } catch (e) {
+      toast((e as Error).message, 'error')
+    }
+  }
 
   const shift = useCallback((d: number) => setOffset((o) => normalizeOffset(o + d)), [])
 
@@ -612,7 +648,7 @@ export function SongViewer({ songId, setlist }: { songId: string; setlist?: Setl
                 chords={songChords}
                 open={prefs.chordStrip}
                 onToggle={() => setPrefs((p) => ({ ...p, chordStrip: !p.chordStrip }))}
-                onPick={setChordOpen}
+                onPick={(symbol) => setChordOpen({ symbol })}
               />
             )}
 
@@ -629,7 +665,7 @@ export function SongViewer({ songId, setlist }: { songId: string; setlist?: Setl
                 markMode={markMode}
                 onLineClick={setMarkLine}
                 onMarkClick={onMarkClick}
-                onChordClick={setChordOpen}
+                onChordClick={(symbol, at) => setChordOpen({ symbol, at })}
               />
             ) : (
               <div className="flex flex-col items-center gap-3 py-10 text-center">
@@ -991,7 +1027,13 @@ export function SongViewer({ songId, setlist }: { songId: string; setlist?: Setl
         }}
       />
 
-      <ChordDialog symbol={chordOpen} onClose={() => setChordOpen(null)} related={songChords} onPick={setChordOpen} />
+      <ChordDialog
+        symbol={chordOpen?.symbol ?? null}
+        onClose={() => setChordOpen(null)}
+        related={songChords}
+        onPick={(symbol) => setChordOpen({ symbol })}
+        fix={song.canEdit && !song.lyricsHidden ? { canHere: Boolean(chordOpen?.at), onSave: fixChord } : undefined}
+      />
     </div>
   )
 }
