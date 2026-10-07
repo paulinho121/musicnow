@@ -9,7 +9,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const dist = path.join(root, 'dist')
 // O mesmo endereço do vite.config.ts.
-const siteUrl = (process.env.VITE_SITE_URL ?? 'https://ensaio.152-67-63-31.sslip.io').replace(/\/$/, '')
+const siteUrl = (process.env.VITE_SITE_URL ?? 'https://ensaiofacil.app.br').replace(/\/$/, '')
 
 const ssr = await import(pathToFileURL(path.join(root, 'dist-ssr/prerender.js')).href)
 const template = await readFile(path.join(dist, 'index.html'), 'utf8')

@@ -16,7 +16,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  SITE: https://ensaio.152-67-63-31.sslip.io
+  SITE: https://ensaiofacil.app.br
 
 jobs:
   check:

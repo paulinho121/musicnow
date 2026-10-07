@@ -63,7 +63,7 @@ jobs:
     timeout-minutes: 10
     environment:
       name: producao
-      url: https://ensaio.152-67-63-31.sslip.io
+      url: https://ensaiofacil.app.br
     steps:
       - uses: actions/download-artifact@v8
         with:
@@ -91,7 +91,7 @@ jobs:
       - name: Conferir o site
         run: |
           for i in $(seq 1 10); do
-            if curl -sf https://ensaio.152-67-63-31.sslip.io/api/health; then echo; exit 0; fi
+            if curl -sf https://ensaiofacil.app.br/api/health; then echo; exit 0; fi
             sleep 3
           done
           echo "O site não respondeu depois da publicação." >&2

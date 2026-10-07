@@ -1,5 +1,5 @@
 # Ensaio Fácil — instalado pelo deploy em /etc/caddy/ensaio-facil.caddy.
-# __DOMAIN__ é substituído pelo domínio na hora do deploy.
+# __DOMAIN__ e __OLD_DOMAIN__ são substituídos na hora do deploy (deploy/deploy.sh).
 __DOMAIN__ {
 	# Conexão ao vivo (Modo Palco): sem compressão nem buffer, cada aviso sai na hora.
 	@live path_regexp live ^/api/setlists/[^/]+/events$
@@ -49,5 +49,21 @@ __DOMAIN__ {
 		# Páginas públicas pré-geradas (acordes, transpositor...) saem prontas; o resto é o app.
 		try_files {path} {path}/index.html /index.html
 		file_server
+	}
+}
+
+# www.ensaiofacil.app.br → ensaiofacil.app.br
+www.__DOMAIN__ {
+	redir https://__DOMAIN__{uri} permanent
+}
+
+# Endereço antigo (sslip.io): links já compartilhados continuam funcionando, levando ao novo.
+# A API continua respondendo aqui por um tempo (avisos do Asaas configurados no endereço antigo).
+__OLD_DOMAIN__ {
+	handle /api/* {
+		reverse_proxy 127.0.0.1:3001
+	}
+	handle {
+		redir https://__DOMAIN__{uri} permanent
 	}
 }

@@ -6,7 +6,7 @@ import { VitePWA } from 'vite-plugin-pwa'
 // Endereço público do site: prévias de link, canonical, sitemap e robots.txt (estes dois
 // gerados em scripts/prerender.mjs). Ao trocar de domínio, troque aqui e no prerender.mjs
 // (ou defina VITE_SITE_URL no build).
-const SITE_URL = (process.env.VITE_SITE_URL ?? 'https://ensaio.152-67-63-31.sslip.io').replace(/\/$/, '')
+const SITE_URL = (process.env.VITE_SITE_URL ?? 'https://ensaiofacil.app.br').replace(/\/$/, '')
 process.env.VITE_SITE_URL = SITE_URL
 
 export default defineConfig({
