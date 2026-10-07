@@ -683,7 +683,7 @@ function ImportDone({
     setCreating(true)
     try {
       const { id } = await api<{ id: string }>('/setlists', { method: 'POST', json: { name: book.name } })
-      for (const songId of book.songIds) await api(`/setlists/${id}/items`, { method: 'POST', json: { songId } })
+      await api(`/setlists/${id}/items/batch`, { method: 'POST', json: { songIds: book.songIds, source: 'arquivo do Word' } })
       toast(`Repertório "${book.name}" criado com ${book.songIds.length} músicas.`)
       navigate(`/repertorios/${id}`)
     } catch (e) {

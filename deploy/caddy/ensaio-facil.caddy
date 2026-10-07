@@ -11,11 +11,11 @@ __DOMAIN__ {
 		X-Content-Type-Options nosniff
 		X-Frame-Options DENY
 		Referrer-Policy strict-origin-when-cross-origin
-		Permissions-Policy "camera=(), microphone=(self), geolocation=(), screen-wake-lock=(self), fullscreen=(self \"https://www.youtube-nocookie.com\"), encrypted-media=(self \"https://www.youtube-nocookie.com\"), picture-in-picture=(self \"https://www.youtube-nocookie.com\")"
+		Permissions-Policy "camera=(), microphone=(self), geolocation=(), screen-wake-lock=(self), fullscreen=(self \"https://www.youtube-nocookie.com\" \"https://open.spotify.com\" \"https://widget.deezer.com\" \"https://embed.music.apple.com\"), encrypted-media=(self \"https://www.youtube-nocookie.com\" \"https://open.spotify.com\" \"https://widget.deezer.com\" \"https://embed.music.apple.com\"), picture-in-picture=(self \"https://www.youtube-nocookie.com\"), autoplay=(self \"https://open.spotify.com\" \"https://widget.deezer.com\" \"https://embed.music.apple.com\"), clipboard-write=(self \"https://open.spotify.com\" \"https://widget.deezer.com\")"
 		# Só executa scripts vindos do próprio site: bloqueia scripts injetados (XSS).
-		# frame-src: só o player oficial do YouTube (gravação de referência).
+		# frame-src: só os players oficiais (YouTube, Spotify, Deezer, Apple Music) da gravação de referência.
 		# style 'unsafe-inline' é necessário para os estilos dinâmicos do React (tamanho da fonte da cifra).
-		Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self'; worker-src 'self'; media-src 'self' blob:; manifest-src 'self'; frame-src https://www.youtube-nocookie.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'"
+		Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self'; worker-src 'self'; media-src 'self' blob:; manifest-src 'self'; frame-src https://www.youtube-nocookie.com https://open.spotify.com https://widget.deezer.com https://embed.music.apple.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'"
 		-Server
 	}
 

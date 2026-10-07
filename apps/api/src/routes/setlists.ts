@@ -1,5 +1,5 @@
 import { atLeast, isChord, normalizeSearch, parseSetlistText, type SetlistRole } from '@ensaio/shared'
-import { and, asc, desc, eq, gt, ilike, isNull, or, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, gt, ilike, inArray, isNull, or, sql } from 'drizzle-orm'
 import { Hono } from 'hono'
 import { createMiddleware } from 'hono/factory'
 import { streamSSE } from 'hono/streaming'
@@ -245,6 +245,7 @@ export const setlistsRoutes = new Hono<AppEnv>()
             timeSignature: song.timeSignature,
             coverUrl: song.coverUrl,
             referenceUrl: song.referenceUrl,
+            ownerId: song.ownerId,
             hasContent: sql<boolean>`length(${song.content}) > 0`,
           },
           personalKey: songUserState.personalKey,
@@ -586,6 +587,38 @@ export const setlistsRoutes = new Hono<AppEnv>()
         return row
       })
       return c.json(item, 201)
+    },
+  )
+
+  // Várias músicas de uma vez, no fim e na ordem dada (repertório montado de uma playlist).
+  .post(
+    '/:id/items/batch',
+    validate('param', idParam),
+    validate('json', z.object({ songIds: z.array(z.string().uuid()).min(1).max(300), source: z.string().trim().max(40).nullish() })),
+    async (c) => {
+      const uid = c.var.user.id
+      const { id } = c.req.valid('param')
+      const { songIds, source } = c.req.valid('json')
+      await requireRole(id, uid, 'admin')
+      const visible = await db
+        .select({ id: song.id })
+        .from(song)
+        .where(and(inArray(song.id, songIds), canViewSong(uid)))
+      const ok = new Set(visible.map((s) => s.id))
+      const ids = songIds.filter((s) => ok.has(s))
+      if (!ids.length) notFound('Música')
+      await db.transaction(async (tx) => {
+        const [{ count, next }] = await tx
+          .select({ count: sql<number>`count(*)::int`, next: sql<number>`coalesce(max(${setlistItem.position}) + 1, 0)::int` })
+          .from(setlistItem)
+          .where(eq(setlistItem.setlistId, id))
+        if (count + ids.length > 300) throw new HTTPException(400, { message: 'Limite de 300 músicas por repertório.' })
+        await tx.insert(setlistItem).values(ids.map((songId, i) => ({ setlistId: id, songId, blockId: null, position: next + i })))
+        await renumber(tx, id)
+        await recordSongUsage(tx, id, ids)
+        await touch(tx, id, uid, 'add_songs', { songs: ids.length, source: source ?? null })
+      })
+      return c.json({ added: ids.length }, 201)
     },
   )
 

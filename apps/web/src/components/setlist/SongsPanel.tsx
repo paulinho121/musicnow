@@ -10,7 +10,6 @@ import {
   ChevronsDownUp,
   ChevronsUp,
   ChevronsUpDown,
-  CirclePlay,
   ClipboardPaste,
   Layers,
   Lightbulb,
@@ -34,7 +33,7 @@ import { SongCover } from '../SongCover'
 import { EmptyState, KeyBadge, useToast } from '../ui'
 import { AddSongDialog } from './AddSongDialog'
 import { BlockDialog, blockColor, blockSubtitle, ImportTextDialog } from './Blocks'
-import { ItemMenu, listenUrl } from './ItemMenu'
+import { ItemMenu, ListenButton, ListenServiceSelect } from './ItemMenu'
 import { ShareSetlistDialog } from './ShareSetlistDialog'
 
 /** Blocos recolhidos neste repertório, lembrados neste aparelho. */
@@ -177,6 +176,7 @@ export function SongsPanel({ setlist }: { setlist: SetlistDetail }) {
             {hasBlocks && ` · ${setlist.blocks.length} ${setlist.blocks.length === 1 ? 'bloco' : 'blocos'}`}
           </p>
           <div className="flex items-center gap-2">
+            <ListenServiceSelect />
             {hasBlocks && (
               <button
                 className="chip h-9"
@@ -481,17 +481,8 @@ function ItemRow({
             <Lightbulb className="size-4" />
           </button>
         )}
-        {/* Ouvir a música: gravação de referência ou busca no YouTube (para toda a banda) */}
-        <a
-          href={listenUrl(item.song)}
-          target="_blank"
-          rel="noreferrer"
-          className="grid size-8 shrink-0 place-items-center rounded-lg text-[#ff4e45] hover:bg-[#ff4e45]/10 sm:size-9"
-          aria-label={`Ouvir ${item.song.title} no YouTube`}
-          title={item.song.referenceUrl ? 'Ouvir a gravação de referência' : 'Procurar no YouTube'}
-        >
-          <CirclePlay className="size-5" />
-        </a>
+        {/* Ouvir a música no serviço de cada um (a referência, se for dele; se não, a busca) */}
+        <ListenButton song={item.song} className="hover:bg-surface-2" />
         <div className={editing ? 'hidden sm:block' : ''}>{keyControl}</div>
         {isAdmin && !editing && (
           <button

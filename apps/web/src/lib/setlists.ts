@@ -112,6 +112,12 @@ export const useUpdateItem = (id: string) =>
       api(`/setlists/${id}/items/${itemId}`, { method: 'PUT', json: body }),
   )
 
+/** Troca o link da gravação de referência de uma música (só quem cadastrou a música). */
+export const useUpdateReference = (id: string) =>
+  useSetlistMutation(id, ({ songId, referenceUrl }: { songId: string; referenceUrl: string | null }) =>
+    api<{ referenceUrl: string | null }>(`/songs/${songId}/reference`, { method: 'PUT', json: { referenceUrl } }),
+  )
+
 export const useRemoveItem = (id: string) =>
   useSetlistMutation(id, (itemId: string) => api(`/setlists/${id}/items/${itemId}`, { method: 'DELETE' }))
 

@@ -1,8 +1,9 @@
 import { PERMISSIONS, SETLIST_STATUS } from '@ensaio/shared'
 import clsx from 'clsx'
-import { Archive, CalendarDays, KeyRound, ListMusic, MapPin, Music2, Plus, Users } from 'lucide-react'
+import { Archive, CalendarDays, KeyRound, ListMusic, ListPlus, MapPin, Music2, Plus, Users } from 'lucide-react'
 import { type FormEvent, useState } from 'react'
 import { Link, useNavigate } from 'react-router'
+import { PlaylistImport } from '../components/setlist/PlaylistImport'
 import { EmptyState, ErrorState, Skeleton } from '../components/ui'
 import { useSetlists } from '../lib/setlists'
 import type { SetlistSummary } from '../lib/types'
@@ -28,6 +29,7 @@ export function Setlists() {
   const { data, isLoading, error, refetch } = useSetlists()
   const [showArchived, setShowArchived] = useState(false)
   const [code, setCode] = useState('')
+  const [fromPlaylist, setFromPlaylist] = useState(false)
   const navigate = useNavigate()
 
   const join = (e: FormEvent) => {
@@ -52,10 +54,22 @@ export function Setlists() {
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-3">
         <h1 className="text-xl sm:text-2xl font-bold">Repertórios</h1>
-        <Link to="/repertorios/novo" className="btn-primary">
-          <Plus className="size-4" /> Novo
-        </Link>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            className="btn-ghost"
+            onClick={() => setFromPlaylist(true)}
+            title="Monte o repertório a partir de uma playlist do Spotify ou do Deezer"
+          >
+            <ListPlus className="size-4" /> <span className="sm:hidden">Playlist</span>
+            <span className="hidden sm:inline">Da playlist</span>
+          </button>
+          <Link to="/repertorios/novo" className="btn-primary">
+            <Plus className="size-4" /> Novo
+          </Link>
+        </div>
       </div>
+      <PlaylistImport open={fromPlaylist} onClose={() => setFromPlaylist(false)} />
 
       <form onSubmit={join} className="card flex items-center gap-2 p-2 pl-4">
         <KeyRound className="size-4 shrink-0 text-muted" />
@@ -85,9 +99,14 @@ export function Setlists() {
           icon={ListMusic}
           title="Nenhum repertório ainda"
           action={
-            <Link to="/repertorios/novo" className="btn-primary">
-              <Plus className="size-4" /> Criar o primeiro
-            </Link>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <Link to="/repertorios/novo" className="btn-primary">
+                <Plus className="size-4" /> Criar o primeiro
+              </Link>
+              <button type="button" className="btn-ghost" onClick={() => setFromPlaylist(true)}>
+                <ListPlus className="size-4" /> A partir de uma playlist
+              </button>
+            </div>
           }
         >
           Monte a ordem das músicas do culto, do show ou do ensaio, defina o tom de cada uma e convide a banda.

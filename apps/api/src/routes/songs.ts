@@ -1,4 +1,4 @@
-import { atLeast, guessKey, isChord, normalizeSearch, PUBLIC_LICENSES, stripLyrics, youtubeId } from '@ensaio/shared'
+import { atLeast, guessKey, isChord, isShortMusicLink, normalizeSearch, parseMusicLink, PUBLIC_LICENSES, stripLyrics } from '@ensaio/shared'
 import { and, asc, desc, eq, exists, ilike, isNull, or, sql, type SQL } from 'drizzle-orm'
 import { Hono } from 'hono'
 import { HTTPException } from 'hono/http-exception'
@@ -7,6 +7,7 @@ import { z } from 'zod'
 import { getRole } from '../access'
 import { assertCanCreate } from '../billing'
 import { COVER_URL_RE } from '../covers'
+import { importPlaylist, normalizeReference } from '../music'
 import { removeScoreFiles, scoresOfSong } from './scores'
 import { publish } from '../realtime'
 import { db, schema } from '../db'
@@ -20,6 +21,14 @@ const keySchema = z
   .trim()
   .max(8)
   .refine((k) => isChord(k), 'Tom inválido')
+  .nullish()
+
+// Links curtos dos apps (link.deezer.com, spotify.link) são resolvidos antes de salvar.
+const referenceSchema = z
+  .string()
+  .trim()
+  .max(500)
+  .refine((u) => parseMusicLink(u) !== null || isShortMusicLink(u), 'Use um link do YouTube, Spotify, Deezer ou Apple Music.')
   .nullish()
 
 const songFields = z.object({
@@ -36,13 +45,8 @@ const songFields = z.object({
   lyricsAuthorized: z.boolean().default(false),
   visibility: z.enum(['private', 'shared', 'public']).default('private'),
   license: z.enum(schema.songLicense.enumValues).default('unknown'),
-  // Só links do YouTube: são tocados no player oficial (forma permitida de ouvir a gravação).
-  referenceUrl: z
-    .string()
-    .trim()
-    .max(500)
-    .refine((u) => youtubeId(u) !== null, 'Use um link do YouTube (youtube.com ou youtu.be).')
-    .nullish(),
+  // YouTube, Spotify, Deezer ou Apple Music: tocados no player oficial de cada um.
+  referenceUrl: referenceSchema,
   // Capa: link do Cover Art Archive, '' (capa gerada pelo app) ou null (procurar sozinho).
   coverUrl: z.union([z.literal(''), z.string().regex(COVER_URL_RE, 'Capa inválida')]).nullish(),
 })
@@ -288,6 +292,7 @@ export const songsRoutes = new Hono<AppEnv>()
 
     await db.transaction(async (tx) => {
       for (const input of songs) {
+        input.referenceUrl = await normalizeReference(input.referenceUrl)
         const key = dupKey(input.title, input.artist)
         if (skipDuplicates && existing.has(key)) {
           skipped.push({ title: input.title, reason: 'Já existe na sua biblioteca' })
@@ -312,6 +317,34 @@ export const songsRoutes = new Hono<AppEnv>()
     })
     return c.json({ created, skipped }, 201)
   })
+
+  // Playlist ou álbum do Spotify/Deezer → lista de músicas (prévia para montar o repertório).
+  .post('/playlist', validate('json', z.object({ url: z.string().trim().url('Cole o link da playlist.').max(500) })), async (c) => {
+    const playlist = await importPlaylist(c.req.valid('json').url)
+    // Quais já estão na biblioteca (mesmo título e artista): entram no repertório sem duplicar.
+    const existing = await ownSongKeys(c.var.user.id)
+    return c.json({ ...playlist, tracks: playlist.tracks.map((t) => ({ ...t, songId: existing.get(dupKey(t.title, t.artist)) ?? null })) })
+  })
+
+  // Trocar só o link da gravação de referência (menu da música no repertório).
+  .put(
+    '/:id/reference',
+    validate('param', z.object({ id: z.string().uuid() })),
+    validate('json', z.object({ referenceUrl: referenceSchema })),
+    async (c) => {
+      const uid = c.var.user.id
+      const { id } = c.req.valid('param')
+      const before = await loadOwnSong(id, uid)
+      const referenceUrl = (await normalizeReference(c.req.valid('json').referenceUrl)) ?? null
+      await db.update(song).set({ referenceUrl }).where(eq(song.id, id))
+      if (referenceUrl !== before.referenceUrl) {
+        await db
+          .insert(changeLog)
+          .values({ entityType: 'song', entityId: id, userId: uid, action: 'update', diff: { fields: ['referenceUrl'] } })
+      }
+      return c.json({ referenceUrl })
+    },
+  )
 
   .get(
     '/:id',
@@ -397,6 +430,7 @@ export const songsRoutes = new Hono<AppEnv>()
     const uid = c.var.user.id
     await assertCanCreate(uid)
     const input = c.req.valid('json')
+    input.referenceUrl = await normalizeReference(input.referenceUrl)
     const originalKey = input.originalKey || guessKey(input.content)
     const [created] = await db
       .insert(song)
@@ -412,6 +446,7 @@ export const songsRoutes = new Hono<AppEnv>()
     const { id } = c.req.valid('param')
     const input = c.req.valid('json')
     const before = await loadOwnSong(id, uid)
+    input.referenceUrl = await normalizeReference(input.referenceUrl)
     const originalKey = input.originalKey || guessKey(input.content)
     // Mudou o nome ou o artista e a capa ainda não foi decidida: procura de novo logo.
     const renamed = before.title !== input.title || (before.artist ?? null) !== (input.artist ?? null)

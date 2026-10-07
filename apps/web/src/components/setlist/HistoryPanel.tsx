@@ -24,6 +24,7 @@ function describe(e: HistoryEntry, setlist: SetlistDetail): string {
     case 'add_block': return `criou o bloco ${d.name ? `"${d.name}"` : ''}`.trim()
     case 'update_block': return `editou o bloco ${d.name ? `"${d.name}"` : ''}`.trim()
     case 'remove_block': return `apagou o bloco ${d.name ? `"${d.name}"` : ''}`.trim()
+    case 'add_songs': return `adicionou ${d.songs ?? 'várias'} músicas${d.source ? ` (${d.source})` : ''}`
     case 'import_text': return `colou uma lista com ${d.songs ?? 'várias'} músicas${Number(d.blocks) ? ` em ${d.blocks} blocos` : ''}`
     case 'join': return `entrou no repertório${d.permission ? ` (${PERMISSIONS[d.permission as Permission]?.toLowerCase()})` : ''}`
     case 'leave': return 'saiu do repertório'

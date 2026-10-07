@@ -7,7 +7,6 @@ import {
   PUBLIC_LICENSES,
   TIME_SIGNATURES,
   VISIBILITY,
-  youtubeId,
   type License,
   type Visibility,
 } from '@ensaio/shared'
@@ -20,6 +19,7 @@ import { FindLinks } from '../components/FindLinks'
 import { ChordAligner } from '../components/ChordAligner'
 import { CoverPicker } from '../components/CoverPicker'
 import { MetadataLookup } from '../components/MetadataLookup'
+import { ReferenceLinkInput } from '../components/ReferenceLinkInput'
 import { ErrorState, PageSpinner, useToast } from '../components/ui'
 import { useDeleteSong, useFacets, useSaveSong, useSong } from '../lib/queries'
 import type { SongInput } from '../lib/types'
@@ -230,18 +230,12 @@ export function SongEditor() {
         <Field label="Tags (separadas por vírgula)">
           <input className="input" value={tagsText} onChange={(e) => setTagsText(e.target.value)} placeholder="abertura, lenta, ceia" />
         </Field>
-        <Field label="Gravação de referência (link do YouTube)" className="md:col-span-2">
-          <input
-            className="input"
-            type="url"
-            inputMode="url"
-            value={form.referenceUrl ?? ''}
-            onChange={(e) => set('referenceUrl', e.target.value.trim() || null)}
-            placeholder="https://www.youtube.com/watch?v=..."
+        <Field label="Gravação de referência (a versão que a banda toca)" className="md:col-span-2">
+          <ReferenceLinkInput
+            value={form.referenceUrl}
+            onChange={(v) => set('referenceUrl', v)}
+            song={{ title: form.title, artist: form.artist }}
           />
-          {form.referenceUrl && !youtubeId(form.referenceUrl) && (
-            <span className="mt-1 block text-xs text-danger">Use um link do YouTube (youtube.com ou youtu.be).</span>
-          )}
         </Field>
         {/* div, não label: dentro de um label, clicar no texto acionaria o primeiro botão */}
         <div className="md:col-span-2">

@@ -30,6 +30,9 @@ export const env = {
   GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET,
   APPLE_CLIENT_ID: process.env.APPLE_CLIENT_ID,
   APPLE_CLIENT_SECRET: process.env.APPLE_CLIENT_SECRET,
+  /** Spotify (importar playlist): app grátis em developer.spotify.com. Sem ele, só o Deezer. */
+  SPOTIFY_CLIENT_ID: process.env.SPOTIFY_CLIENT_ID,
+  SPOTIFY_CLIENT_SECRET: process.env.SPOTIFY_CLIENT_SECRET,
   /** Asaas (assinaturas): chave da API, ambiente (sandbox|production) e o token que o Asaas manda nos avisos. */
   ASAAS_API_KEY: process.env.ASAAS_API_KEY,
   ASAAS_ENV: (process.env.ASAAS_ENV === 'production' ? 'production' : 'sandbox') as 'production' | 'sandbox',

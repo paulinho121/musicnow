@@ -225,8 +225,10 @@ export interface SetlistItem {
     coverUrl: string | null
     /** false = música só com nome e tom (ainda sem cifra). */
     hasContent: boolean
-    /** Gravação de referência (YouTube), se cadastrada. */
+    /** Gravação de referência (YouTube, Spotify, Deezer ou Apple Music), se cadastrada. */
     referenceUrl: string | null
+    /** Quem cadastrou a música (só essa pessoa troca o link de referência). */
+    ownerId: string
   }
 }
 
