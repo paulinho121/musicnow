@@ -51,8 +51,8 @@ export function Layout() {
             to={to}
             className={({ isActive }) =>
               clsx(
-                'flex h-11 items-center gap-3 rounded-xl px-3 text-sm font-medium transition',
-                isActive ? 'bg-accent/15 text-accent' : 'text-muted hover:bg-surface hover:text-text',
+                'flex h-11 items-center gap-3 rounded-full px-4 text-sm font-bold transition',
+                isActive ? 'bg-primary text-primary-ink' : 'text-muted hover:bg-surface hover:text-text',
               )
             }
           >
@@ -72,7 +72,7 @@ export function Layout() {
 
       <nav
         className={clsx(
-          'fixed inset-x-0 bottom-0 z-40 grid border-t border-border bg-bg/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden',
+          'fixed inset-x-0 bottom-0 z-40 grid rounded-t-3xl border-t border-[var(--card-border)] bg-[var(--nav-bg)] px-1 pb-[env(safe-area-inset-bottom)] shadow-[0_-6px_24px_rgb(38_33_56/0.08)] backdrop-blur md:hidden',
         )}
         style={{ gridTemplateColumns: `repeat(${mobileItems.length}, minmax(0, 1fr))` }}
       >
@@ -82,14 +82,21 @@ export function Layout() {
             to={to}
             className={({ isActive }) =>
               clsx(
-                'flex h-16 min-w-0 flex-col items-center justify-center gap-1 font-medium',
+                'flex h-[4.25rem] min-w-0 flex-col items-center justify-center gap-1 font-semibold',
                 mobileItems.length > 5 ? 'text-[10px]' : 'text-[11px]',
-                isActive ? 'text-accent' : 'text-muted',
+                isActive ? 'text-text' : 'text-muted',
               )
             }
           >
-            <Icon className="size-5" />
-            {label}
+            {({ isActive }) => (
+              <>
+                {/* Item ativo: o ícone ganha uma pílula colorida (como nos apps de referência). */}
+                <span className={clsx('grid h-8 w-12 place-items-center rounded-full transition', isActive && 'bg-accent/18 text-accent')}>
+                  <Icon className="size-5" />
+                </span>
+                {label}
+              </>
+            )}
           </NavLink>
         ))}
       </nav>

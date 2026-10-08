@@ -2,7 +2,9 @@
 // Fica em arquivo próprio (e não inline no HTML) para a política de segurança (CSP) bloquear scripts inline.
 try {
   var t = localStorage.getItem('ef-theme')
-  document.documentElement.dataset.theme = t === 'light' ? 'light' : 'dark'
+  // Sem escolha salva: escuro (palco); no endereço de teste, o claro (visual novo em avaliação).
+  var def = location.hostname.indexOf('teste.') === 0 ? 'light' : 'dark'
+  document.documentElement.dataset.theme = t === 'light' || t === 'dark' ? t : def
 } catch (e) {
   document.documentElement.dataset.theme = 'dark'
 }

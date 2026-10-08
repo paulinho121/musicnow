@@ -178,6 +178,7 @@ export function Library() {
       ) : (
         <EmptyState
           icon={Music2}
+          art="biblioteca"
           title="Sua biblioteca está vazia"
           action={
             <div className="flex flex-col gap-2 sm:flex-row">

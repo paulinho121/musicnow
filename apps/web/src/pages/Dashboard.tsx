@@ -6,6 +6,7 @@ import { Link, useNavigate } from 'react-router'
 import { AgendaSummary } from '../components/AgendaSummary'
 import { GettingStarted } from '../components/GettingStarted'
 import { HeroBackground, HeroCustomizeDialog } from '../components/HeroBackground'
+import { PromoCard } from '../components/PromoCard'
 import { SongCover } from '../components/SongCover'
 import { SongCard } from '../components/SongRow'
 import { ErrorState, Skeleton } from '../components/ui'
@@ -34,6 +35,7 @@ const ACTIONS = [
   { to: '/musicas/encontrar', label: 'Encontrar', icon: Globe },
   { to: '/musicas/importar', label: 'Importar', icon: FileUp },
   { to: '/acordes', label: 'Acordes', icon: Guitar },
+  { to: '/agenda', label: 'Agenda', icon: CalendarDays },
 ]
 
 export function Dashboard() {
@@ -74,8 +76,8 @@ export function Dashboard() {
           <ImagePlus className="size-4" /> <span className="max-sm:sr-only">Personalizar</span>
         </button>
         <div className="relative">
-          <p className="text-sm font-medium text-muted">{greeting()},</p>
-          <h1 className="text-3xl font-extrabold tracking-tight sm:text-4xl">{me?.name?.split(' ')[0] ?? '...'}</h1>
+          <p className="text-sm font-semibold text-muted">{greeting()},</p>
+          <h1 className="text-4xl font-black tracking-tight sm:text-5xl">{me?.name?.split(' ')[0] ?? '...'}</h1>
           {data && (
             <p className="mt-1 text-sm text-muted">
               {data.counts.library} {data.counts.library === 1 ? 'música' : 'músicas'} na sua biblioteca
@@ -86,7 +88,7 @@ export function Dashboard() {
             <Search className="pointer-events-none absolute top-1/2 left-4 z-10 size-5 -translate-y-1/2 text-muted" />
             <input
               type="search"
-              className="input h-13 rounded-2xl bg-bg/70 pl-12 text-base shadow-inner backdrop-blur"
+              className="input h-13 rounded-full border-transparent bg-surface pl-12 text-base shadow-[var(--card-shadow)]"
               placeholder="Buscar música para tocar agora"
               value={q}
               onChange={(e) => setQ(e.target.value)}
@@ -97,20 +99,28 @@ export function Dashboard() {
       </header>
       <HeroCustomizeDialog images={heroImages} open={customizing} onClose={() => setCustomizing(false)} />
 
-      <nav aria-label="Atalhos" className="grid grid-cols-4 gap-2 sm:gap-3">
-        {ACTIONS.map(({ to, label, icon: Icon }) => (
+      {/* Atalhos em pílulas, que deslizam no celular */}
+      <nav aria-label="Atalhos" className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] md:mx-0 md:px-0">
+        {ACTIONS.map(({ to, label, icon: Icon }, i) => (
           <Link
             key={to}
             to={to}
-            className="group flex flex-col items-center gap-2 rounded-2xl border border-border bg-surface px-1 py-3.5 text-center transition hover:-translate-y-0.5 hover:border-accent/40 sm:py-4"
+            className={clsx(
+              'inline-flex h-12 shrink-0 items-center gap-2 rounded-full border px-4 text-sm font-bold shadow-[var(--card-shadow)] transition active:scale-95',
+              i === 0 ? 'border-transparent bg-primary text-primary-ink' : 'border-[var(--card-border)] bg-surface text-text hover:bg-surface-2',
+            )}
           >
-            <span className="grid size-10 place-items-center rounded-xl bg-accent/12 text-accent transition group-hover:bg-accent group-hover:text-accent-ink">
-              <Icon className="size-5" />
-            </span>
-            <span className="text-xs leading-tight font-semibold sm:text-sm">{label}</span>
+            <Icon className="size-5" />
+            {label}
           </Link>
         ))}
       </nav>
+
+      {data && data.counts.library === 0 && (
+        <PromoCard art="biblioteca" title="Traga suas cifras para cá" action={{ to: '/musicas/importar', label: 'Importar cifras' }}>
+          Do Word, de arquivos ChordPro ou colando o texto: o app arruma acordes, seções e tom.
+        </PromoCard>
+      )}
 
       {data?.onboarding && <GettingStarted progress={data.onboarding} />}
       <AgendaSummary />
@@ -139,18 +149,9 @@ export function Dashboard() {
                 ))}
               </div>
             ) : (
-              <Link
-                to="/repertorios/novo"
-                className="card flex items-center gap-4 border-dashed p-5 transition hover:border-accent/50 hover:bg-surface-2"
-              >
-                <span className="grid size-12 shrink-0 place-items-center rounded-2xl bg-accent/12 text-accent">
-                  <Plus className="size-6" />
-                </span>
-                <span>
-                  <span className="block font-semibold">Nenhum evento marcado</span>
-                  <span className="block text-sm text-muted">Monte o repertório do próximo culto, show ou ensaio e convide a banda.</span>
-                </span>
-              </Link>
+              <PromoCard art="repertorio" title="Monte o repertório do próximo evento" action={{ to: '/repertorios/novo', label: 'Criar repertório' }}>
+                Culto, show ou ensaio: a ordem das músicas, o tom de cada uma e a banda toda vendo junto.
+              </PromoCard>
             )}
           </Section>
 
@@ -174,10 +175,10 @@ function NextEvent({ event: s }: { event: Upcoming }) {
   return (
     <Link
       to={`/repertorios/${s.id}`}
-      className="group relative flex items-center gap-4 overflow-hidden rounded-3xl border border-border bg-surface p-4 transition hover:border-accent/50 sm:gap-5 sm:p-5"
+      className="card group relative flex items-center gap-4 overflow-hidden p-4 transition hover:brightness-[1.02] sm:gap-5 sm:p-5"
     >
       <div className="pointer-events-none absolute inset-y-0 right-0 w-2/3 bg-gradient-to-l from-accent/10 to-transparent" />
-      <Mosaic songs={s.songs} className="size-24 rounded-2xl shadow-xl shadow-black/40 sm:size-28" />
+      <Mosaic songs={s.songs} className="size-24 rounded-2xl shadow-lg shadow-black/20 sm:size-28" />
       <div className="relative min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
           {s.eventDate && (
@@ -239,11 +240,11 @@ function Section({
   return (
     <section>
       <div className="mb-3 flex items-center justify-between">
-        <h2 className="flex items-center gap-2 text-lg font-bold tracking-tight">
-          <Icon className="size-4 text-accent" /> {title}
+        <h2 className="flex items-center gap-2 text-xl font-extrabold tracking-tight">
+          <Icon className="size-5 text-accent" /> {title}
         </h2>
         {more && (
-          <Link to={more.to} className="text-sm font-medium text-muted hover:text-text">
+          <Link to={more.to} className="text-sm font-bold text-accent hover:underline">
             {more.label}
           </Link>
         )}

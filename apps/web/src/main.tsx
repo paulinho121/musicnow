@@ -1,5 +1,6 @@
 import '@fontsource-variable/inter'
 import '@fontsource-variable/jetbrains-mono'
+import '@fontsource-variable/nunito'
 import './index.css'
 import { MutationCache, QueryCache, QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { StrictMode } from 'react'

@@ -97,6 +97,7 @@ export function Setlists() {
       ) : !active.length && !archived.length ? (
         <EmptyState
           icon={ListMusic}
+          art="repertorio"
           title="Nenhum repertório ainda"
           action={
             <div className="flex flex-col gap-2 sm:flex-row">

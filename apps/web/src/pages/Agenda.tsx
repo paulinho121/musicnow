@@ -118,7 +118,7 @@ export function Agenda() {
       </div>
 
       {inMonth.length === 0 ? (
-        <EmptyState icon={CalendarDays} title="Nenhum show neste mês">
+        <EmptyState icon={CalendarDays} art="agenda" title="Nenhum show neste mês">
           {gigs.length === 0
             ? 'Anote seus shows e apresentações com o cachê combinado: o app soma quanto você tem a receber.'
             : 'Use as setas para ver outros meses ou anote um show novo.'}

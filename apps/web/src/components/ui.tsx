@@ -1,6 +1,7 @@
 import clsx from 'clsx'
 import { AlertTriangle, CheckCircle2, Loader2, type LucideIcon } from 'lucide-react'
 import { createContext, useCallback, useContext, useState, type ReactNode } from 'react'
+import { Illustration, type IllustrationName } from './Illustration'
 
 export function Spinner({ className }: { className?: string }) {
   return <Loader2 aria-label="Carregando" className={clsx('animate-spin text-muted', className ?? 'size-6')} />
@@ -23,18 +24,25 @@ export function EmptyState({
   title,
   children,
   action,
+  art,
 }: {
   icon: LucideIcon
   title: string
   children?: ReactNode
   action?: ReactNode
+  /** Ilustração no lugar do ícone (telas vazias principais). */
+  art?: IllustrationName
 }) {
   return (
     <div className="card flex flex-col items-center gap-3 px-6 py-10 text-center">
-      <div className="grid size-12 place-items-center rounded-2xl bg-surface-2">
-        <Icon className="size-6 text-muted" />
-      </div>
-      <h3 className="text-base font-semibold">{title}</h3>
+      {art ? (
+        <Illustration name={art} className="size-36" />
+      ) : (
+        <div className="grid size-12 place-items-center rounded-2xl bg-surface-2">
+          <Icon className="size-6 text-muted" />
+        </div>
+      )}
+      <h3 className={art ? 'text-xl font-extrabold' : 'text-base font-semibold'}>{title}</h3>
       {children && <p className="max-w-sm text-sm text-muted">{children}</p>}
       {action}
     </div>
