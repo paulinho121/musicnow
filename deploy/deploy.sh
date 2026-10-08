@@ -26,29 +26,15 @@ trap 'rm -rf "$TMP"' EXIT
 bash deploy/make-bundle.sh "$TMP/bundle.tgz"
 
 echo "== atualizando a configuração do servidor"
-scp -q -i "$KEY" -o BatchMode=yes deploy/setup-vm.sh deploy/pg-backup.sh deploy/ci-deploy.sh deploy/caddy/ensaio-facil.caddy "$HOST:/tmp/"
+scp -q -i "$KEY" -o BatchMode=yes deploy/setup-vm.sh deploy/pg-backup.sh deploy/ci-deploy.sh deploy/caddy-install.sh deploy/caddy/ensaio-facil.caddy "$HOST:/tmp/"
 $SSH "$HOST" "DOMAIN=$DOMAIN OLD_DOMAIN=$OLD_DOMAIN bash -s" <<'REMOTE'
 set -euo pipefail
 cd /
 # Configuração da VM (idempotente: só muda o que estiver diferente).
 bash /tmp/setup-vm.sh "$DOMAIN" >/dev/null
-
-# Caddy: instala o site do projeto e só recarrega se a configuração mudou e for válida.
-sed "s/__OLD_DOMAIN__/$OLD_DOMAIN/g; s/__DOMAIN__/$DOMAIN/g" /tmp/ensaio-facil.caddy > /tmp/ensaio-facil.caddy.final
-if ! sudo cmp -s /tmp/ensaio-facil.caddy.final /etc/caddy/ensaio-facil.caddy; then
-  sudo cp /etc/caddy/ensaio-facil.caddy /etc/caddy/ensaio-facil.caddy.bak 2>/dev/null || true
-  sudo install -m 644 /tmp/ensaio-facil.caddy.final /etc/caddy/ensaio-facil.caddy
-  if sudo caddy validate --config /etc/caddy/Caddyfile >/dev/null 2>&1; then
-    sudo systemctl reload caddy
-    echo "Configuração do Caddy atualizada."
-  else
-    echo "Configuração do Caddy inválida: mantendo a anterior."
-    [ -f /etc/caddy/ensaio-facil.caddy.bak ] && sudo mv /etc/caddy/ensaio-facil.caddy.bak /etc/caddy/ensaio-facil.caddy
-    sudo caddy validate --config /etc/caddy/Caddyfile 2>&1 | tail -3
-    exit 1
-  fi
-fi
-rm -f /tmp/ensaio-facil.caddy /tmp/ensaio-facil.caddy.final /tmp/setup-vm.sh /tmp/pg-backup.sh /tmp/ci-deploy.sh
+# Caddy: produção e teste no mesmo arquivo; só recarrega se mudou e for válido.
+bash /tmp/caddy-install.sh /tmp/ensaio-facil.caddy
+rm -f /tmp/ensaio-facil.caddy /tmp/setup-vm.sh /tmp/pg-backup.sh /tmp/ci-deploy.sh /tmp/caddy-install.sh
 REMOTE
 
 echo "== instalando a nova versão"

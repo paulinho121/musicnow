@@ -69,6 +69,12 @@ createRoot(document.getElementById('root')!).render(
           <OfflineBanner />
           <IntroSplash />
           <PaywallDialog />
+          {/* Versão de teste (teste.ensaiofacil.app.br): selo fixo para nunca confundir com o app oficial. */}
+          {import.meta.env.VITE_APP_ENV === 'teste' && (
+            <div className="pointer-events-none fixed top-2 left-1/2 z-[100] -translate-x-1/2 rounded-full bg-fuchsia-600 px-3 py-0.5 text-[11px] font-black tracking-widest text-white shadow-lg">
+              TESTE
+            </div>
+          )}
         </ToastProvider>
       </QueryClientProvider>
     </AppErrorBoundary>

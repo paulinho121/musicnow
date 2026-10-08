@@ -10,13 +10,19 @@
 # A chave SSH do GitHub Actions só consegue rodar ESTE script (command= no
 # authorized_keys): não abre terminal nem executa outros comandos. Por isso ele
 # nunca executa nada que venha dentro do pacote — só copia arquivos.
+#
+# Sem argumento publica a produção. Com "teste", publica a versão de teste
+# (teste.ensaiofacil.app.br): outras pastas, outro serviço, outra porta e outro banco.
 set -euo pipefail
 umask 022
 cd /
 
 MAX_BYTES=$((60 * 1024 * 1024))
-BASE=/opt/ensaio-facil
-WEB=/var/www/ensaio-facil
+case "${1:-producao}" in
+  producao) BASE=/opt/ensaio-facil; WEB=/var/www/ensaio-facil; SERVICE=ensaio-api; PORT=3001 ;;
+  teste) BASE=/opt/ensaio-facil-teste; WEB=/var/www/ensaio-facil-teste; SERVICE=ensaio-api-teste; PORT=3002 ;;
+  *) echo "Ambiente desconhecido: $1" >&2; exit 1 ;;
+esac
 TMP=$(mktemp -d /tmp/ensaio-deploy.XXXXXX)
 trap 'rm -rf "$TMP"' EXIT
 
@@ -52,7 +58,7 @@ swap() { # swap <novo> <destino>
 
 healthy() {
   for _ in $(seq 1 25); do
-    curl -sf http://127.0.0.1:3001/api/health >/dev/null && return 0
+    curl -sf "http://127.0.0.1:$PORT/api/health" >/dev/null && return 0
     sleep 1
   done
   return 1
@@ -61,14 +67,14 @@ healthy() {
 log "Instalando a API..."
 rm -rf "$BASE/api.new" && mv "$TMP/x/api" "$BASE/api.new"
 swap "$BASE/api.new" "$BASE/api"
-systemctl restart ensaio-api
+systemctl restart "$SERVICE"
 
 if ! healthy; then
   log "A API nova não respondeu. Voltando para a versão anterior..."
-  journalctl -u ensaio-api -n 25 --no-pager || true
+  journalctl -u "$SERVICE" -n 25 --no-pager || true
   if [ -d "$BASE/api.old" ]; then
     rm -rf "$BASE/api.failed" && mv "$BASE/api" "$BASE/api.failed" && mv "$BASE/api.old" "$BASE/api"
-    systemctl restart ensaio-api
+    systemctl restart "$SERVICE"
     healthy && log "Versão anterior restaurada. O site continua no ar."
   fi
   exit 1
@@ -79,4 +85,4 @@ log "Instalando o app..."
 rm -rf "$WEB.new" && mv "$TMP/x/web" "$WEB.new"
 swap "$WEB.new" "$WEB"
 
-log "Publicado. Memória da API: $(systemctl show ensaio-api -p MemoryCurrent --value | numfmt --to=iec)"
+log "Publicado. Memória da API: $(systemctl show "$SERVICE" -p MemoryCurrent --value | numfmt --to=iec)"

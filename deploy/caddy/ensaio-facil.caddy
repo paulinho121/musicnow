@@ -1,6 +1,8 @@
 # Ensaio Fácil — instalado pelo deploy em /etc/caddy/ensaio-facil.caddy.
 # __DOMAIN__ e __OLD_DOMAIN__ são substituídos na hora do deploy (deploy/deploy.sh).
-__DOMAIN__ {
+
+# O site (produção e teste usam o mesmo bloco): {args[0]} = porta da API, {args[1]} = pasta do app.
+(ensaio_site) {
 	# Conexão ao vivo (Modo Palco): sem compressão nem buffer, cada aviso sai na hora.
 	@live path_regexp live ^/api/setlists/[^/]+/events$
 	@compress not path_regexp ^/api/setlists/[^/]+/events$
@@ -20,7 +22,7 @@ __DOMAIN__ {
 	}
 
 	handle @live {
-		reverse_proxy 127.0.0.1:3001 {
+		reverse_proxy 127.0.0.1:{args[0]} {
 			flush_interval -1
 		}
 	}
@@ -30,15 +32,15 @@ __DOMAIN__ {
 	@preview path /convite/* /compartilhado/*
 	handle @preview {
 		rewrite * /api/og{uri}
-		reverse_proxy 127.0.0.1:3001
+		reverse_proxy 127.0.0.1:{args[0]}
 	}
 
 	handle /api/* {
-		reverse_proxy 127.0.0.1:3001
+		reverse_proxy 127.0.0.1:{args[0]}
 	}
 
 	handle {
-		root * /var/www/ensaio-facil
+		root * {args[1]}
 		@static path /assets/*
 		header @static Cache-Control "public, max-age=31536000, immutable"
 		@fresh not path /assets/*
@@ -50,6 +52,16 @@ __DOMAIN__ {
 		try_files {path} {path}/index.html /index.html
 		file_server
 	}
+}
+
+__DOMAIN__ {
+	import ensaio_site 3001 /var/www/ensaio-facil
+}
+
+# Versão de teste: outro banco e outra API (porta 3002). Fora do Google (noindex).
+teste.__DOMAIN__ {
+	header X-Robots-Tag "noindex, nofollow"
+	import ensaio_site 3002 /var/www/ensaio-facil-teste
 }
 
 # www.ensaiofacil.app.br → ensaiofacil.app.br
