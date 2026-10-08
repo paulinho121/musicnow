@@ -4,6 +4,7 @@ import { CalendarDays, ChevronRight, Clock, FileUp, Globe, Guitar, ImagePlus, Ma
 import { type FormEvent, useState } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { AgendaSummary } from '../components/AgendaSummary'
+import { Avatar } from '../components/Avatar'
 import { GettingStarted } from '../components/GettingStarted'
 import { HeroBackground, HeroCustomizeDialog } from '../components/HeroBackground'
 import { SongCover } from '../components/SongCover'
@@ -74,8 +75,18 @@ export function Dashboard() {
           <ImagePlus className="size-4" /> <span className="max-sm:sr-only">Personalizar</span>
         </button>
         <div className="relative">
-          <p className="text-sm font-medium text-muted">{greeting()},</p>
-          <h1 className="text-3xl font-extrabold tracking-tight sm:text-4xl">{me?.name?.split(' ')[0] ?? '...'}</h1>
+          <div className="flex items-center gap-3 sm:gap-4">
+            {/* Foto de perfil (toque para trocar no Perfil); sem foto, a inicial. */}
+            {me && (
+              <Link to="/perfil" aria-label="Seu perfil" className="shrink-0 rounded-full ring-2 ring-white/20 transition hover:ring-accent">
+                <Avatar name={me.name} image={me.image} className="size-14 text-xl sm:size-16 sm:text-2xl" />
+              </Link>
+            )}
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-muted">{greeting()},</p>
+              <h1 className="truncate text-3xl font-extrabold tracking-tight sm:text-4xl">{me?.name?.split(' ')[0] ?? '...'}</h1>
+            </div>
+          </div>
           {data && (
             <p className="mt-1 text-sm text-muted">
               {data.counts.library} {data.counts.library === 1 ? 'música' : 'músicas'} na sua biblioteca
