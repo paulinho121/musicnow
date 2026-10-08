@@ -20,7 +20,7 @@ cd /
 MAX_BYTES=$((60 * 1024 * 1024))
 case "${1:-producao}" in
   producao) BASE=/opt/ensaio-facil; WEB=/var/www/ensaio-facil; SERVICE=ensaio-api; PORT=3001 ;;
-  teste) BASE=/opt/ensaio-facil-teste; WEB=/var/www/ensaio-facil-teste; SERVICE=ensaio-api-teste; PORT=3002 ;;
+  teste) BASE=/opt/ensaio-facil-teste; WEB=/var/www/ensaio-facil-teste; SERVICE=ensaio-api-teste; PORT=3012 ;;
   *) echo "Ambiente desconhecido: $1" >&2; exit 1 ;;
 esac
 TMP=$(mktemp -d /tmp/ensaio-deploy.XXXXXX)
@@ -56,9 +56,13 @@ swap() { # swap <novo> <destino>
   chown -R ubuntu:ubuntu "$2"
 }
 
+# Saudável = o serviço está de pé E quem responde na porta é a API do Ensaio Fácil
+# (a /api/meta só existe nela; outro programa na mesma porta não passa).
 healthy() {
   for _ in $(seq 1 25); do
-    curl -sf "http://127.0.0.1:$PORT/api/health" >/dev/null && return 0
+    if systemctl is-active --quiet "$SERVICE" && curl -sf "http://127.0.0.1:$PORT/api/meta" | grep -q '"providers"'; then
+      return 0
+    fi
     sleep 1
   done
   return 1

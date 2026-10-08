@@ -4,7 +4,7 @@
 #
 # Tudo separado da produção: banco ensaio_facil_teste (usuário próprio), pastas
 # /opt/ensaio-facil-teste e /var/www/ensaio-facil-teste, serviço ensaio-api-teste na
-# porta 3002. Sem chave do Asaas (cobrança desligada) e sem e-mail (vai só para o log).
+# porta 3012. Sem chave do Asaas (cobrança desligada) e sem e-mail (vai só para o log).
 set -euo pipefail
 cd /
 DOMAIN="${1:-teste.ensaiofacil.app.br}"
@@ -31,7 +31,7 @@ if [ ! -f /etc/ensaio-facil/api-teste.env ]; then
 DATABASE_URL=postgresql://ensaio_teste:${PASS}@localhost:5432/ensaio_facil_teste
 BETTER_AUTH_SECRET=$(openssl rand -base64 32)
 APP_URL=https://${DOMAIN}
-PORT=3002
+PORT=3012
 UPLOAD_DIR=/var/lib/ensaio-facil-teste/uploads
 MIGRATIONS_DIR=/opt/ensaio-facil-teste/api/drizzle
 NODE_ENV=production

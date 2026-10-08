@@ -58,10 +58,10 @@ __DOMAIN__ {
 	import ensaio_site 3001 /var/www/ensaio-facil
 }
 
-# Versão de teste: outro banco e outra API (porta 3002). Fora do Google (noindex).
+# Versão de teste: outro banco e outra API (porta 3012). Fora do Google (noindex).
 teste.__DOMAIN__ {
 	header X-Robots-Tag "noindex, nofollow"
-	import ensaio_site 3002 /var/www/ensaio-facil-teste
+	import ensaio_site 3012 /var/www/ensaio-facil-teste
 }
 
 # www.ensaiofacil.app.br → ensaiofacil.app.br
