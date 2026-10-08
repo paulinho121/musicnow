@@ -30,6 +30,8 @@ import {
   ListPlus,
   Lock,
   Mic,
+  AudioWaveform,
+  Music2,
   LogOut,
   Minus,
   MoveHorizontal,
@@ -75,6 +77,14 @@ import { useLocalState } from '../lib/storage'
 import { useAccidentals } from '../lib/accidentals'
 import type { SongMark } from '../lib/types'
 
+type ViewMode = 'chords' | 'singer' | 'bass'
+const VIEW_MODES: ViewMode[] = ['chords', 'singer', 'bass']
+const VIEW_MODE_TOAST: Record<ViewMode, string> = {
+  chords: 'Cifra completa.',
+  singer: 'Modo cantor: só a letra.',
+  bass: 'Modo baixista: a nota do baixo em destaque.',
+}
+
 const VIEWER_DEFAULTS = {
   fontSize: 17,
   lineHeight: 1.45,
@@ -82,8 +92,13 @@ const VIEWER_DEFAULTS = {
   /** Velocidade da rolagem lembrada por música (cada música tem o seu andamento). */
   speeds: {} as Record<string, number>,
   showChords: true,
-  /** Modo cantor (só a letra). null = automático: liga para quem tem Voz como instrumento principal. */
+  /** Modo cantor (só a letra). Substituído por `mode`; lido só para quem já tinha escolhido. */
   singer: null as boolean | null,
+  /**
+   * Jeito de ver a cifra: completa, cantor (só a letra) ou baixista (nota do baixo em destaque).
+   * null = automático pelo instrumento principal (Voz → cantor, Baixo → baixista).
+   */
+  mode: null as ViewMode | null,
   chordStrip: false,
   wrap: true,
   view: 'chord' as 'chord' | 'score',
@@ -340,12 +355,20 @@ export function SongViewer({ songId, setlist }: { songId: string; setlist?: Setl
 
   const hideLyrics = song.lyricsHidden
   const uid = session?.user.id
-  // Modo cantor: só a letra, maior. Liga sozinho para quem canta (Voz como instrumento principal).
-  const isVoice = me?.instruments.find((i) => i.primary)?.instrument === 'voz'
-  const singer = !hideLyrics && Boolean(song.content.trim()) && (prefs.singer ?? isVoice)
-  const toggleSinger = () => {
-    setPrefs((p) => ({ ...p, singer: !singer }))
-    toast(singer ? 'Cifra completa de volta.' : 'Modo cantor: só a letra.')
+  // Jeito de ver: cifra completa, cantor (só a letra) ou baixista (nota do baixo em destaque).
+  // Automático pelo instrumento principal; a escolha da pessoa fica lembrada.
+  const primary = me?.instruments.find((i) => i.primary)?.instrument
+  const autoMode: ViewMode = primary === 'voz' ? 'singer' : primary === 'baixo' ? 'bass' : 'chords'
+  const chosenMode = prefs.mode ?? (prefs.singer === null || prefs.singer === undefined ? null : prefs.singer ? 'singer' : 'chords')
+  const modes = VIEW_MODES.filter((m) => m !== 'singer' || !hideLyrics)
+  const wanted = chosenMode ?? autoMode
+  const mode: ViewMode = song.content.trim() && modes.includes(wanted) ? wanted : 'chords'
+  const singer = mode === 'singer'
+  const bassMode = mode === 'bass'
+  const cycleMode = () => {
+    const next = modes[(modes.indexOf(mode) + 1) % modes.length]
+    setPrefs((p) => ({ ...p, mode: next }))
+    toast(VIEW_MODE_TOAST[next])
   }
   // Fora de repertório, oferece salvar o tom pessoal; dentro dele, o tom é o da banda.
   const personalDiffers = !setlist && currentKey !== (song.personalKey ?? original)
@@ -671,6 +694,7 @@ export function SongViewer({ songId, setlist }: { songId: string; setlist?: Setl
                 lineHeight={prefs.lineHeight}
                 showChords={prefs.showChords && !singer}
                 singer={singer}
+                bass={bassMode}
                 wrap={prefs.wrap}
                 hideLyrics={hideLyrics}
                 currentUserId={uid}
@@ -864,15 +888,14 @@ export function SongViewer({ songId, setlist }: { songId: string; setlist?: Setl
               </button>
             )}
             <span className="mx-0.5 h-7 w-px bg-border" />
-            {!hideLyrics && (
+            {song.content.trim() && (
               <button
-                className={clsx('btn-icon', singer && 'border-accent bg-accent text-accent-ink hover:bg-accent')}
-                aria-label={singer ? 'Voltar para a cifra completa' : 'Modo cantor: só a letra'}
-                aria-pressed={singer}
-                title={singer ? 'Voltar para a cifra completa' : 'Modo cantor: só a letra'}
-                onClick={toggleSinger}
+                className={clsx('btn-icon', mode !== 'chords' && 'border-accent bg-accent text-accent-ink hover:bg-accent')}
+                aria-label={`Jeito de ver: ${mode === 'singer' ? 'cantor' : mode === 'bass' ? 'baixista' : 'cifra completa'}. Trocar`}
+                title="Trocar: cifra completa → cantor (só a letra) → baixista (nota do baixo)"
+                onClick={cycleMode}
               >
-                <Mic className="size-5" />
+                {mode === 'singer' ? <Mic className="size-5" /> : mode === 'bass' ? <AudioWaveform className="size-5" /> : <Music2 className="size-5" />}
               </button>
             )}
             <button

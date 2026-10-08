@@ -1,4 +1,4 @@
-import { isChordLine, parseSheet, SECTION_LABELS, splitChordLine, wrapChordPair, type SectionType, type SheetLine } from '@ensaio/shared'
+import { chordBassLine, isChordLine, parseSheet, SECTION_LABELS, splitChordLine, wrapChordPair, type SectionType, type SheetLine } from '@ensaio/shared'
 import clsx from 'clsx'
 import { memo, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useAccidentals } from '../lib/accidentals'
@@ -60,6 +60,8 @@ interface Props {
   hideLyrics?: boolean
   /** Modo cantor: só a letra, centralizada e em fonte comum. */
   singer?: boolean
+  /** Modo baixista: a nota do baixo de cada acorde em destaque, em cima do acorde. */
+  bass?: boolean
   currentUserId?: string
   /** Modo de marcar: as linhas viram botões para criar marcação; as marcações, para apagar. */
   markMode?: boolean
@@ -99,6 +101,7 @@ export const ChordSheet = memo(function ChordSheet({
   showChords = true,
   hideLyrics = false,
   singer = false,
+  bass = false,
   currentUserId,
   markMode = false,
   onLineClick,
@@ -195,6 +198,7 @@ export const ChordSheet = memo(function ChordSheet({
                   showChords={showChords}
                   hideLyrics={hideLyrics}
                   singer={singer}
+                  bass={bass}
                   onChordClick={onChordClick}
                   cols={cols}
                   pair={pair}
@@ -213,6 +217,7 @@ function Line({
   showChords,
   hideLyrics,
   singer = false,
+  bass = false,
   onChordClick,
   cols = null,
   pair = null,
@@ -222,6 +227,7 @@ function Line({
   showChords: boolean
   hideLyrics: boolean
   singer?: boolean
+  bass?: boolean
   onChordClick?: OnChordClick
   /** Colunas disponíveis (quebra ligada) ou null (linha inteira, com rolagem lateral). */
   cols?: number | null
@@ -247,7 +253,8 @@ function Line({
               before += row.chords ? splitChordLine(row.chords).filter((p) => p.chord).length : 0
               return (
                 <div key={k}>
-                  <div className="font-bold text-chord">
+                  {bass && row.chords && <div className="font-black text-chord">{chordBassLine(row.chords)}</div>}
+                  <div className={bass ? 'font-semibold text-muted' : 'font-bold text-chord'}>
                     {row.chords ? <Chords text={row.chords} line={index} start={start} onChordClick={onChordClick} /> : ' '}
                   </div>
                   {row.lyrics !== null && <div>{row.lyrics || ' '}</div>}
@@ -258,9 +265,13 @@ function Line({
         )
       }
       return (
-        <div className="font-bold text-chord">
-          <Chords text={line.text} line={index} onChordClick={onChordClick} />
-        </div>
+        <>
+          {/* Modo baixista: a nota do baixo em cima, nas mesmas colunas; o acorde completo embaixo, discreto. */}
+          {bass && <div className="font-black text-chord">{chordBassLine(line.text)}</div>}
+          <div className={bass ? 'font-semibold text-muted' : 'font-bold text-chord'}>
+            <Chords text={line.text} line={index} onChordClick={onChordClick} />
+          </div>
+        </>
       )
     case 'section':
       return (
@@ -275,7 +286,20 @@ function Line({
           </span>
           {line.chords && showChords && (
             <span className="font-bold text-chord">
-              {isChordLine(line.chords) ? <Chords text={line.chords} line={index} onChordClick={onChordClick} /> : line.chords}
+              {isChordLine(line.chords) ? (
+                bass ? (
+                  <>
+                    <span className="font-black">{chordBassLine(line.chords).trim().replace(/\s+/g, ' ')}</span>{' '}
+                    <span className="font-semibold text-muted">
+                      (<Chords text={line.chords.trim()} line={index} onChordClick={onChordClick} />)
+                    </span>
+                  </>
+                ) : (
+                  <Chords text={line.chords} line={index} onChordClick={onChordClick} />
+                )
+              ) : (
+                line.chords
+              )}
             </span>
           )}
         </div>

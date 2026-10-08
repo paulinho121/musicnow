@@ -246,6 +246,14 @@ function mapChordLines(content: string, fn: (line: string, lineIndex: number) =>
     .join('\n')
 }
 
+/** A nota que o baixo toca em cada acorde da linha (Am7/G → G, F7M → F), nas mesmas colunas. */
+export function chordBassLine(line: string): string {
+  return mapChordsInLine(line, (c) => {
+    const p = parseChord(c)
+    return p ? (p.bass ?? p.root) : c
+  })
+}
+
 /** Mesmo acorde, em qualquer grafia (A#m7 = Bbm7). */
 export function sameChord(a: string, b: string): boolean {
   const x = parseChord(a)

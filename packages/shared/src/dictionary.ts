@@ -184,6 +184,50 @@ function build(symbol: string, root: number, bass: number | null, set: Set<numbe
   }
 }
 
+// ---------------------------------------------------------------- baixo
+
+/** Afinação do baixo (MIDI), da corda mais grave para a mais aguda: (B) E A D G. */
+export const BASS_TUNING = { 4: [28, 33, 38, 43], 5: [23, 28, 33, 38, 43] } as const
+
+/** Grau da nota no acorde, como o baixista fala: 1 (tônica), 3, 5, 7, 9... */
+function degreeLabel(interval: number): string {
+  const iv = interval % 12
+  return { 0: '1', 1: 'b9', 2: '9', 3: 'b3', 4: '3', 5: '4', 6: 'b5', 7: '5', 8: '#5', 9: '6', 10: '7', 11: '7M' }[iv] ?? '?'
+}
+
+export interface BassDot {
+  /** Corda (0 = a mais grave). */
+  string: number
+  fret: number
+  note: string
+  degree: string
+  /** É a nota que o baixo toca no acorde (a do baixo, ou a fundamental). */
+  main: boolean
+}
+
+/**
+ * Onde estão as notas do acorde no braço do baixo, da casa 0 até `maxFret`: a nota do baixo
+ * em destaque e as outras notas do acorde (3ª, 5ª, 7ª) para a linha e o arpejo.
+ */
+export function bassFretboard(symbol: string, strings: 4 | 5 = 4, maxFret = 7): BassDot[] {
+  const info = chordInfo(symbol)
+  if (!info) return []
+  const main = info.bass ?? info.root
+  const flats = info.notes.some((n) => n.includes('b')) || (info.bassNote?.includes('b') ?? false)
+  const names = flats ? FLATS : SHARPS
+  const pcs = new Map<number, string>(info.intervals.map((iv) => [(info.root + iv) % 12, degreeLabel(iv)]))
+  if (!pcs.has(main)) pcs.set(main, 'baixo')
+  const dots: BassDot[] = []
+  BASS_TUNING[strings].forEach((open, s) => {
+    for (let fret = 0; fret <= maxFret; fret++) {
+      const pc = (open + fret) % 12
+      const degree = pcs.get(pc)
+      if (degree) dots.push({ string: s, fret, note: names[pc], degree, main: pc === main })
+    }
+  })
+  return dots
+}
+
 // ---------------------------------------------------------------- violão / guitarra
 
 /** Afinação padrão (MIDI), da 6ª corda (Mi grave) para a 1ª (Mi agudo). */

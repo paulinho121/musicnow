@@ -1,4 +1,4 @@
-import { GUITAR_TUNING, type Voicing } from '@ensaio/shared'
+import { GUITAR_TUNING, type BassDot, type Voicing } from '@ensaio/shared'
 
 const SHARPS = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
 const FLATS = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B']
@@ -95,6 +95,68 @@ const WHITE = [0, 2, 4, 5, 7, 9, 11]
 const BLACK_AFTER: Record<number, number> = { 1: 0, 3: 1, 6: 3, 8: 4, 10: 5 } // tecla preta → branca à esquerda
 
 /** Teclado de duas oitavas (ou mais) com as notas do acorde destacadas. */
+/**
+ * Braço do baixo na horizontal, como na tablatura (corda mais aguda em cima): a nota que o
+ * baixo toca em destaque e as outras notas do acorde com o grau (1, 3, 5, 7) para a linha.
+ */
+export function BassDiagram({ dots, strings, maxFret, className }: { dots: BassDot[]; strings: 4 | 5; maxFret: number; className?: string }) {
+  // Nome da corda à esquerda, depois as notas soltas (casa 0) antes do traste zero.
+  const left = 52
+  const top = 14
+  const colW = 40
+  const rowH = 26
+  const width = left + (maxFret + 0.5) * colW + 8
+  const height = top + (strings - 1) * rowH + 34
+  // Corda 0 é a mais grave: desenhada embaixo.
+  const y = (s: number) => top + (strings - 1 - s) * rowH
+  const x = (fret: number) => (fret === 0 ? left - 18 : left + (fret - 0.5) * colW)
+  const names = strings === 5 ? ['B', 'E', 'A', 'D', 'G'] : ['E', 'A', 'D', 'G']
+  return (
+    <svg viewBox={`0 0 ${width} ${height}`} className={className} role="img" aria-label={`Baixo: ${dots.filter((d) => d.main).map((d) => d.note)[0] ?? ''}`}>
+      {Array.from({ length: strings }, (_, s) => (
+        <g key={s}>
+          <line x1={left} x2={left + maxFret * colW} y1={y(s)} y2={y(s)} stroke="var(--muted)" strokeWidth={1 + (strings - 1 - s) * 0} opacity={0.7} />
+          <text x={4} y={y(s) + 4} fontSize={11} fontWeight={700} fill="var(--muted)">
+            {names[s]}
+          </text>
+        </g>
+      ))}
+      {Array.from({ length: maxFret + 1 }, (_, f) => (
+        <line key={f} x1={left + f * colW} x2={left + f * colW} y1={y(strings - 1)} y2={y(0)} stroke="var(--border)" strokeWidth={f === 0 ? 4 : 1.5} />
+      ))}
+      {[3, 5, 7, 9, 12].filter((f) => f <= maxFret).map((f) => (
+        <g key={f}>
+          <text x={x(f)} y={y(0) + 26} textAnchor="middle" fontSize={10} fontWeight={600} fill="var(--muted)">
+            {f}
+          </text>
+        </g>
+      ))}
+      {dots.map((d) => (
+        <g key={`${d.string}-${d.fret}`}>
+          <circle
+            cx={x(d.fret)}
+            cy={y(d.string)}
+            r={10}
+            fill={d.main ? 'var(--accent)' : 'var(--surface)'}
+            stroke="var(--accent)"
+            strokeWidth={d.main ? 0 : 1.6}
+          />
+          <text
+            x={x(d.fret)}
+            y={y(d.string) + 3.5}
+            textAnchor="middle"
+            fontSize={d.degree.length > 2 ? 7.5 : 9.5}
+            fontWeight={800}
+            fill={d.main ? 'var(--accent-ink, #111)' : 'var(--text)'}
+          >
+            {d.main ? d.note : d.degree}
+          </text>
+        </g>
+      ))}
+    </svg>
+  )
+}
+
 export function PianoDiagram({ notes, flats = false, className }: { notes: number[]; flats?: boolean; className?: string }) {
   if (notes.length === 0) return null
   const lowC = Math.floor(Math.min(...notes) / 12) * 12

@@ -1,12 +1,14 @@
-import { chordInfo, GUITAR_TUNING, guitarVoicings, isChord, keyboardNotes, noteNamePt, parseChord } from '@ensaio/shared'
+import { BASS_TUNING, bassFretboard, chordInfo, GUITAR_TUNING, guitarVoicings, isChord, keyboardNotes, noteNamePt, parseChord } from '@ensaio/shared'
 import clsx from 'clsx'
-import { Check, ChevronLeft, ChevronRight, Guitar, Loader2, PencilLine, Piano, Volume2 } from 'lucide-react'
+import { Check, ChevronLeft, ChevronRight, Guitar, Loader2, AudioWaveform, PencilLine, Piano, Volume2 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useLocalState } from '../lib/storage'
-import { GuitarDiagram, PianoDiagram, playNotes } from './ChordDiagrams'
+import { BassDiagram, GuitarDiagram, PianoDiagram, playNotes } from './ChordDiagrams'
 import { Sheet } from './Sheet'
 
-type Instrument = 'violao' | 'teclado'
+type Instrument = 'violao' | 'teclado' | 'baixo'
+
+const BASS_FRETS = 7
 
 /** Nome por extenso: "Fá sustenido menor, com sétima (baixo em Lá)". */
 export function chordFullName(symbol: string) {
@@ -18,10 +20,12 @@ export function chordFullName(symbol: string) {
 
 /** Tudo sobre um acorde: nome, notas e como montar no violão e no teclado. */
 export function ChordDetails({ symbol }: { symbol: string }) {
-  const [prefs, setPrefs] = useLocalState('ef-chords', { instrument: 'violao' as Instrument })
+  const [prefs, setPrefs] = useLocalState('ef-chords', { instrument: 'violao' as Instrument, bassStrings: 4 as 4 | 5 })
   const info = useMemo(() => chordInfo(symbol), [symbol])
   const voicings = useMemo(() => guitarVoicings(symbol, 8), [symbol])
   const keys = useMemo(() => keyboardNotes(symbol), [symbol])
+  const bassStrings = prefs.bassStrings ?? 4
+  const bassDots = useMemo(() => bassFretboard(symbol, bassStrings, BASS_FRETS), [symbol, bassStrings])
   const [pos, setPos] = useState(0)
   useEffect(() => setPos(0), [symbol])
 
@@ -30,10 +34,13 @@ export function ChordDetails({ symbol }: { symbol: string }) {
   }
   const flats = info.notes.some((n) => n.includes('b'))
   const v = voicings[Math.min(pos, voicings.length - 1)]
+  const bassMain = bassDots.find((d) => d.main)
   const play = () =>
-    prefs.instrument === 'violao' && v
-      ? playNotes(v.frets.flatMap((f, s) => (f < 0 ? [] : [GUITAR_TUNING[s] + f])))
-      : playNotes(keys, 0.012)
+    prefs.instrument === 'baixo' && bassMain
+      ? playNotes([BASS_TUNING[bassStrings][bassMain.string] + bassMain.fret + 12])
+      : prefs.instrument === 'violao' && v
+        ? playNotes(v.frets.flatMap((f, s) => (f < 0 ? [] : [GUITAR_TUNING[s] + f])))
+        : playNotes(keys, 0.012)
 
   return (
     <div className="space-y-4">
@@ -49,18 +56,19 @@ export function ChordDetails({ symbol }: { symbol: string }) {
         </p>
       </div>
 
-      <div className="flex gap-2">
+      <div className="flex flex-wrap gap-2">
         {(
           [
             ['violao', 'Violão', Guitar],
             ['teclado', 'Teclado', Piano],
+            ['baixo', 'Baixo', AudioWaveform],
           ] as const
         ).map(([id, label, Icon]) => (
           <button
             key={id}
             className={clsx('chip h-9', prefs.instrument === id && 'chip-on')}
             aria-pressed={prefs.instrument === id}
-            onClick={() => setPrefs({ instrument: id })}
+            onClick={() => setPrefs((p) => ({ ...p, instrument: id }))}
           >
             <Icon className="size-4" /> {label}
           </button>
@@ -70,7 +78,28 @@ export function ChordDetails({ symbol }: { symbol: string }) {
         </button>
       </div>
 
-      {prefs.instrument === 'violao' ? (
+      {prefs.instrument === 'baixo' ? (
+        <div className="space-y-2">
+          <div className="flex justify-end gap-1">
+            {([4, 5] as const).map((n) => (
+              <button
+                key={n}
+                type="button"
+                className={clsx('chip h-7 text-xs', bassStrings === n && 'chip-on')}
+                aria-pressed={bassStrings === n}
+                onClick={() => setPrefs((p) => ({ ...p, bassStrings: n }))}
+              >
+                {n} cordas
+              </button>
+            ))}
+          </div>
+          <BassDiagram dots={bassDots} strings={bassStrings} maxFret={BASS_FRETS} className="w-full" />
+          <p className="text-center text-xs text-muted">
+            Em destaque, a nota do baixo{bassMain ? ` (${bassMain.note})` : ''}. Os números são as outras notas do acorde: 1 = tônica, 3, 5,
+            7… para a linha e o arpejo. Casas 0 a {BASS_FRETS}.
+          </p>
+        </div>
+      ) : prefs.instrument === 'violao' ? (
         v ? (
           <div className="flex flex-col items-center gap-2">
             <GuitarDiagram voicing={v} flats={flats} className="h-56 w-auto" />
