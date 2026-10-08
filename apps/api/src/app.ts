@@ -9,6 +9,7 @@ import { mailEnabled } from './mail'
 import type { AppEnv } from './http'
 import { billingRoutes } from './routes/billing'
 import { catalogRoutes } from './routes/catalog'
+import { avatarFilesRoutes, avatarRoutes } from './routes/avatar'
 import { heroRoutes } from './routes/hero'
 import { meRoutes } from './routes/me'
 import { scoresRoutes } from './routes/scores'
@@ -32,6 +33,8 @@ const api = new Hono<AppEnv>()
   .get('/meta', (c) => c.json({ providers: enabledProviders, passwordReset: mailEnabled }))
   .on(['GET', 'POST'], '/auth/*', (c) => auth.handler(c.req.raw))
   .route('/me/hero', heroRoutes)
+  .route('/me/avatar', avatarRoutes)
+  .route('/avatars', avatarFilesRoutes)
   .route('/me', meRoutes)
   .route('/songs', songsRoutes)
   .route('/shared', sharedSongRoutes)

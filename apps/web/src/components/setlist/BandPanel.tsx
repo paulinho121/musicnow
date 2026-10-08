@@ -6,6 +6,7 @@ import { useNavigate } from 'react-router'
 import { useSession } from '../../lib/auth'
 import { shareLink, useCreateInvite, useRemoveMember, useRevokeInvite, useUpdateMember, whatsappUrl } from '../../lib/setlists'
 import type { SetlistDetail, SetlistInvite } from '../../lib/types'
+import { Avatar } from '../Avatar'
 import { Sheet } from '../Sheet'
 import { useToast } from '../ui'
 
@@ -50,7 +51,7 @@ export function BandPanel({ setlist }: { setlist: SetlistDetail }) {
           const canRemove = isAdmin && !isOwnerRow && !me && (isOwner || m.permission !== 'admin')
           return (
             <li key={m.userId} className="flex flex-wrap items-center gap-3 p-3">
-              <div className="grid size-10 shrink-0 place-items-center rounded-full bg-surface-2 font-semibold">{m.name.slice(0, 1).toUpperCase()}</div>
+              <Avatar name={m.name} image={m.image} />
               <div className="min-w-0 flex-1">
                 <p className="flex items-center gap-1.5 truncate font-medium">
                   {m.name}

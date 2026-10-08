@@ -14,6 +14,7 @@ import { db, schema } from '../db'
 import { env } from '../env'
 import { forbidden, notFound, requireUser, validate, type AppEnv } from '../http'
 import { assertCanCreate } from '../billing'
+import { sweepAvatars } from './avatar'
 import { sweepHeroImages } from './hero'
 import { canViewSong } from './songs'
 
@@ -219,6 +220,7 @@ export function startScoreSweeper() {
     Promise.all([
       sweep().catch((e) => console.error('Partituras: falha na limpeza', e)),
       sweepHeroImages().catch((e) => console.error('Imagens do início: falha na limpeza', e)),
+      sweepAvatars().catch((e) => console.error('Fotos de perfil: falha na limpeza', e)),
     ])
   setTimeout(run, 30_000)
   setInterval(run, 24 * 60 * 60 * 1000)

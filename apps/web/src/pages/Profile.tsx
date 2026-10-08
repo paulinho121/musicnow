@@ -1,12 +1,14 @@
 import { INSTRUMENTS, MUSICIAN_ROLES, type Instrument, type MusicianRole } from '@ensaio/shared'
 import { useQueryClient } from '@tanstack/react-query'
 import clsx from 'clsx'
-import { Check, ChevronRight, Crown, Handshake, LifeBuoy, LogOut, Mail, ShieldCheck, Moon, Star, Sun } from 'lucide-react'
-import { type FormEvent, useEffect, useState } from 'react'
+import { Camera, Check, ChevronRight, Crown, Handshake, LifeBuoy, Loader2, LogOut, Mail, ShieldCheck, Moon, Star, Sun, Trash2 } from 'lucide-react'
+import { type FormEvent, useEffect, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router'
+import { Avatar } from '../components/Avatar'
 import { DeleteAccount } from '../components/DeleteAccount'
 import { ErrorState, PageSpinner, useToast } from '../components/ui'
 import { logout as endSession } from '../lib/auth'
+import { useAvatar } from '../lib/avatar'
 import { useMe, useSaveProfile } from '../lib/queries'
 import { getTheme, setTheme, type Theme } from '../lib/storage'
 
@@ -84,6 +86,7 @@ export function Profile() {
       </header>
 
       <section className="card grid gap-4 p-4 md:grid-cols-2 md:p-5">
+        <ProfilePhoto name={name || me.name} image={me.image} />
         <label className="block">
           <span className="label">Nome</span>
           <input className="input" value={name} onChange={(e) => setName(e.target.value)} maxLength={120} />
@@ -260,5 +263,59 @@ export function Profile() {
 
       {!onboarding && <DeleteAccount />}
     </form>
+  )
+}
+
+/** Foto de perfil: a banda vê nos repertórios. O aparelho recorta e reduz antes de enviar. */
+function ProfilePhoto({ name, image }: { name: string; image: string | null }) {
+  const { upload, remove } = useAvatar()
+  const toast = useToast()
+  const input = useRef<HTMLInputElement>(null)
+  const busy = upload.isPending || remove.isPending
+  return (
+    <div className="flex items-center gap-4 md:col-span-2">
+      <button
+        type="button"
+        className="group relative rounded-full focus-visible:outline-offset-4"
+        onClick={() => input.current?.click()}
+        disabled={busy}
+        aria-label={image ? 'Trocar a foto de perfil' : 'Escolher uma foto de perfil'}
+      >
+        <Avatar name={name} image={image} className="size-20 text-3xl" />
+        <span className="absolute -right-0.5 -bottom-0.5 grid size-8 place-items-center rounded-full border-2 border-surface bg-accent text-accent-ink">
+          {busy ? <Loader2 className="size-4 animate-spin" /> : <Camera className="size-4" />}
+        </span>
+      </button>
+      <div className="min-w-0">
+        <p className="font-semibold">Foto de perfil</p>
+        <p className="text-sm text-muted">Aparece para a sua banda nos repertórios.</p>
+        <div className="mt-2 flex flex-wrap gap-2">
+          <button type="button" className="btn-ghost h-9 px-3 text-sm" onClick={() => input.current?.click()} disabled={busy}>
+            <Camera className="size-4" /> {image ? 'Trocar foto' : 'Escolher foto'}
+          </button>
+          {image && (
+            <button
+              type="button"
+              className="btn-ghost h-9 px-3 text-sm text-danger"
+              disabled={busy}
+              onClick={() => remove.mutate(undefined, { onSuccess: () => toast('Foto removida.'), onError: (e) => toast(e.message, 'error') })}
+            >
+              <Trash2 className="size-4" /> Remover
+            </button>
+          )}
+        </div>
+      </div>
+      <input
+        ref={input}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0]
+          e.target.value = ''
+          if (file) upload.mutate(file, { onSuccess: () => toast('Foto atualizada.'), onError: (err) => toast(err.message, 'error') })
+        }}
+      />
+    </div>
   )
 }

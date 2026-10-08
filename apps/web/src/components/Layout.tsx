@@ -6,6 +6,7 @@ import { NavLink, Outlet } from 'react-router'
 import { redeemPendingCoupon } from '../lib/coupon'
 import { keys, useMe } from '../lib/queries'
 import { usePageTracking } from '../lib/usePageTracking'
+import { Avatar } from './Avatar'
 import { BillingBanner } from './BillingNotice'
 import { Logo } from './Logo'
 import { PageSpinner, useToast } from './ui'
@@ -56,7 +57,8 @@ export function Layout() {
               )
             }
           >
-            <Icon className="size-5" />
+            {/* Perfil: a foto da pessoa no lugar do ícone, quando ela tem foto. */}
+            {to === '/perfil' && me?.image ? <Avatar name={me.name} image={me.image} className="size-5 text-[10px]" /> : <Icon className="size-5" />}
             {label}
           </NavLink>
         ))}
@@ -88,7 +90,8 @@ export function Layout() {
               )
             }
           >
-            <Icon className="size-5" />
+            {/* Perfil: a foto da pessoa no lugar do ícone, quando ela tem foto. */}
+            {to === '/perfil' && me?.image ? <Avatar name={me.name} image={me.image} className="size-5 text-[10px]" /> : <Icon className="size-5" />}
             {label}
           </NavLink>
         ))}
