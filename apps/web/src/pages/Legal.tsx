@@ -4,14 +4,14 @@ import type { ReactNode } from 'react'
 import { Link } from 'react-router'
 import { Logo } from '../components/Logo'
 
-// Dados do responsável pelo app. PREENCHER antes de cobrar (exigência do Código de Defesa
-// do Consumidor e da LGPD): razão social ou nome, CNPJ/MEI e um e-mail de atendimento.
+// Dados do responsável pelo app (exigência do Código de Defesa do Consumidor e da LGPD):
+// razão social, CNPJ e e-mail de atendimento. Dados públicos da empresa (Inova Simples, 09/10/2026).
 export const COMPANY = {
-  name: import.meta.env.VITE_COMPANY_NAME ?? '[NOME OU RAZÃO SOCIAL]',
-  document: import.meta.env.VITE_COMPANY_DOCUMENT ?? '[CNPJ]',
-  email: import.meta.env.VITE_SUPPORT_EMAIL ?? '[E-MAIL DE ATENDIMENTO]',
+  name: import.meta.env.VITE_COMPANY_NAME ?? 'JB TECNOLOGIA INOVA SIMPLES (I.S.)',
+  document: import.meta.env.VITE_COMPANY_DOCUMENT ?? '69.552.917/0001-03',
+  email: import.meta.env.VITE_SUPPORT_EMAIL ?? 'contato@ensaiofacil.app.br',
 }
-const UPDATED = '5 de outubro de 2026'
+const UPDATED = '9 de outubro de 2026'
 
 function LegalPage({ title, children }: { title: string; children: ReactNode }) {
   return (
