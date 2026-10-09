@@ -13,3 +13,9 @@ uploads
 /*.gpx
 /test-gp.mjs
 dist-ssr
+
+# Arquivos de trabalho de vídeos (HyperFrames): ficam só no computador
+.tmp-capture/
+.tmp-frames/
+.tmp-frames2/
+_reel-check/
