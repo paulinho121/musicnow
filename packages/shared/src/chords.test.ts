@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
   spellKey,
+  isTabLine,
+  transposeTabBlock,
   replaceChordAt,
   replaceChordEverywhere,
   sameChord,
@@ -253,5 +255,45 @@ describe('corrigir um acorde da cifra', () => {
     expect(sameChord('A#m7', 'Bbm7')).toBe(true)
     expect(sameChord('Am', 'Am7')).toBe(false)
     expect(replaceChordEverywhere('Bb  F', 'A#', 'Bb/D').content).toBe('Bb/D F')
+  })
+})
+
+describe('tablatura acompanha o tom', () => {
+  const tab = [
+    'E|------------------------|',
+    'B|------------------------|',
+    'G|-7/9--9-9-9---7---6-----|',
+    'D|------------------------|',
+    'A|-5/7--7-7-7---5---4-----|',
+    'E|------------------------|',
+  ]
+
+  it('reconhece as linhas de tablatura (e não confunde com letra ou acordes)', () => {
+    expect(tab.every(isTabLine)).toBe(true)
+    expect(isTabLine('e|--0h2p0--|')).toBe(true)
+    expect(isTabLine('Eu sei que estás aqui')).toBe(false)
+    expect(isTabLine('A  D  E')).toBe(false)
+    const lines = parseSheet(['[Intro] A A7M', ...tab, 'Letra aqui'].join('\n'))
+    expect(lines.slice(1, 7).every((l) => l.kind === 'tab')).toBe(true)
+    expect(lines[7].kind).toBe('lyrics')
+  })
+
+  it('sobe meio tom: cada casa +1, as notas separadas e as cordas alinhadas (A → Bb)', () => {
+    const out = parseSheet(tab.join('\n'), 1, 'Bb').map((l) => (l as { text: string }).text)
+    expect(out[2]).toBe('G|-8/10--10-10-10---8---7-----|')
+    expect(out[4]).toBe('A|-6/8---8--8--8----6---5-----|')
+    expect(out[0]).toBe('E|----------------------------|')
+    // Todas as cordas com o mesmo comprimento: nada desalinha.
+    expect(new Set(out.map((l) => l.length)).size).toBe(1)
+  })
+
+  it('desce abaixo da casa 0: o riff inteiro sobe uma oitava (não fica negativo)', () => {
+    const [g] = transposeTabBlock(['G|-0--2--4-|'], -2)
+    expect(g).toBe('G|-10--12--14-|')
+    expect(transposeTabBlock(['D|-5-|'], 0)).toEqual(['D|-5-|'])
+  })
+
+  it('a letra oculta (quem não cadastrou) mantém a tablatura', () => {
+    expect(stripLyrics(['Letra', tab[2]].join('\n'))).toBe(['', tab[2]].join('\n'))
   })
 })

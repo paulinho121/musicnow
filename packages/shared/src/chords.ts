@@ -281,18 +281,87 @@ export function replaceChordEverywhere(content: string, from: string, to: string
   return { content: next, count }
 }
 
+// ---------------------------------------------------------------------------
+// Tablatura ("E|-7/9--9-9---|"): as casas sobem/descem junto com o tom.
+
+// Nome da corda (E, B, G, D, A, e, opcional #/b) + "|" + o braço: traços, casas e técnicas
+// (h p b r / \ ~ x), com pelo menos um trecho de traços.
+const TAB_LINE_RE = /^\s*[A-Ga-g][#b]?\s*\|[-0-9|hpbrstvx/\\~()^.*=<> ]*$/
+
+export function isTabLine(line: string): boolean {
+  return TAB_LINE_RE.test(line) && /-{2,}/.test(line)
+}
+
+const MAX_FRET = 24
+
+/**
+ * Transpõe um bloco de tablatura (as linhas seguidas das cordas) coluna a coluna, junto: onde
+ * uma casa ganha um dígito (9 → 10), TODAS as cordas ganham uma coluna ali — as notas seguem
+ * separadas e as cordas, alinhadas. Se alguma casa ficaria abaixo de 0 (ou acima da 24), o
+ * bloco inteiro sobe (ou desce) uma oitava: a mesma nota, num lugar tocável do braço.
+ */
+export function transposeTabBlock(lines: string[], semitones: number): string[] {
+  if (!semitones) return lines
+  const heads = lines.map((l) => l.slice(0, l.indexOf('|') + 1))
+  const bodies = lines.map((l) => l.slice(l.indexOf('|') + 1))
+  const frets = bodies.flatMap((b) => (b.match(/\d+/g) ?? []).map(Number))
+  if (!frets.length) return lines
+  const min = Math.min(...frets)
+  const max = Math.max(...frets)
+  let s = semitones
+  if (min + s < 0 && max + s + 12 <= MAX_FRET) s += 12
+  else if (max + s > MAX_FRET && min + s - 12 >= 0) s -= 12
+
+  const width = Math.max(...bodies.map((b) => b.length))
+  const padded = bodies.map((b) => b.padEnd(width, b.endsWith('|') ? ' ' : '-'))
+  const isDigit = (c: string | undefined) => c !== undefined && c >= '0' && c <= '9'
+  const out = padded.map(() => '')
+  let pos = 0
+  while (pos < width) {
+    if (!padded.some((b) => isDigit(b[pos]))) {
+      padded.forEach((b, i) => (out[i] += b[pos]))
+      pos++
+      continue
+    }
+    // Trecho de colunas em que alguma corda tem dígito: transpõe e iguala a largura.
+    let end = pos
+    while (end < width && padded.some((b) => isDigit(b[end]))) end++
+    const segs = padded.map((b) => b.slice(pos, end).replace(/\d+/g, (n) => String(Number(n) + s)))
+    const w = Math.max(...segs.map((x) => x.length))
+    segs.forEach((x, i) => (out[i] += x.padEnd(w, '-')))
+    pos = end
+  }
+  return out.map((b, i) => heads[i] + b.replace(/ +$/, ''))
+}
+
+/** Aplica a transposição em todos os blocos de tablatura do texto (linha a linha, no lugar). */
+function transposeTabs(lines: string[], semitones: number): string[] {
+  if (!semitones) return lines
+  const out = [...lines]
+  for (let i = 0; i < out.length; i++) {
+    if (!isTabLine(out[i])) continue
+    let j = i
+    while (j < out.length && isTabLine(out[j])) j++
+    out.splice(i, j - i, ...transposeTabBlock(out.slice(i, j), semitones))
+    i = j - 1
+  }
+  return out
+}
+
 export type SheetLine =
   | { kind: 'section'; label: string; type: SectionType | null; chords?: string }
   | { kind: 'chords'; text: string }
   | { kind: 'lyrics'; text: string }
+  | { kind: 'tab'; text: string }
   | { kind: 'blank' }
 
 /** Converte o texto da cifra em linhas classificadas, já transpostas. */
 export function parseSheet(content: string, semitones = 0, targetKey?: string | null, accidentals: Accidentals = 'auto'): SheetLine[] {
   const shift = (l: string) => shiftLine(l, semitones, targetKey, accidentals)
-  return content.replace(/\r\n?/g, '\n').split('\n').map((raw): SheetLine => {
+  return transposeTabs(content.replace(/\r\n?/g, '\n').split('\n'), semitones).map((raw): SheetLine => {
     const line = raw.replace(/\s+$/, '')
     if (line.trim() === '') return { kind: 'blank' }
+    if (isTabLine(line)) return { kind: 'tab', text: line }
     const sec = matchSection(line)
     if (sec) {
       const rest = sec.rest
@@ -310,10 +379,9 @@ export function parseSheet(content: string, semitones = 0, targetKey?: string | 
 
 /** Transpõe o texto inteiro da cifra (para exportar ou salvar em outro tom). */
 export function transposeSheet(content: string, semitones: number, targetKey?: string | null, accidentals: Accidentals = 'auto'): string {
-  return content
-    .replace(/\r\n?/g, '\n')
-    .split('\n')
+  return transposeTabs(content.replace(/\r\n?/g, '\n').split('\n'), semitones)
     .map((line) => {
+      if (isTabLine(line)) return line
       const sec = matchSection(line)
       if (sec && sec.rest && isChordLine(sec.rest)) {
         const head = line.slice(0, line.length - sec.rest.length)
@@ -351,7 +419,7 @@ export function stripLyrics(content: string): string {
     .split('\n')
     .map((line) => {
       if (!line.trim()) return ''
-      if (SECTION_RE.test(line) || isChordLine(line)) return line
+      if (SECTION_RE.test(line) || isChordLine(line) || isTabLine(line)) return line
       return ''
     })
     .join('\n')

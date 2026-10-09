@@ -237,6 +237,10 @@ function Line({
   switch (line.kind) {
     case 'blank':
       return <div aria-hidden>{' '}</div>
+    case 'tab':
+      // Modo cantor: só a letra. A tablatura nunca quebra a linha (desalinharia as cordas).
+      if (singer || !showChords) return null
+      return <div className="overflow-x-auto whitespace-pre text-[0.92em] [scrollbar-width:none]">{line.text}</div>
     case 'lyrics':
       if (hideLyrics) return null
       // No modo cantor a letra é centralizada: os espaços que alinhavam os acordes saem.
