@@ -37,4 +37,22 @@ describe('cobrança desligada', () => {
     expect(created.status).toBe(201)
     expect(await client`select 1 from billing_account where user_id = ${user.id}`).toHaveLength(0)
   })
+
+  it('quem assinou mesmo com a cobrança desligada vê o próprio plano', async () => {
+    const res = await app.request('/api/auth/sign-up/email', {
+      method: 'POST',
+      headers: { origin: ORIGIN, 'content-type': 'application/json' },
+      body: JSON.stringify({ name: 'assinou', email: `assinou-${run}@${DOMAIN}`, password: `senha-${run}-assinou` }),
+    })
+    const cookie = res.headers
+      .getSetCookie()
+      .map((c) => c.split(';')[0])
+      .join('; ')
+    const { user } = await res.json()
+    const until = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+    await client`insert into billing_account (user_id, status, plan, trial_ends_at, current_period_end) values (${user.id}, 'active', 'yearly', now(), ${until.toISOString()})`
+    const me = await (await app.request('/api/me', { headers: { origin: ORIGIN, cookie } })).json()
+    expect(me.billing).toMatchObject({ enforced: false, active: true, reason: 'subscription', status: 'active', plan: 'yearly' })
+    expect(new Date(me.billing.currentPeriodEnd).getTime()).toBe(until.getTime())
+  })
 })

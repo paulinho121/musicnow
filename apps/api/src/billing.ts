@@ -57,17 +57,21 @@ export async function billingSummary(u: { id: string; email: string; role?: stri
   // Cobrança desligada: não grava nada. O teste de 14 dias de cada pessoa só começa quando a
   // cobrança for ligada (senão, no dia do lançamento, todo mundo já estaria com o teste vencido).
   if (!env.BILLING_ENFORCED) {
+    // Quem assinou mesmo assim (pagamentos já valendo) vê o próprio plano; só não cria a conta
+    // de quem não assinou, para o teste não começar antes da hora.
+    const [acc] = await db.select().from(billingAccount).where(eq(billingAccount.userId, u.id))
+    const paid = Boolean(acc?.currentPeriodEnd && acc.currentPeriodEnd.getTime() + GRACE_DAYS * DAY > Date.now())
     return {
       enforced: false,
       configured: Boolean(env.ASAAS_API_KEY),
       active: true,
-      reason: (isAdminUser(u) ? 'admin' : 'free') as AccessReason,
+      reason: (isAdminUser(u) ? 'admin' : paid ? 'subscription' : 'free') as AccessReason,
       trialDaysLeft: 0,
-      status: 'trialing',
-      plan: null,
+      status: acc?.status ?? 'trialing',
+      plan: (acc?.plan as PlanId | null) ?? null,
       trialEndsAt: null,
-      currentPeriodEnd: null,
-      pending: false,
+      currentPeriodEnd: acc?.currentPeriodEnd ?? null,
+      pending: Boolean(acc?.asaasSubscriptionId) && (!acc?.currentPeriodEnd || acc.currentPeriodEnd.getTime() < Date.now()),
     }
   }
   const acc = await getAccount(u.id)
