@@ -92,6 +92,8 @@ const VIEWER_DEFAULTS = {
   /** Velocidade da rolagem lembrada por música (cada música tem o seu andamento). */
   speeds: {} as Record<string, number>,
   showChords: true,
+  /** Tablaturas (E|---) na cifra: dá para esconder. */
+  showTabs: true,
   /** Modo cantor (só a letra). Substituído por `mode`; lido só para quem já tinha escolhido. */
   singer: null as boolean | null,
   /**
@@ -693,6 +695,7 @@ export function SongViewer({ songId, setlist }: { songId: string; setlist?: Setl
                 fontSize={singer ? Math.round(prefs.fontSize * 1.2) : prefs.fontSize}
                 lineHeight={prefs.lineHeight}
                 showChords={prefs.showChords && !singer}
+                showTabs={prefs.showTabs ?? true}
                 singer={singer}
                 bass={bassMode}
                 wrap={prefs.wrap}
@@ -819,6 +822,17 @@ export function SongViewer({ songId, setlist }: { songId: string; setlist?: Setl
               onChange={(e) => setPrefs((p) => ({ ...p, showChords: e.target.checked }))}
             />
           </label>
+          {lines.some((l) => l.kind === 'tab') && (
+            <label className="flex h-11 items-center justify-between text-sm">
+              Mostrar tablaturas
+              <input
+                type="checkbox"
+                className="size-5 accent-[var(--accent)]"
+                checked={prefs.showTabs ?? true}
+                onChange={(e) => setPrefs((p) => ({ ...p, showTabs: e.target.checked }))}
+              />
+            </label>
+          )}
           <label className="flex min-h-11 items-center justify-between gap-3 text-sm">
             <span>
               Quebrar linhas longas

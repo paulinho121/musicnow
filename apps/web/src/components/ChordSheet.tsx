@@ -56,6 +56,8 @@ interface Props {
   fontSize: number
   lineHeight: number
   showChords?: boolean
+  /** Tablaturas (E|---): a pessoa pode esconder nos ajustes de leitura. */
+  showTabs?: boolean
   /** Letra sem autorização de exibição: mostra só acordes e seções. */
   hideLyrics?: boolean
   /** Modo cantor: só a letra, centralizada e em fonte comum. */
@@ -99,6 +101,7 @@ export const ChordSheet = memo(function ChordSheet({
   fontSize,
   lineHeight,
   showChords = true,
+  showTabs = true,
   hideLyrics = false,
   singer = false,
   bass = false,
@@ -144,7 +147,9 @@ export const ChordSheet = memo(function ChordSheet({
           (hideLyrics && line.kind === 'blank' && lines[i + 1]?.kind !== 'section') ||
           pairedAbove ||
           // Modo cantor: sem as linhas de acorde, sobram brancos repetidos; fica um só.
-          (singer && line.kind === 'blank' && (i === 0 || lines[i - 1]?.kind === 'blank'))
+          (singer && line.kind === 'blank' && (i === 0 || lines[i - 1]?.kind === 'blank')) ||
+          // Tablaturas escondidas: some também a linha em branco logo depois de cada bloco.
+          (!showTabs && line.kind === 'blank' && lines[i - 1]?.kind === 'tab')
         return (
           <div key={i} id={`linha-${i}`} className="scroll-mt-28">
             {lineMarks && (
@@ -189,13 +194,14 @@ export const ChordSheet = memo(function ChordSheet({
                   onClick={() => onLineClick(i)}
                   aria-label={`Marcar a linha ${i + 1}`}
                 >
-                  <Line line={line} showChords={showChords} hideLyrics={hideLyrics} singer={singer} cols={cols} pair={pair} />
+                  <Line line={line} showChords={showChords} showTabs={showTabs} hideLyrics={hideLyrics} singer={singer} cols={cols} pair={pair} />
                 </button>
               ) : (
                 <Line
                   line={line}
                   index={i}
                   showChords={showChords}
+                  showTabs={showTabs}
                   hideLyrics={hideLyrics}
                   singer={singer}
                   bass={bass}
@@ -215,6 +221,7 @@ function Line({
   line,
   index = 0,
   showChords,
+  showTabs = true,
   hideLyrics,
   singer = false,
   bass = false,
@@ -225,6 +232,7 @@ function Line({
   line: SheetLine
   index?: number
   showChords: boolean
+  showTabs?: boolean
   hideLyrics: boolean
   singer?: boolean
   bass?: boolean
@@ -239,7 +247,7 @@ function Line({
       return <div aria-hidden>{' '}</div>
     case 'tab':
       // Modo cantor: só a letra. A tablatura nunca quebra a linha (desalinharia as cordas).
-      if (singer || !showChords) return null
+      if (singer || !showChords || !showTabs) return null
       return <div className="overflow-x-auto whitespace-pre text-[0.92em] [scrollbar-width:none]">{line.text}</div>
     case 'lyrics':
       if (hideLyrics) return null
