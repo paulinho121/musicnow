@@ -7,7 +7,7 @@ import { z } from 'zod'
 import { getRole } from '../access'
 import { assertCanCreate } from '../billing'
 import { COVER_URL_RE } from '../covers'
-import { importPlaylist, normalizeReference } from '../music'
+import { importPlaylist, lookupTrack, normalizeReference } from '../music'
 import { removeScoreFiles, scoresOfSong } from './scores'
 import { publish } from '../realtime'
 import { db, schema } from '../db'
@@ -324,6 +324,14 @@ export const songsRoutes = new Hono<AppEnv>()
     // Quais já estão na biblioteca (mesmo título e artista): entram no repertório sem duplicar.
     const existing = await ownSongKeys(c.var.user.id)
     return c.json({ ...playlist, tracks: playlist.tracks.map((t) => ({ ...t, songId: existing.get(dupKey(t.title, t.artist)) ?? null })) })
+  })
+
+  // Link de uma música do Deezer → nome, artista, BPM e o link da versão (preenche a música nova).
+  .post('/from-link', validate('json', z.object({ url: z.string().trim().url('Cole o link da música.').max(500) })), async (c) => {
+    const track = await lookupTrack(c.req.valid('json').url)
+    // Já está na biblioteca (mesmo nome e artista)? A tela avisa em vez de duplicar.
+    const existing = await ownSongKeys(c.var.user.id)
+    return c.json({ ...track, songId: existing.get(dupKey(track.title, track.artist)) ?? null })
   })
 
   // Trocar só o link da gravação de referência (menu da música no repertório).

@@ -20,6 +20,7 @@ import { ChordAligner } from '../components/ChordAligner'
 import { CoverPicker } from '../components/CoverPicker'
 import { MetadataLookup } from '../components/MetadataLookup'
 import { ReferenceLinkInput } from '../components/ReferenceLinkInput'
+import { TrackLinkFill } from '../components/TrackLinkFill'
 import { ErrorState, PageSpinner, useToast } from '../components/ui'
 import { useDeleteSong, useFacets, useSaveSong, useSong } from '../lib/queries'
 import type { SongInput } from '../lib/types'
@@ -153,6 +154,20 @@ export function SongEditor() {
         </Link>
         <h1 className="flex-1 text-xl sm:text-2xl font-bold">{editing ? 'Editar música' : 'Nova música'}</h1>
       </div>
+
+      {!editing && (
+        <TrackLinkFill
+          onFill={(t) =>
+            setForm((f) => ({
+              ...f,
+              title: t.title,
+              artist: t.artist ?? f.artist,
+              bpm: t.bpm ?? f.bpm,
+              referenceUrl: t.url,
+            }))
+          }
+        />
+      )}
 
       <section className="card grid gap-4 p-4 md:grid-cols-2 md:p-5">
         <div className="md:col-span-2">

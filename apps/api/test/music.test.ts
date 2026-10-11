@@ -55,6 +55,12 @@ vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
       ],
     })
   }
+  if (url.startsWith('https://link.deezer.com/s/abc')) {
+    return new Response(null, { status: 302, headers: { location: 'https://www.deezer.com/track/555?host=1&utm_source=user_sharing' } })
+  }
+  if (url === 'https://api.deezer.com/track/555') {
+    return json({ title: `Um Amor ${run} Ao Vivo`, title_short: `Um Amor ${run}`, link: 'https://www.deezer.com/track/555', artist: { name: 'Djavan' }, bpm: 117.1, duration: 327 })
+  }
   if (url === 'https://api.deezer.com/playlist/404') return json({ error: { type: 'DataException', message: 'no data', code: 800 } })
   return realFetch(input, init)
 })
@@ -113,6 +119,16 @@ describe('repertório de uma playlist', () => {
     expect(missing.data.error).toMatch(/pública/)
     const other = await call(ana, 'POST', '/songs/playlist', { url: 'https://example.com/playlist/1' })
     expect(other.status).toBe(400)
+  })
+
+  it('uma música só pelo link curto do Deezer: nome, artista, BPM e o link da versão', async () => {
+    const r = await call(ana, 'POST', '/songs/from-link', { url: 'https://link.deezer.com/s/abcDEF123' })
+    expect(r.status).toBe(200)
+    expect(r.data).toMatchObject({ title: `Um Amor ${run}`, artist: 'Djavan', bpm: 117, durationSec: 327, url: 'https://www.deezer.com/track/555', songId: null })
+    // Link de playlist aqui: orienta a usar a importação de playlist.
+    const pl = await call(ana, 'POST', '/songs/from-link', { url: 'https://www.deezer.com/br/playlist/123' })
+    expect(pl.status).toBe(400)
+    expect(pl.data.error).toMatch(/Playlist/)
   })
 
   it('adiciona várias músicas de uma vez, na ordem', async () => {

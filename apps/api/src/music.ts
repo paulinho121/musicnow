@@ -91,7 +91,51 @@ interface DeezerPage {
   error?: { message: string }
 }
 
+export interface TrackInfo {
+  title: string
+  artist: string | null
+  /** Andamento informado pelo Deezer (arredondado); null quando não informa. */
+  bpm: number | null
+  durationSec: number | null
+  url: string
+}
+
+async function deezerTrack(id: string): Promise<TrackInfo> {
+  const { body: t } = await getJson<DeezerTrack & { bpm?: number; duration?: number; error?: unknown }>(`https://api.deezer.com/track/${id}`)
+  if (!t || t.error || !t.title) return fail('Não achamos essa música no Deezer. Confira o link.')
+  const bpm = t.bpm && t.bpm >= 20 && t.bpm <= 320 ? Math.round(t.bpm) : null
+  return {
+    title: cleanTrackTitle(t.title_short || t.title),
+    artist: t.artist?.name ?? null,
+    bpm,
+    durationSec: t.duration ?? null,
+    url: t.link || `https://www.deezer.com/track/${id}`,
+  }
+}
+
+/**
+ * Link de UMA música (Deezer; também o link curto do botão Compartilhar) → nome, artista,
+ * BPM e o link da versão, para preencher a música nova.
+ */
+export async function lookupTrack(raw: string): Promise<TrackInfo> {
+  const url = isShortMusicLink(raw) ? await resolveShortLink(raw) : raw
+  const link = parseMusicLink(url)
+  if (link?.service === 'deezer' && link.kind === 'track') return deezerTrack(link.id)
+  if (link?.service === 'deezer' || link?.service === 'spotify') {
+    if (link.kind !== 'track') return fail('Esse link é de uma playlist ou álbum. Para trazer várias músicas, use Repertórios → Playlist.')
+  }
+  if (link?.service === 'spotify') {
+    return fail('O Spotify não deixa apps lerem os dados da música. Cole o link da mesma música no Deezer.')
+  }
+  return fail('Cole o link de uma música do Deezer (no app: Compartilhar → Copiar link).')
+}
+
 async function deezerPlaylist(link: MusicLink): Promise<ImportedPlaylist> {
+  // Link de uma música só: vira uma "playlist" de uma faixa.
+  if (link.kind === 'track') {
+    const t = await deezerTrack(link.id)
+    return { service: 'deezer', name: t.title, tracks: [{ title: t.title, artist: t.artist, url: t.url }], truncated: false }
+  }
   const base = `https://api.deezer.com/${link.kind}/${link.id}`
   const { body: info } = await getJson<{ title?: string; error?: unknown }>(base)
   if (!info || info.error || !info.title) fail('Não achamos essa playlist no Deezer. Confira se ela é pública.')
