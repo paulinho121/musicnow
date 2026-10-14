@@ -855,7 +855,7 @@ export function SongViewer({ songId, setlist }: { songId: string; setlist?: Setl
               onClick={() => {
                 const s = songInKey(song, offset, currentKey)
                 downloadText(fileNameFor(`${song.title}${currentKey ? ` (${currentKey})` : ''}`, 'cho'), toChordPro(s))
-                toast('Arquivo ChordPro baixado: abre em OnSong, SongbookPro e outros apps.')
+                toast('Arquivo ChordPro pronto: é para abrir no OnSong, SongbookPro e outros apps.')
               }}
               title="Baixar no formato ChordPro, no tom atual"
             >
