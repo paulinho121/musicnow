@@ -1,4 +1,4 @@
-import { chordBassLine, chordDurations, isBarLine, isChordLine, parseChord, parseSheet, SECTION_LABELS, splitChordLine, wrapChordPair, type SectionType, type SheetLine } from '@ensaio/shared'
+import { barEvents, chordBassLine, isBarLine, isChordLine, parseChord, parseSheet, SECTION_LABELS, splitChordLine, wrapChordPair, type SectionType, type SheetLine } from '@ensaio/shared'
 import clsx from 'clsx'
 import { memo, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useAccidentals } from '../lib/accidentals'
@@ -393,6 +393,8 @@ interface Bar {
   double: boolean
   /** Barra dupla depois do último compasso ("| G ||"): fim de parte. */
   end?: boolean
+  /** Casa de repetição ("1." / "2."): na volta, toca-se a casa seguinte. */
+  ending?: string
 }
 
 /** Divide "||: C | F G :|| x2" em compassos e o que sobra depois da última barra ("x2"). */
@@ -413,7 +415,9 @@ function splitBars(text: string): { bars: Bar[]; note: string } {
     const open = t.startsWith(':')
     const close = t.endsWith(':')
     t = t.replace(/^:|:$/g, '').trim()
-    bars.push({ text: t, open, close, double: double || open })
+    const ending = t.match(/^(\d)\.\s*/)
+    if (ending) t = t.slice(ending[0].length)
+    bars.push({ text: t, open, close, double: double || open, ending: ending?.[1] })
     double = false
   }
   // Barra dupla no fim ("... | G ||") fecha o último compasso com traço grosso.
@@ -454,34 +458,48 @@ function BarRow({
             <div
               key={i}
               className={clsx(
-                'flex min-h-[2.4em] items-end gap-[1.4ch] py-0.5 pr-[1.2ch] pl-[1ch]',
+                'relative flex min-h-[2.4em] items-end gap-[1.4ch] py-0.5 pr-[1.2ch] pl-[1ch]',
+                // Casa 1 / 2: o colchete por cima do compasso, como na partitura.
+                b.ending && 'mt-1 border-t-2 pt-[0.9em]',
                 b.double ? 'border-l-4' : 'border-l-2',
                 last && (b.close || b.end ? 'border-r-4' : 'border-r-2'),
                 'border-muted/60',
               )}
             >
               {b.open && <span className="-ml-[0.6ch] font-black text-muted">:</span>}
-              {(() => {
-                const durations = chordDurations(b.text, timeSignature)
-                let c = 0
-                return splitChordLine(b.text)
-                .filter((p) => p.chord || p.text.replace(/[\s/]/g, ''))
-                .map((p, j) => {
-                  if (!p.chord) return <span key={j} className="text-muted">{p.text.replace(/\//g, '').trim()}</span>
-                  const at = { line, occurrence: occurrence++ }
-                  const beats = durations[c++] ?? 1
-                  const chord = p.chord
-                  const label = bass ? (
-                    <span className="flex flex-col items-start leading-tight">
-                      <span className="font-black">{parseChord(chord)?.bass ?? parseChord(chord)?.root}</span>
-                      <span className="text-[0.75em] font-semibold text-muted">
-                        <ChordLabel chord={chord} />
-                      </span>
+              {b.ending && (
+                <span className="absolute -top-[0.15em] left-[0.6ch] font-sans text-[0.7em] font-bold text-muted">{b.ending}.</span>
+              )}
+              {barEvents(b.text, timeSignature).map((e, j) => {
+                // A figura em cima; cada coisa ocupa no compasso o espaço do tempo que dura.
+                const slot = (body: React.ReactNode, rest = false) => (
+                  <span key={j} className="flex flex-col items-start" style={{ minWidth: `${e.beats * 3}ch` }}>
+                    <NoteFigure quarters={e.beats} rest={rest} />
+                    {body}
+                  </span>
+                )
+                if (e.kind === 'repeat')
+                  return (
+                    <span key={j} className="self-center text-[1.2em] font-bold text-muted" title="Repete o compasso anterior">
+                      %
                     </span>
-                  ) : (
-                    <ChordLabel chord={chord} />
                   )
-                  const body = onChordClick ? (
+                if (e.kind === 'hit') return slot(<span className="font-black text-chord" title="Ataque marcado (convenção)">×</span>)
+                if (e.kind === 'rest') return slot(<span className="font-sans text-[0.8em] font-bold text-muted" title="Ninguém toca">N.C.</span>, true)
+                const chord = e.chord
+                const at = { line, occurrence: occurrence++ }
+                const label = bass ? (
+                  <span className="flex flex-col items-start leading-tight">
+                    <span className="font-black">{parseChord(chord)?.bass ?? parseChord(chord)?.root}</span>
+                    <span className="text-[0.75em] font-semibold text-muted">
+                      <ChordLabel chord={chord} />
+                    </span>
+                  </span>
+                ) : (
+                  <ChordLabel chord={chord} />
+                )
+                return slot(
+                  onChordClick ? (
                     <button
                       type="button"
                       className="cursor-pointer rounded-sm font-bold text-chord hover:bg-chord/15 focus-visible:bg-chord/15"
@@ -492,16 +510,9 @@ function BarRow({
                     </button>
                   ) : (
                     <span className="font-bold text-chord">{label}</span>
-                  )
-                  // A figura em cima do acorde; o acorde ocupa no compasso o espaço do tempo que dura.
-                  return (
-                    <span key={j} className="flex flex-col items-start" style={{ minWidth: `${beats * 3}ch` }}>
-                      <NoteFigure quarters={beats} />
-                      {body}
-                    </span>
-                  )
-                })
-              })()}
+                  ),
+                )
+              })}
               {b.close && <span className="ml-auto -mr-[0.6ch] font-black text-muted">:</span>}
             </div>
           )
@@ -529,9 +540,10 @@ const FIGURES: Record<string, { name: string; hollow: boolean; stem: boolean; fl
  * A figura musical do tempo que o acorde dura, desenhada (não um caractere: fica igual no
  * iPhone, no Android e no PDF). Duração sem figura (ex.: 3 acordes em 4/4) não mostra nada.
  */
-function NoteFigure({ quarters }: { quarters: number }) {
+function NoteFigure({ quarters, rest = false }: { quarters: number; rest?: boolean }) {
   const f = FIGURES[String(Math.round(quarters * 100) / 100)]
   if (!f) return <span className="h-[1.15em]" aria-hidden />
+  if (rest) return <RestFigure quarters={quarters} dot={f.dot} name={f.name.replace(/^\S+/, (n) => `pausa de ${n}`)} />
   return (
     <svg viewBox="0 0 18 26" className="h-[1.15em] w-auto text-muted" role="img" aria-label={f.name}>
       <title>{f.name}</title>
@@ -550,6 +562,35 @@ function NoteFigure({ quarters }: { quarters: number }) {
         <path key={i} d={`M10.1 ${2 + i * 5} q5 3 4 9`} fill="none" stroke="currentColor" strokeWidth="1.5" />
       ))}
       {f.dot && <circle cx="15.5" cy="20" r="1.5" fill="currentColor" />}
+    </svg>
+  )
+}
+
+/** Pausa (N.C.) com o desenho da pausa de cada figura. */
+function RestFigure({ quarters, dot, name }: { quarters: number; dot: boolean; name: string }) {
+  const q = dot ? quarters / 1.5 : quarters
+  return (
+    <svg viewBox="0 0 18 26" className="h-[1.15em] w-auto text-muted" role="img" aria-label={name}>
+      <title>{name}</title>
+      {q >= 4 ? (
+        <>
+          <line x1="1" y1="9" x2="15" y2="9" stroke="currentColor" strokeWidth="1.2" />
+          <rect x="4" y="9" width="8" height="4" fill="currentColor" />
+        </>
+      ) : q >= 2 ? (
+        <>
+          <line x1="1" y1="17" x2="15" y2="17" stroke="currentColor" strokeWidth="1.2" />
+          <rect x="4" y="13" width="8" height="4" fill="currentColor" />
+        </>
+      ) : q >= 1 ? (
+        <path d="M6 3 l5 6 -4 4 5 6 c-4 -2 -7 0 -4 5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
+      ) : (
+        <>
+          <circle cx="6" cy="10" r="2" fill="currentColor" />
+          <path d="M6 11 q4 1 6 -3 l-4 14" fill="none" stroke="currentColor" strokeWidth="1.5" />
+        </>
+      )}
+      {dot && <circle cx="15.5" cy="15" r="1.5" fill="currentColor" />}
     </svg>
   )
 }

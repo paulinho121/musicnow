@@ -11,6 +11,7 @@ import {
   isChordLine,
   isBarLine,
   chordDurations,
+  barEvents,
   wrapChordPair,
   moveChordInLine,
   normalizeOffset,
@@ -341,5 +342,26 @@ describe('duração dos acordes no compasso', () => {
   })
   it('acorde com baixo (C/G) não é confundido com a barra de tempo', () => {
     expect(chordDurations('C/G / Am7', '4/4')).toEqual([2, 1])
+  })
+})
+
+describe('ataques, pausa e casas', () => {
+  it('reconhece a linha com x, N.C. e casas 1 e 2', () => {
+    expect(isBarLine('| C x x x | N.C. | G |')).toBe(true)
+    expect(isBarLine('|1. Gm D7 :||2. Gm |')).toBe(true)
+  })
+  it('ataque e pausa contam tempo como os acordes', () => {
+    expect(barEvents('C x x x', '4/4').map((e) => [e.kind, e.beats])).toEqual([
+      ['chord', 1],
+      ['hit', 1],
+      ['hit', 1],
+      ['hit', 1],
+    ])
+    expect(barEvents('N.C.', '4/4')).toEqual([{ kind: 'rest', beats: 4 }])
+    expect(barEvents('C / / x', '4/4').map((e) => e.beats)).toEqual([3, 1])
+    expect(barEvents('%', '3/4')).toEqual([{ kind: 'repeat', beats: 3 }])
+  })
+  it('transpõe o acorde e deixa x e N.C. como estão', () => {
+    expect(transposeChordLine('| C x x | N.C. |', 2, false)).toBe('| D x x | N.C. |')
   })
 })

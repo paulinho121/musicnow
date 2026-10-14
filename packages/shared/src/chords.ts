@@ -178,7 +178,7 @@ export function sectionTypeFromLabel(label: string): SectionType | null {
 }
 
 // Tokens que podem aparecer numa linha de acordes sem serem acordes.
-const NOISE_RE = /^(\||\|\||\(|\)|x\d+|\d+x|%|-+|\/+|\.+|:)$/i
+const NOISE_RE = /^(\||\|\||\(|\)|x\d+|\d+x|%|-+|\/+|\.+|:|x|×|n\.?c\.?|\d\.)$/i
 
 export function isChordLine(line: string): boolean {
   if (isTabLine(line)) return false
@@ -209,25 +209,46 @@ export function parseTimeSignature(ts?: string | null): { beats: number; unit: n
   return beats > 0 && [1, 2, 4, 8, 16].includes(unit) ? { beats, unit } : { beats: 4, unit: 4 }
 }
 
+/** O que acontece dentro de um compasso, na ordem, com a duração em semínimas. */
+export type BarEvent =
+  | { kind: 'chord'; chord: string; beats: number }
+  /** "x": ataque marcado (convenção/parada): a banda toca junto e corta. */
+  | { kind: 'hit'; beats: number }
+  /** "N.C.": ninguém toca. */
+  | { kind: 'rest'; beats: number }
+  /** "%": repete o compasso anterior inteiro. */
+  | { kind: 'repeat'; beats: number }
+
 /**
- * Quanto dura cada acorde de um compasso, em semínimas (1 = semínima, 2 = mínima...).
- * Cada "/" soma um tempo ao acorde anterior: "C7M / / Dm7" em 4/4 → [3, 1]. Sem barras,
- * os acordes dividem o compasso por igual: "C G" em 4/4 → [2, 2].
+ * Lê um compasso: acordes, ataques (x), pausa (N.C.) e "%". Cada "/" soma um tempo ao que
+ * veio antes: "C7M / / Dm7" em 4/4 → C7M 3 tempos, Dm7 1. Sem barras, o compasso é dividido
+ * por igual: "C G" em 4/4 → 2 + 2; "C x x x" → 4 semínimas.
  */
-export function chordDurations(bar: string, timeSignature?: string | null): number[] {
+export function barEvents(bar: string, timeSignature?: string | null): BarEvent[] {
   const { beats, unit } = parseTimeSignature(timeSignature)
   const quarter = 4 / unit
-  const out: number[] = []
+  const out: BarEvent[] = []
   let slashes = false
   for (const t of bar.trim().split(/\s+/).filter(Boolean)) {
-    if (isChord(t) || isChord(t.replace(/^\(|\)$/g, ''))) out.push(1)
+    const core = t.replace(/^\(|\)$/g, '')
+    if (isChord(t)) out.push({ kind: 'chord', chord: t, beats: 1 })
+    else if (isChord(core)) out.push({ kind: 'chord', chord: core, beats: 1 })
+    else if (/^[x×]$/i.test(t)) out.push({ kind: 'hit', beats: 1 })
+    else if (/^n\.?c\.?$/i.test(core)) out.push({ kind: 'rest', beats: 1 })
+    else if (t === '%') out.push({ kind: 'repeat', beats: beats * quarter })
     else if (/^\/+$/.test(t)) {
       slashes = true
-      if (out.length) out[out.length - 1] += t.length
+      if (out.length) out[out.length - 1].beats += t.length
     }
   }
-  if (!slashes) return out.map(() => (beats / out.length) * quarter)
-  return out.map((b) => b * quarter)
+  if (out.length === 1 && out[0].kind === 'repeat') return out
+  if (!slashes) return out.map((e) => ({ ...e, beats: (beats / out.length) * quarter }))
+  return out.map((e) => ({ ...e, beats: e.beats * quarter }))
+}
+
+/** Quanto dura cada acorde do compasso, em semínimas (veja barEvents). */
+export function chordDurations(bar: string, timeSignature?: string | null): number[] {
+  return barEvents(bar, timeSignature).flatMap((e) => (e.kind === 'chord' ? [e.beats] : []))
 }
 
 /** Linha de compassos ("| C | F G | Am |"): acordes separados por barras, sem letra. */
