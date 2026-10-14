@@ -15,6 +15,7 @@ import {
   transposeChord,
   transposeKey,
 } from '@ensaio/shared'
+import { MetronomePanel } from '../components/Metronome'
 import clsx from 'clsx'
 import {
   ArrowLeft,
@@ -32,6 +33,7 @@ import {
   Mic,
   AudioWaveform,
   Music2,
+  Timer,
   LogOut,
   Minus,
   MoveHorizontal,
@@ -182,6 +184,7 @@ export function SongViewer({ songId, setlist }: { songId: string; setlist?: Setl
   const [pickerOpen, setPickerOpen] = useState(false)
   const [panelOpen, setPanelOpen] = useState(false)
   const [scrolling, setScrolling] = useState(false)
+  const [metronome, setMetronome] = useState(false)
   const [locked, setLocked] = useState(false)
   const [fullscreen, setFullscreen] = useState(false)
   const [markMode, setMarkMode] = useState(false)
@@ -875,6 +878,15 @@ export function SongViewer({ songId, setlist }: { songId: string; setlist?: Setl
 
       {!locked && viewMode === 'chord' && (
         <div className="fixed inset-x-0 bottom-0 z-30 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+          {metronome && (
+            <MetronomePanel
+              key={song.id}
+              initialBpm={song.bpm}
+              timeSignature={song.timeSignature}
+              onClose={() => setMetronome(false)}
+              onCountInDone={() => setScrolling(true)}
+            />
+          )}
           <div className="mx-auto flex w-fit max-w-[calc(100%-1rem)] items-center gap-1.5 rounded-2xl border border-border bg-surface/95 p-1.5 shadow-2xl shadow-black/40 backdrop-blur">
             <button className="btn-icon" aria-label="Descer meio tom" onClick={() => shift(-1)} disabled={!song.content}>
               <Minus className="size-5" />
@@ -893,8 +905,9 @@ export function SongViewer({ songId, setlist }: { songId: string; setlist?: Setl
               <Plus className="size-5" />
             </button>
             {original && currentKey !== (baseKey ?? original) && (
+              // No celular a barra não comporta: volta-se ao tom pelo seletor (o original vem marcado).
               <button
-                className="btn-icon"
+                className="btn-icon max-sm:hidden"
                 aria-label={resetLabel}
                 title={resetLabel}
                 onClick={() => setOffset(baseKey ? normalizeOffset(semitonesBetween(original, baseKey)) : 0)}
@@ -920,6 +933,15 @@ export function SongViewer({ songId, setlist }: { songId: string; setlist?: Setl
               onClick={() => setPanelOpen((o) => !o)}
             >
               <Type className="size-5" />
+            </button>
+            <button
+              className={clsx('btn-icon', metronome && 'border-accent text-accent')}
+              aria-label="Metrônomo"
+              aria-expanded={metronome}
+              title="Metrônomo e contagem de entrada"
+              onClick={() => setMetronome((m) => !m)}
+            >
+              <Timer className="size-5" />
             </button>
             <button
               className={clsx('btn-icon', scrolling && 'border-accent bg-accent text-accent-ink hover:bg-accent')}
