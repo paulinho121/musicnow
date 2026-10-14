@@ -355,6 +355,11 @@ export function SongEditor() {
             {form.visibility === 'shared' && 'Você e os músicos dos repertórios em que ela estiver.'}
             {form.visibility === 'public' && 'Qualquer usuário do Ensaio Fácil pode encontrar e usar.'}
           </p>
+          {form.visibility !== 'private' && !form.lyricsAuthorized && (
+            <p className="mt-2 rounded-lg bg-accent/10 px-3 py-2 text-xs text-accent">
+              Os outros vão ver só os acordes. Para mostrar a letra, marque "Tenho autorização para exibir a letra" logo abaixo.
+            </p>
+          )}
         </div>
         <label className="block">
           <span className="label">Licença</span>
