@@ -255,15 +255,18 @@ function Line({
       if (hideLyrics) return null
       // No modo cantor a letra é centralizada: os espaços que alinhavam os acordes saem.
       return <div className={clsx(cols && 'whitespace-pre-wrap')}>{singer ? line.text.trim() : line.text}</div>
-    case 'chords':
+    case 'chords': {
       if (!showChords) return null
       if (isBarLine(line.text)) return <BarRow text={line.text} line={index} cols={cols} bass={bass} onChordClick={onChordClick} />
+      // Sem a letra embaixo, os espaços que punham cada acorde em cima da sílaba só espalham os
+      // acordes pela tela: ficam em sequência, com um espaçamento fixo.
+      const text = hideLyrics ? line.text.trim().split(/\s+/).join('   ') : line.text
       if (cols) {
         // Cada pedaço da linha quebrada continua a contagem dos acordes do anterior.
         let before = 0
         return (
           <>
-            {wrapChordPair(line.text, pair, cols).map((row, k) => {
+            {wrapChordPair(text, pair, cols).map((row, k) => {
               const start = before
               before += row.chords ? splitChordLine(row.chords).filter((p) => p.chord).length : 0
               return (
@@ -282,12 +285,13 @@ function Line({
       return (
         <>
           {/* Modo baixista: a nota do baixo em cima, nas mesmas colunas; o acorde completo embaixo, discreto. */}
-          {bass && <div className="font-black text-chord">{chordBassLine(line.text)}</div>}
+          {bass && <div className="font-black text-chord">{chordBassLine(text)}</div>}
           <div className={bass ? 'font-semibold text-muted' : 'font-bold text-chord'}>
-            <Chords text={line.text} line={index} onChordClick={onChordClick} />
+            <Chords text={text} line={index} onChordClick={onChordClick} />
           </div>
         </>
       )
+    }
     case 'section':
       return (
         <div className={clsx('mt-3 mb-1 flex items-baseline gap-x-3', cols && 'flex-wrap whitespace-pre-wrap', singer && 'justify-center')}>
