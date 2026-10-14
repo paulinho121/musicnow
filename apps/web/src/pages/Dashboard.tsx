@@ -32,10 +32,10 @@ function whenLabel(iso: string) {
 }
 
 const ACTIONS = [
-  { to: '/musicas/nova', label: 'Nova música', icon: Plus },
-  { to: '/musicas/encontrar', label: 'Encontrar', icon: Globe },
-  { to: '/musicas/importar', label: 'Importar', icon: FileUp },
-  { to: '/acordes', label: 'Acordes', icon: Guitar },
+  { to: '/musicas/nova', label: 'Nova música', hint: 'Escrever ou colar a cifra', icon: Plus },
+  { to: '/musicas/encontrar', label: 'Encontrar', hint: 'Buscar no catálogo', icon: Globe },
+  { to: '/musicas/importar', label: 'Importar', hint: 'Arquivos e listas prontas', icon: FileUp },
+  { to: '/acordes', label: 'Acordes', hint: 'Dicionário de acordes', icon: Guitar },
 ]
 
 export function Dashboard() {
@@ -109,17 +109,18 @@ export function Dashboard() {
       </header>
       <HeroCustomizeDialog images={heroImages} open={customizing} onClose={() => setCustomizing(false)} />
 
-      <nav aria-label="Atalhos" className="grid grid-cols-4 gap-2 sm:gap-3">
-        {ACTIONS.map(({ to, label, icon: Icon }) => (
+      <nav aria-label="Atalhos" className="grid grid-cols-2 gap-2 xl:grid-cols-4">
+        {ACTIONS.map(({ to, label, hint, icon: Icon }) => (
           <Link
             key={to}
             to={to}
-            className="group flex flex-col items-center gap-2 rounded-2xl border border-border bg-surface px-1 py-3.5 text-center transition hover:-translate-y-0.5 hover:border-accent/40 sm:py-4"
+            className="group flex items-center gap-3 rounded-xl border border-border bg-surface px-3.5 py-3 transition hover:border-border hover:bg-surface-2"
           >
-            <span className="grid size-10 place-items-center rounded-xl bg-accent/12 text-accent transition group-hover:bg-accent group-hover:text-accent-ink">
-              <Icon className="size-5" />
+            <Icon className="size-5 shrink-0 text-muted transition group-hover:text-accent" />
+            <span className="min-w-0">
+              <span className="block text-sm leading-tight font-semibold">{label}</span>
+              <span className="hidden truncate text-xs text-muted sm:block">{hint}</span>
             </span>
-            <span className="text-xs leading-tight font-semibold sm:text-sm">{label}</span>
           </Link>
         ))}
       </nav>
@@ -152,18 +153,16 @@ export function Dashboard() {
                 ))}
               </div>
             ) : (
-              <Link
-                to="/repertorios/novo"
-                className="card flex items-center gap-4 border-dashed p-5 transition hover:border-accent/50 hover:bg-surface-2"
-              >
-                <span className="grid size-12 shrink-0 place-items-center rounded-2xl bg-accent/12 text-accent">
-                  <Plus className="size-6" />
-                </span>
-                <span>
-                  <span className="block font-semibold">Nenhum evento marcado</span>
-                  <span className="block text-sm text-muted">Monte o repertório do próximo culto, show ou ensaio e convide a banda.</span>
-                </span>
-              </Link>
+              <div className="card flex flex-wrap items-center gap-x-4 gap-y-3 px-4 py-3.5">
+                <CalendarDays className="size-5 shrink-0 text-muted" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium">Nenhum evento marcado</p>
+                  <p className="text-xs text-muted">Crie o repertório do próximo culto, show ou ensaio.</p>
+                </div>
+                <Link to="/repertorios/novo" className="btn-ghost h-9 px-3 text-sm max-sm:w-full">
+                  <Plus className="size-4" /> Novo repertório
+                </Link>
+              </div>
             )}
           </Section>
 
