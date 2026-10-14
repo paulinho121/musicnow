@@ -1,5 +1,5 @@
 import clsx from 'clsx'
-import { CalendarDays, Gauge, Home, LifeBuoy, ListMusic, Music2, ShieldCheck, UserRound } from 'lucide-react'
+import { CalendarDays, Gauge, Home, LifeBuoy, ListMusic, Music2, ShieldCheck, UserRound, Globe } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { Suspense, useEffect } from 'react'
 import { NavLink, Outlet } from 'react-router'
@@ -17,6 +17,8 @@ const BASE_NAV = [
   { to: '/repertorios', label: 'Repertórios', icon: ListMusic },
   { to: '/agenda', label: 'Agenda', icon: CalendarDays },
   { to: '/afinador', label: 'Afinador', icon: Gauge },
+  // No celular fica no Perfil.
+  { to: '/minha-banda', label: 'Página da banda', icon: Globe, desktopOnly: true },
   // No celular a Ajuda fica no Perfil (a barra de baixo não comporta tudo).
   { to: '/ajuda', label: 'Ajuda', icon: LifeBuoy, desktopOnly: true },
   { to: '/perfil', label: 'Perfil', icon: UserRound },

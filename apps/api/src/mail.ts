@@ -123,6 +123,38 @@ ${url}`,
   })
 }
 
+export async function sendQuoteRequestEmail(
+  to: string,
+  bandName: string,
+  q: { name: string; contact: string; eventDate?: string | null; eventType?: string | null; location?: string | null; message?: string | null },
+  url: string,
+) {
+  const date = q.eventDate ? q.eventDate.split('-').reverse().join('/') : null
+  const rows: [string, string | null | undefined][] = [
+    ['Nome', q.name],
+    ['Contato', q.contact],
+    ['Data', date],
+    ['Evento', q.eventType],
+    ['Local', q.location],
+    ['Mensagem', q.message],
+  ]
+  const filled = rows.filter((r): r is [string, string] => Boolean(r[1]))
+  await sendMail({
+    to,
+    subject: `Pedido de orçamento para ${bandName}${date ? ` (${date})` : ''}`,
+    text: [`Novo pedido de orçamento na página da ${bandName}:`, '', ...filled.map(([k, v]) => `${k}: ${v}`), '', `Ver no app: ${url}`].join('\n'),
+    html: layout({
+      title: `Pedido de orçamento: ${bandName}`,
+      body:
+        `<p style="font-size:15px;line-height:1.5">Alguém pediu orçamento na página da banda:</p>` +
+        `<table style="font-size:15px;line-height:1.5">${filled
+          .map(([k, v]) => `<tr><td style="padding:2px 12px 2px 0;color:#888">${k}</td><td><b>${escapeHtml(v)}</b></td></tr>`)
+          .join('')}</table>`,
+      button: { label: 'Ver no Ensaio Fácil', url },
+    }),
+  })
+}
+
 // ---------------------------------------------------------------- ciclo de vida da conta
 
 const p = (html: string) => `<p style="font-size:15px;line-height:1.5">${html}</p>`

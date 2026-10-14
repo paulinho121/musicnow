@@ -1,7 +1,7 @@
 import { INSTRUMENTS, MUSICIAN_ROLES, type Instrument, type MusicianRole } from '@ensaio/shared'
 import { useQueryClient } from '@tanstack/react-query'
 import clsx from 'clsx'
-import { Camera, Check, ChevronRight, Crown, Handshake, LifeBuoy, Loader2, LogOut, Mail, ShieldCheck, Moon, Star, Sun, Trash2 } from 'lucide-react'
+import { Camera, Check, ChevronRight, Crown, Handshake, LifeBuoy, Loader2, LogOut, Mail, ShieldCheck, Moon, Star, Sun, Trash2, Globe } from 'lucide-react'
 import { type FormEvent, useEffect, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router'
 import { Avatar } from '../components/Avatar'
@@ -225,6 +225,17 @@ export function Profile() {
           <span className="min-w-0 flex-1">
             <span className="block font-semibold">Gestão</span>
             <span className="block text-sm text-muted">Painel do administrador</span>
+          </span>
+          <ChevronRight className="size-4 text-muted" />
+        </Link>
+      )}
+
+      {!onboarding && (
+        <Link to="/minha-banda" className="card flex items-center gap-3 p-4 transition hover:border-accent/50">
+          <Globe className="size-5 shrink-0 text-accent" />
+          <span className="min-w-0 flex-1">
+            <span className="block font-semibold">Página da banda</span>
+            <span className="block text-sm text-muted">Link para quem quer contratar: repertório e pedido de orçamento</span>
           </span>
           <ChevronRight className="size-4 text-muted" />
         </Link>

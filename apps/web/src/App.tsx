@@ -45,6 +45,8 @@ const Subscription = page(() => import('./pages/Subscription'), 'Subscription')
 const Checkout = page(() => import('./pages/Checkout'), 'Checkout')
 const Help = page(() => import('./pages/Help'), 'Help')
 const Agenda = page(() => import('./pages/Agenda'), 'Agenda')
+const MyBand = page(() => import('./pages/MyBand'), 'MyBand')
+const BandPublic = page(() => import('./pages/BandPublic'), 'BandPublic')
 const AdminSupport = page(() => import('./pages/admin/AdminSupport'), 'AdminSupport')
 const AdminLayout = page(() => import('./pages/admin/AdminLayout'), 'AdminLayout')
 const AdminOverview = page(() => import('./pages/admin/AdminOverview'), 'AdminOverview')
@@ -134,6 +136,8 @@ export const router = createBrowserRouter([
       { path: '/afinador-online/:slug', element: <PublicTuner /> },
       // Link do parceiro: guarda o cupom e leva ao cadastro.
       { path: '/p/:code', element: <PartnerLink /> },
+      // Página pública da banda (para quem quer contratar).
+      { path: '/banda/:slug', element: <BandPublic /> },
       {
         element: <RequireAuth />,
         children: [
@@ -166,6 +170,7 @@ export const router = createBrowserRouter([
               { path: '/assinatura/pagar/:id', element: <Checkout /> },
               { path: '/ajuda', element: <Help /> },
               { path: '/agenda', element: <Agenda /> },
+              { path: '/minha-banda', element: <MyBand /> },
               { path: '/parceiro', element: <PartnerDashboard /> },
               {
                 element: <RequireAdmin />,

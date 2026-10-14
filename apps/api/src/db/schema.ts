@@ -729,6 +729,55 @@ export const setlistEntry = pgTable(
   (t) => [index().on(t.setlistId), index().on(t.userId)],
 )
 
+/**
+ * Página pública da banda (ensaiofacil.app.br/banda/:slug): apresentação, contatos, o
+ * repertório (só nomes e artistas, nunca letra) e o formulário de pedido de orçamento.
+ */
+export const bandPage = pgTable(
+  'band_page',
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    ownerId: text()
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    slug: text().notNull(),
+    name: text().notNull(),
+    city: text(),
+    bio: text(),
+    /** Estilos que a banda toca ("Pop rock, MPB, Sertanejo"). */
+    genres: text(),
+    whatsapp: text(),
+    instagram: text(),
+    youtube: text(),
+    /** Repertório mostrado na página (null = nenhum). */
+    setlistId: uuid().references(() => setlist.id, { onDelete: 'set null' }),
+    published: boolean().notNull().default(true),
+    ...timestamps,
+  },
+  (t) => [uniqueIndex().on(t.slug), index().on(t.ownerId)],
+)
+
+/** Pedido de orçamento feito na página pública da banda. */
+export const quoteRequest = pgTable(
+  'quote_request',
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    bandPageId: uuid()
+      .notNull()
+      .references(() => bandPage.id, { onDelete: 'cascade' }),
+    name: text().notNull(),
+    contact: text().notNull(),
+    eventDate: date({ mode: 'string' }),
+    eventType: text(),
+    location: text(),
+    message: text(),
+    /** novo | respondido | arquivado */
+    status: text().notNull().default('novo'),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index().on(t.bandPageId, t.createdAt)],
+)
+
 /** Pedidos de ajuda (aba Ajuda): problema, dúvida ou sugestão, com a tela e o aparelho. */
 export const supportTicket = pgTable(
   'support_ticket',

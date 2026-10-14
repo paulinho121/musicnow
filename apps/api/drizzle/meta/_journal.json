@@ -162,6 +162,13 @@
       "when": 1791998271230,
       "tag": "0022_financeiro_show",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1791998958666,
+      "tag": "0023_pagina_banda",
+      "breakpoints": true
     }
   ]
 }
