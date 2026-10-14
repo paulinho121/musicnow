@@ -199,8 +199,52 @@ export const setlistsRoutes = new Hono<AppEnv>()
       .leftJoin(setlistMember, and(eq(setlistMember.setlistId, setlist.id), eq(setlistMember.userId, uid)))
       .where(or(eq(setlist.ownerId, uid), eq(setlistMember.userId, uid)))
       .orderBy(asc(setlist.eventDate), desc(setlist.updatedAt))
+    const ids = rows.map((r) => r.id)
+    // Para o cartão: as 4 primeiras capas, até 5 rostos da banda e o resumo da escala.
+    const [covers, faces, scale] = ids.length
+      ? await Promise.all([
+          db.execute<{ setlist_id: string; title: string; artist: string | null; cover_url: string | null }>(sql`
+            select setlist_id, title, artist, cover_url from (
+              select i.setlist_id, s.title, s.artist, s.cover_url,
+                     row_number() over (partition by i.setlist_id order by i.position) as n
+              from ${setlistItem} i join ${song} s on s.id = i.song_id
+              where i.setlist_id in ${ids}
+            ) x where n <= 4 order by setlist_id, n`),
+          db.execute<{ setlist_id: string; name: string; image: string | null }>(sql`
+            select setlist_id, name, image from (
+              select p.setlist_id, u.name, u.image, row_number() over (partition by p.setlist_id order by p.ord, p.joined) as n
+              from (
+                select s.id as setlist_id, s.owner_id as user_id, 0 as ord, s.created_at as joined from ${setlist} s where s.id in ${ids}
+                union all
+                select m.setlist_id, m.user_id, 1, m.joined_at from ${setlistMember} m where m.setlist_id in ${ids}
+              ) p join ${user} u on u.id = p.user_id
+            ) x where n <= 5 order by setlist_id, n`),
+          db.execute<{ setlist_id: string; total: number; confirmed: number; mine: string | null }>(sql`
+            select setlist_id, count(*)::int as total,
+                   count(*) filter (where status = 'confirmado')::int as confirmed,
+                   max(case when user_id = ${uid} then status::text end) as mine
+            from ${schema.setlistAssignment} where setlist_id in ${ids} group by setlist_id`),
+        ])
+      : [[], [], []]
+    const by = <T extends { setlist_id: string }>(list: Iterable<T>) => {
+      const m = new Map<string, T[]>()
+      for (const x of list) m.set(x.setlist_id, [...(m.get(x.setlist_id) ?? []), x])
+      return m
+    }
+    const coverMap = by(covers)
+    const faceMap = by(faces)
+    const scaleMap = by(scale)
     return c.json(
-      rows.map(({ myPermission, ...r }) => ({ ...r, role: (r.ownerId === uid ? 'owner' : myPermission) as SetlistRole })),
+      rows.map(({ myPermission, ...r }) => {
+        const sc = scaleMap.get(r.id)?.[0]
+        return {
+          ...r,
+          role: (r.ownerId === uid ? 'owner' : myPermission) as SetlistRole,
+          songs: (coverMap.get(r.id) ?? []).map((x) => ({ title: x.title, artist: x.artist, coverUrl: x.cover_url })),
+          people: (faceMap.get(r.id) ?? []).map((x) => ({ name: x.name, image: x.image })),
+          schedule: sc ? { total: sc.total, confirmed: sc.confirmed, mine: sc.mine } : null,
+        }
+      }),
     )
   })
 

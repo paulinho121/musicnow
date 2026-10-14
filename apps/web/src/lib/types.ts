@@ -195,6 +195,12 @@ export interface SetlistSummary {
   role: SetlistRole
   itemCount: number
   memberCount: number
+  /** As 4 primeiras músicas (capas do cartão). */
+  songs: { title: string; artist: string | null; coverUrl: string | null }[]
+  /** Até 5 rostos da banda (o dono primeiro). */
+  people: { name: string; image: string | null }[]
+  /** Escala: quantos escalados, quantos confirmaram e a minha resposta. */
+  schedule: { total: number; confirmed: number; mine: 'pendente' | 'confirmado' | 'recusado' | null } | null
 }
 
 /** Bloco do repertório (barzinho, baile): "Bloco 2 · Marília · 130 BPM". */
