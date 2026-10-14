@@ -141,7 +141,7 @@ function SongPage({
         )}
         {song.notes && <p className="mt-1 text-sm text-muted">{song.notes}</p>}
       </header>
-      <ChordSheet lines={lines} marks={showMarks ? song.marks : []} fontSize={fontSize} lineHeight={1.35} hideLyrics={song.lyricsHidden} />
+      <ChordSheet lines={lines} marks={showMarks ? song.marks : []} fontSize={fontSize} lineHeight={1.35} hideLyrics={song.lyricsHidden} timeSignature={song.timeSignature} />
     </article>
   )
 }

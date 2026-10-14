@@ -327,7 +327,7 @@ export function SongEditor() {
           )
         ) : form.content.trim() ? (
           <div className="rounded-xl bg-bg p-4">
-            <ChordSheet lines={lines} fontSize={15} lineHeight={1.45} wrap />
+            <ChordSheet lines={lines} fontSize={15} lineHeight={1.45} wrap timeSignature={form.timeSignature} />
           </div>
         ) : (
           <p className="py-10 text-center text-sm text-muted">Nada para visualizar ainda.</p>

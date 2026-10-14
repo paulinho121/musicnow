@@ -10,6 +10,7 @@ import {
   isChord,
   isChordLine,
   isBarLine,
+  chordDurations,
   wrapChordPair,
   moveChordInLine,
   normalizeOffset,
@@ -323,5 +324,22 @@ describe('mapa de compassos', () => {
 
   it('parseSheet trata a linha de compassos como acordes', () => {
     expect(parseSheet('|C|F|', 5)).toEqual([{ kind: 'chords', text: '|F|A#|' }])
+  })
+})
+
+describe('duração dos acordes no compasso', () => {
+  it('a barra soma tempos ao acorde anterior', () => {
+    expect(chordDurations('C7M / / Dm7', '4/4')).toEqual([3, 1])
+    expect(chordDurations('C / G /', '4/4')).toEqual([2, 2])
+  })
+  it('sem barras, divide o compasso por igual', () => {
+    expect(chordDurations('C', '4/4')).toEqual([4])
+    expect(chordDurations('C G', null)).toEqual([2, 2])
+    expect(chordDurations('C G Am F', '4/4')).toEqual([1, 1, 1, 1])
+    expect(chordDurations('C', '3/4')).toEqual([3])
+    expect(chordDurations('C G', '6/8')).toEqual([1.5, 1.5]) // semínimas pontuadas
+  })
+  it('acorde com baixo (C/G) não é confundido com a barra de tempo', () => {
+    expect(chordDurations('C/G / Am7', '4/4')).toEqual([2, 1])
   })
 })

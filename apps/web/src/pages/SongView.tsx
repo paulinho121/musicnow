@@ -692,6 +692,7 @@ export function SongViewer({ songId, setlist }: { songId: string; setlist?: Setl
               <ChordSheet
                 lines={lines}
                 marks={song.marks}
+                timeSignature={song.timeSignature}
                 fontSize={singer ? Math.round(prefs.fontSize * 1.2) : prefs.fontSize}
                 lineHeight={prefs.lineHeight}
                 showChords={prefs.showChords && !singer}

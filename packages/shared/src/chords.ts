@@ -201,6 +201,35 @@ export function transposeChordLine(line: string, semitones: number, useFlats: bo
   return mapChordsInLine(line, (c) => transposeChord(c, semitones, useFlats))
 }
 
+/** Compasso da música ("4/4", "6/8"): tempos por compasso e a figura que vale um tempo. */
+export function parseTimeSignature(ts?: string | null): { beats: number; unit: number } {
+  const m = ts?.match(/^\s*(\d{1,2})\s*\/\s*(\d{1,2})\s*$/)
+  const beats = m ? Number(m[1]) : 4
+  const unit = m ? Number(m[2]) : 4
+  return beats > 0 && [1, 2, 4, 8, 16].includes(unit) ? { beats, unit } : { beats: 4, unit: 4 }
+}
+
+/**
+ * Quanto dura cada acorde de um compasso, em semínimas (1 = semínima, 2 = mínima...).
+ * Cada "/" soma um tempo ao acorde anterior: "C7M / / Dm7" em 4/4 → [3, 1]. Sem barras,
+ * os acordes dividem o compasso por igual: "C G" em 4/4 → [2, 2].
+ */
+export function chordDurations(bar: string, timeSignature?: string | null): number[] {
+  const { beats, unit } = parseTimeSignature(timeSignature)
+  const quarter = 4 / unit
+  const out: number[] = []
+  let slashes = false
+  for (const t of bar.trim().split(/\s+/).filter(Boolean)) {
+    if (isChord(t) || isChord(t.replace(/^\(|\)$/g, ''))) out.push(1)
+    else if (/^\/+$/.test(t)) {
+      slashes = true
+      if (out.length) out[out.length - 1] += t.length
+    }
+  }
+  if (!slashes) return out.map(() => (beats / out.length) * quarter)
+  return out.map((b) => b * quarter)
+}
+
 /** Linha de compassos ("| C | F G | Am |"): acordes separados por barras, sem letra. */
 export function isBarLine(line: string): boolean {
   return (line.match(/\|/g)?.length ?? 0) >= 2 && isChordLine(line)

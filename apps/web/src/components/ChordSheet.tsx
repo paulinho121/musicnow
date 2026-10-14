@@ -1,4 +1,4 @@
-import { chordBassLine, isBarLine, isChordLine, parseChord, parseSheet, SECTION_LABELS, splitChordLine, wrapChordPair, type SectionType, type SheetLine } from '@ensaio/shared'
+import { chordBassLine, chordDurations, isBarLine, isChordLine, parseChord, parseSheet, SECTION_LABELS, splitChordLine, wrapChordPair, type SectionType, type SheetLine } from '@ensaio/shared'
 import clsx from 'clsx'
 import { memo, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useAccidentals } from '../lib/accidentals'
@@ -58,6 +58,8 @@ interface Props {
   showChords?: boolean
   /** Tablaturas (E|---): a pessoa pode esconder nos ajustes de leitura. */
   showTabs?: boolean
+  /** Compasso da música ("4/4"): dá a duração de cada acorde no mapa de compassos. */
+  timeSignature?: string | null
   /** Letra sem autorização de exibição: mostra só acordes e seções. */
   hideLyrics?: boolean
   /** Modo cantor: só a letra, centralizada e em fonte comum. */
@@ -102,6 +104,7 @@ export const ChordSheet = memo(function ChordSheet({
   lineHeight,
   showChords = true,
   showTabs = true,
+  timeSignature = null,
   hideLyrics = false,
   singer = false,
   bass = false,
@@ -196,7 +199,7 @@ export const ChordSheet = memo(function ChordSheet({
                   onClick={() => onLineClick(i)}
                   aria-label={`Marcar a linha ${i + 1}`}
                 >
-                  <Line line={line} showChords={showChords} showTabs={showTabs} hideLyrics={hideLyrics} singer={singer} cols={cols} pair={pair} />
+                  <Line line={line} showChords={showChords} showTabs={showTabs} timeSignature={timeSignature} hideLyrics={hideLyrics} singer={singer} cols={cols} pair={pair} />
                 </button>
               ) : (
                 <Line
@@ -204,6 +207,7 @@ export const ChordSheet = memo(function ChordSheet({
                   index={i}
                   showChords={showChords}
                   showTabs={showTabs}
+                  timeSignature={timeSignature}
                   hideLyrics={hideLyrics}
                   singer={singer}
                   bass={bass}
@@ -224,6 +228,7 @@ function Line({
   index = 0,
   showChords,
   showTabs = true,
+  timeSignature = null,
   hideLyrics,
   singer = false,
   bass = false,
@@ -235,6 +240,7 @@ function Line({
   index?: number
   showChords: boolean
   showTabs?: boolean
+  timeSignature?: string | null
   hideLyrics: boolean
   singer?: boolean
   bass?: boolean
@@ -257,7 +263,7 @@ function Line({
       return <div className={clsx(cols && 'whitespace-pre-wrap')}>{singer ? line.text.trim() : line.text}</div>
     case 'chords': {
       if (!showChords) return null
-      if (isBarLine(line.text)) return <BarRow text={line.text} line={index} cols={cols} bass={bass} onChordClick={onChordClick} />
+      if (isBarLine(line.text)) return <BarRow text={line.text} line={index} cols={cols} bass={bass} timeSignature={timeSignature} onChordClick={onChordClick} />
       // Sem a letra embaixo, os espaços que punham cada acorde em cima da sílaba só espalham os
       // acordes pela tela: ficam em sequência, com um espaçamento fixo.
       const text = hideLyrics ? line.text.trim().split(/\s+/).join('   ') : line.text
@@ -424,12 +430,14 @@ function BarRow({
   line,
   cols,
   bass,
+  timeSignature,
   onChordClick,
 }: {
   text: string
   line: number
   cols?: number | null
   bass: boolean
+  timeSignature?: string | null
   onChordClick?: OnChordClick
 }) {
   const { bars, note } = splitBars(text)
@@ -439,25 +447,29 @@ function BarRow({
   let occurrence = 0
   return (
     <div className="my-1 flex items-center gap-3">
-      <div className="grid" style={{ gridTemplateColumns: `repeat(${k}, minmax(9ch, max-content))` }}>
+      <div className="grid" style={{ gridTemplateColumns: `repeat(${k}, minmax(11ch, max-content))` }}>
         {bars.map((b, i) => {
           const last = i % k === k - 1 || i === bars.length - 1
           return (
             <div
               key={i}
               className={clsx(
-                'flex min-h-[2.4em] items-center gap-[1.4ch] py-0.5 pr-[1.2ch] pl-[1ch]',
+                'flex min-h-[2.4em] items-end gap-[1.4ch] py-0.5 pr-[1.2ch] pl-[1ch]',
                 b.double ? 'border-l-4' : 'border-l-2',
                 last && (b.close || b.end ? 'border-r-4' : 'border-r-2'),
                 'border-muted/60',
               )}
             >
               {b.open && <span className="-ml-[0.6ch] font-black text-muted">:</span>}
-              {splitChordLine(b.text)
-                .filter((p) => p.text.trim())
+              {(() => {
+                const durations = chordDurations(b.text, timeSignature)
+                let c = 0
+                return splitChordLine(b.text)
+                .filter((p) => p.chord || p.text.replace(/[\s/]/g, ''))
                 .map((p, j) => {
-                  if (!p.chord) return <span key={j} className="text-muted">{p.text.trim()}</span>
+                  if (!p.chord) return <span key={j} className="text-muted">{p.text.replace(/\//g, '').trim()}</span>
                   const at = { line, occurrence: occurrence++ }
+                  const beats = durations[c++] ?? 1
                   const chord = p.chord
                   const label = bass ? (
                     <span className="flex flex-col items-start leading-tight">
@@ -469,9 +481,8 @@ function BarRow({
                   ) : (
                     <ChordLabel chord={chord} />
                   )
-                  return onChordClick ? (
+                  const body = onChordClick ? (
                     <button
-                      key={j}
                       type="button"
                       className="cursor-pointer rounded-sm font-bold text-chord hover:bg-chord/15 focus-visible:bg-chord/15"
                       onClick={() => onChordClick(chord, at)}
@@ -480,11 +491,17 @@ function BarRow({
                       {label}
                     </button>
                   ) : (
-                    <span key={j} className="font-bold text-chord">
-                      {label}
+                    <span className="font-bold text-chord">{label}</span>
+                  )
+                  // A figura em cima do acorde; o acorde ocupa no compasso o espaço do tempo que dura.
+                  return (
+                    <span key={j} className="flex flex-col items-start" style={{ minWidth: `${beats * 3}ch` }}>
+                      <NoteFigure quarters={beats} />
+                      {body}
                     </span>
                   )
-                })}
+                })
+              })()}
               {b.close && <span className="ml-auto -mr-[0.6ch] font-black text-muted">:</span>}
             </div>
           )
@@ -492,5 +509,47 @@ function BarRow({
       </div>
       {note && <span className="rounded-md bg-surface-2 px-2 py-0.5 font-sans text-[0.75em] font-bold text-muted">{note}</span>}
     </div>
+  )
+}
+
+/** Figuras: duração em semínimas → cabeça vazada ou cheia, haste, colchetes e ponto. */
+const FIGURES: Record<string, { name: string; hollow: boolean; stem: boolean; flags: number; dot: boolean }> = {
+  '6': { name: 'semibreve pontuada', hollow: true, stem: false, flags: 0, dot: true },
+  '4': { name: 'semibreve', hollow: true, stem: false, flags: 0, dot: false },
+  '3': { name: 'mínima pontuada', hollow: true, stem: true, flags: 0, dot: true },
+  '2': { name: 'mínima', hollow: true, stem: true, flags: 0, dot: false },
+  '1.5': { name: 'semínima pontuada', hollow: false, stem: true, flags: 0, dot: true },
+  '1': { name: 'semínima', hollow: false, stem: true, flags: 0, dot: false },
+  '0.75': { name: 'colcheia pontuada', hollow: false, stem: true, flags: 1, dot: true },
+  '0.5': { name: 'colcheia', hollow: false, stem: true, flags: 1, dot: false },
+  '0.25': { name: 'semicolcheia', hollow: false, stem: true, flags: 2, dot: false },
+}
+
+/**
+ * A figura musical do tempo que o acorde dura, desenhada (não um caractere: fica igual no
+ * iPhone, no Android e no PDF). Duração sem figura (ex.: 3 acordes em 4/4) não mostra nada.
+ */
+function NoteFigure({ quarters }: { quarters: number }) {
+  const f = FIGURES[String(Math.round(quarters * 100) / 100)]
+  if (!f) return <span className="h-[1.15em]" aria-hidden />
+  return (
+    <svg viewBox="0 0 18 26" className="h-[1.15em] w-auto text-muted" role="img" aria-label={f.name}>
+      <title>{f.name}</title>
+      <ellipse
+        cx="6"
+        cy="20"
+        rx="4.6"
+        ry="3.2"
+        transform="rotate(-22 6 20)"
+        fill={f.hollow ? 'none' : 'currentColor'}
+        stroke="currentColor"
+        strokeWidth={f.hollow ? 1.6 : 0}
+      />
+      {f.stem && <line x1="10.1" y1="19" x2="10.1" y2="2" stroke="currentColor" strokeWidth="1.4" />}
+      {Array.from({ length: f.flags }, (_, i) => (
+        <path key={i} d={`M10.1 ${2 + i * 5} q5 3 4 9`} fill="none" stroke="currentColor" strokeWidth="1.5" />
+      ))}
+      {f.dot && <circle cx="15.5" cy="20" r="1.5" fill="currentColor" />}
+    </svg>
   )
 }
