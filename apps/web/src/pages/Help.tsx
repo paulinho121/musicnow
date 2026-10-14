@@ -59,6 +59,30 @@ const FAQ: { topic: string; items: { q: string; a: string }[] }[] = [
         a: 'No repertório, toque em "Comandar Banda ao Vivo". Quando você troca de música ou de tom, todos que estão seguindo veem na hora. Precisa de internet (ou do Wi-Fi do local) em todos os celulares.',
       },
       {
+        q: 'Como monto a escala de quem toca?',
+        a: 'No repertório, aba Escala: escolha quem toca e o instrumento. Cada pessoa recebe um e-mail e responde "Confirmo" ou "Não posso". Quem avisou que não pode na data aparece em vermelho para você.',
+      },
+      {
+        q: 'Como aviso que não posso tocar num dia?',
+        a: 'Em Agenda → "Datas em que não posso tocar". Quem monta a escala da banda vê o aviso.',
+      },
+      {
+        q: 'Como marco um ensaio no estúdio e divido o valor?',
+        a: 'No repertório, aba Ensaios → "Marcar ensaio": data, estúdio, sala e valor. O app divide entre os músicos e cada um marca quando acertou a sua parte.',
+      },
+      {
+        q: 'Como controlo o cachê e as despesas do show?',
+        a: 'No repertório, aba Financeiro (para quem administra): lance o que a banda recebe, as despesas e o cachê de cada músico. O app mostra o lucro e quem falta pagar. Cada músico vê só o próprio cachê.',
+      },
+      {
+        q: 'Como divido o repertório em blocos?',
+        a: 'Na lista de músicas, use "Dividir em blocos" (o app separa a lista na ordem atual) ou "Novo bloco" para escolher as músicas. Em cada bloco, "Trazer do repertório" move várias músicas de uma vez.',
+      },
+      {
+        q: 'Tenho uma página para mandar a quem quer contratar a banda?',
+        a: 'Sim: em Página da banda (no celular, pelo Perfil). Ela mostra a apresentação, os contatos, o repertório (só nomes) e um formulário de pedido de orçamento. Os pedidos chegam por e-mail e no app.',
+      },
+      {
         q: 'Cada músico pode tocar num tom diferente?',
         a: 'Sim. Na música, mude o tom com − e + e toque em "Salvar como meu tom": vale só para você (ex.: quem usa capotraste).',
       },
@@ -74,6 +98,14 @@ const FAQ: { topic: string; items: { q: string; a: string }[] }[] = [
       {
         q: 'Um acorde está no lugar errado da letra. Como corrijo?',
         a: 'Na música, toque em "Ajustar posição dos acordes": toque no acorde e depois na sílaba onde ele entra. Não precisa contar espaços.',
+      },
+      {
+        q: 'Como escrevo só os acordes, em compassos?',
+        a: 'Use barras: | C | F | G | G |. Cada "/" soma um tempo ao acorde (| C7M / / Dm7 | = 3 tempos + 1) e a figura aparece em cima. Também valem repetição (||: :|| x2), ataque (x), pausa (N.C.) e casas 1 e 2.',
+      },
+      {
+        q: 'A tablatura muda junto com o tom?',
+        a: 'Muda: as casas sobem ou descem com o tom e as cordas continuam alinhadas. Se não quiser ver a tablatura, desligue em "Aa" → Mostrar tablaturas.',
       },
       {
         q: 'Não sei montar um acorde. E agora?',
@@ -93,6 +125,10 @@ const FAQ: { topic: string; items: { q: string; a: string }[] }[] = [
         a: 'Pareie o pedal nas configurações de Bluetooth do celular. Na música, toque em "Aa" (ajustes) → Pedal: escolha se ele rola a cifra ou troca de música, e aperte o pedal para testar. Espaço liga e pausa a rolagem automática.',
       },
       {
+        q: 'Tem metrônomo?',
+        a: 'Tem: na música, toque no ícone de cronômetro na barra de baixo. Ele usa o BPM da música; "Bater" mede o andamento no toque e "Contar e ir" conta um compasso e liga a rolagem automática.',
+      },
+      {
         q: 'A tela do celular apaga no meio da música.',
         a: 'Com a música aberta, o app pede para a tela ficar acesa. Alguns celulares no modo economia de bateria ignoram o pedido: desligue a economia durante o show.',
       },
@@ -102,7 +138,11 @@ const FAQ: { topic: string; items: { q: string; a: string }[] }[] = [
     topic: 'Assinatura e pagamento',
     items: [
       {
-        q: 'Quanto custa?',
+        q: 'Preciso pagar agora?',
+        a: 'Não. Durante o lançamento, todos os recursos estão liberados, sem cartão. Você será avisado com antecedência antes de qualquer cobrança.',
+      },
+      {
+        q: 'Quanto vai custar?',
         a: `${formatBRL(PLANS.monthly.price)} por mês ou ${formatBRL(PLANS.yearly.price)} por ano, com ${TRIAL_DAYS} dias grátis sem cartão. Só paga quem cria os repertórios: os músicos convidados nunca pagam.`,
       },
       {

@@ -1,5 +1,5 @@
 import clsx from 'clsx'
-import { Check, ChevronRight, ListMusic, Music2, Radio, UserPlus, X } from 'lucide-react'
+import { Check, ChevronRight, X } from 'lucide-react'
 import { useState } from 'react'
 import { Link } from 'react-router'
 
@@ -20,23 +20,20 @@ export function GettingStarted({ progress }: { progress: { opened: boolean; setl
   const steps = [
     {
       done: progress.opened,
-      icon: Music2,
       title: 'Abra a música de exemplo',
-      text: 'Veja como trocar o tom e ler no palco.',
+      text: 'Troque o tom e veja como fica a leitura no palco.',
       to: '/musicas',
     },
     {
       done: progress.setlist,
-      icon: ListMusic,
       title: 'Monte seu primeiro repertório',
-      text: 'Cole a lista do WhatsApp: leva 1 minuto.',
+      text: 'Cole a lista que você já usa no WhatsApp.',
       to: '/comecar',
     },
     {
       done: progress.band,
-      icon: UserPlus,
       title: 'Chame a sua banda',
-      text: 'Mande o link: entram de graça e veem tudo no mesmo tom.',
+      text: 'Os músicos entram pelo link, sem pagar.',
       to: '/repertorios',
     },
   ]
@@ -53,51 +50,46 @@ export function GettingStarted({ progress }: { progress: { opened: boolean; setl
   }
 
   return (
-    <section className="card relative overflow-hidden p-5" aria-label="Primeiros passos">
-      <div aria-hidden className="pointer-events-none absolute -top-16 -right-10 size-48 rounded-full bg-accent/15 blur-3xl" />
-      <div className="relative flex items-start justify-between gap-3">
-        <div>
-          <h2 className="font-bold">Comece em 3 passos</h2>
-          <p className="text-sm text-muted">
-            {done} de {steps.length} feitos · depois é só tocar no <Radio className="inline size-3.5 align-[-2px]" /> Modo Palco
+    <section className="card" aria-label="Primeiros passos">
+      <div className="flex items-center justify-between gap-3 px-4 pt-3.5 pb-3">
+        <div className="min-w-0">
+          <h2 className="text-sm font-semibold">Primeiros passos</h2>
+          <p className="text-xs text-muted">
+            {done} de {steps.length} concluídos
           </p>
         </div>
-        <button
-          className="btn-icon size-8 shrink-0 border-transparent bg-transparent"
-          onClick={hide}
-          aria-label="Esconder primeiros passos"
-        >
-          <X className="size-4" />
-        </button>
+        <div className="flex items-center gap-3">
+          <div className="h-1 w-20 overflow-hidden rounded-full bg-surface-2" aria-hidden>
+            <div className="h-full rounded-full bg-accent transition-all" style={{ width: `${(done / steps.length) * 100}%` }} />
+          </div>
+          <button
+            className="grid size-8 place-items-center rounded-lg text-muted transition hover:bg-surface-2 hover:text-text"
+            onClick={hide}
+            aria-label="Esconder primeiros passos"
+            title="Esconder"
+          >
+            <X className="size-4" />
+          </button>
+        </div>
       </div>
-      <div className="relative mt-3 h-1.5 overflow-hidden rounded-full bg-surface-2">
-        <div className="h-full rounded-full bg-accent transition-all" style={{ width: `${(done / steps.length) * 100}%` }} />
-      </div>
-      <ol className="relative mt-4 grid gap-2 md:grid-cols-3">
-        {steps.map(({ done, icon: Icon, title, text, to }, i) => (
+      <ol className="divide-y divide-border border-t border-border">
+        {steps.map(({ done, title, text, to }) => (
           <li key={title}>
-            <Link
-              to={to}
-              className={clsx(
-                'flex h-full items-center gap-3 rounded-xl border p-3 transition',
-                done ? 'border-border opacity-60' : 'border-accent/30 bg-accent/5 hover:border-accent/60 hover:bg-accent/10',
-              )}
-            >
+            <Link to={to} className="group flex items-center gap-3 px-4 py-3 transition hover:bg-surface-2">
               <span
                 className={clsx(
-                  'grid size-9 shrink-0 place-items-center rounded-full text-sm font-bold',
-                  done ? 'bg-ok/15 text-ok' : 'bg-accent text-accent-ink',
+                  'grid size-5 shrink-0 place-items-center rounded-full border',
+                  done ? 'border-ok bg-ok text-bg' : 'border-muted/60',
                 )}
+                aria-label={done ? 'Concluído' : 'Pendente'}
               >
-                {done ? <Check className="size-4" /> : i + 1}
+                {done && <Check className="size-3" strokeWidth={3} />}
               </span>
               <span className="min-w-0 flex-1">
-                <span className={clsx('flex items-center gap-1.5 text-sm font-semibold', done && 'line-through')}>
-                  <Icon className="size-3.5 shrink-0 text-muted" /> {title}
-                </span>
-                <span className="block text-xs text-muted">{text}</span>
+                <span className={clsx('block text-sm font-medium', done && 'text-muted line-through')}>{title}</span>
+                {!done && <span className="block text-xs text-muted">{text}</span>}
               </span>
-              {!done && <ChevronRight className="size-4 shrink-0 text-muted" />}
+              {!done && <ChevronRight className="size-4 shrink-0 text-muted transition group-hover:text-text" />}
             </Link>
           </li>
         ))}

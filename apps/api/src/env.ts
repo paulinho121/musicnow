@@ -38,6 +38,12 @@ export const env = {
   ASAAS_ENV: (process.env.ASAAS_ENV === 'production' ? 'production' : 'sandbox') as 'production' | 'sandbox',
   ASAAS_WEBHOOK_TOKEN: process.env.ASAAS_WEBHOOK_TOKEN,
   /**
+   * Dá para assinar? Só com a chave de produção do Asaas (no servidor de verdade, a de teste
+   * geraria um Pix que não existe). Em desenvolvimento e nos testes, a de teste vale.
+   */
+  CHECKOUT_OPEN:
+    Boolean(process.env.ASAAS_API_KEY) && (process.env.ASAAS_ENV === 'production' || process.env.NODE_ENV !== 'production'),
+  /**
    * Cobrança valendo (fim do teste bloqueia a criação). Liga sozinha quando a chave do Asaas
    * existe — sem ela não haveria como pagar. BILLING_ENFORCED=false desliga; =true força (testes).
    */

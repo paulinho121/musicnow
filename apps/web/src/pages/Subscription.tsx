@@ -77,7 +77,29 @@ export function Subscription() {
 
       <StatusCard b={b} />
 
-      {!subscribed && (
+      {!subscribed && !b.checkout && (
+        <section className="card p-5">
+          <h2 className="text-lg font-bold">Como vai funcionar</h2>
+          <p className="mt-1 text-sm text-muted">
+            Durante o lançamento, todos os recursos estão liberados, sem cartão e sem cadastro de pagamento. Você será avisado com antecedência
+            antes de qualquer cobrança.
+          </p>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            {(['monthly', 'yearly'] as const).map((id) => (
+              <div key={id} className="rounded-xl border border-border px-4 py-3">
+                <p className="text-xs font-semibold text-muted">Plano {PLANS[id].label.toLowerCase()} (depois do lançamento)</p>
+                <p className="mt-0.5 text-lg font-bold">
+                  {formatBRL(PLANS[id].price)}
+                  <span className="text-sm font-medium text-muted">{id === 'monthly' ? '/mês' : '/ano'}</span>
+                </p>
+              </div>
+            ))}
+          </div>
+          <p className="mt-3 text-xs text-muted">Só quem cria músicas e repertórios vai assinar. Os músicos da banda continuam de graça.</p>
+        </section>
+      )}
+
+      {!subscribed && b.checkout && (
         <form onSubmit={submit} className="card space-y-5 p-5">
           <div>
             <h2 className="text-lg font-bold">Escolha o plano</h2>
@@ -195,6 +217,7 @@ export function Subscription() {
         </button>
       )}
 
+      {(b.checkout || subscribed) && (
       <section className="space-y-2 text-xs text-muted">
         <p className="flex items-start gap-2">
           <ShieldCheck className="mt-0.5 size-3.5 shrink-0" />
@@ -212,6 +235,7 @@ export function Subscription() {
           .
         </p>
       </section>
+      )}
     </div>
   )
 }
@@ -221,7 +245,7 @@ function StatusCard({ b }: { b: BillingSummary }) {
     if (b.reason === 'admin') return { title: 'Acesso de administrador', text: 'Tudo liberado na sua conta.', tone: 'ok' }
     if (b.reason === 'partner')
       return { title: 'Conta de parceiro', text: 'Acesso liberado enquanto você for parceiro do Ensaio Fácil.', tone: 'ok' }
-    if (b.reason === 'free') return { title: 'Tudo liberado', text: 'A cobrança ainda não começou. Aproveite!', tone: 'ok' }
+    if (b.reason === 'free') return { title: 'Acesso antecipado', text: 'Todos os recursos liberados durante o lançamento.', tone: 'ok' }
     if (b.reason === 'trial')
       return {
         title: `Teste grátis: ${b.trialDaysLeft === 1 ? 'falta 1 dia' : `faltam ${b.trialDaysLeft} dias`}`,

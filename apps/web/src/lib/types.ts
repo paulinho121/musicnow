@@ -120,6 +120,8 @@ export interface BillingSummary {
   enforced: boolean
   /** O pagamento (Asaas) já foi configurado no servidor. */
   configured: boolean
+  /** Dá para assinar agora (Asaas de produção ativo). */
+  checkout: boolean
   active: boolean
   reason: 'admin' | 'partner' | 'free' | 'subscription' | 'trial' | 'expired'
   trialDaysLeft: number

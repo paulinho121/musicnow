@@ -64,6 +64,7 @@ export async function billingSummary(u: { id: string; email: string; role?: stri
     return {
       enforced: false,
       configured: Boolean(env.ASAAS_API_KEY),
+      checkout: env.CHECKOUT_OPEN,
       active: true,
       reason: (isAdminUser(u) ? 'admin' : paid ? 'subscription' : 'free') as AccessReason,
       trialDaysLeft: 0,
@@ -79,6 +80,7 @@ export async function billingSummary(u: { id: string; email: string; role?: stri
   return {
     enforced: env.BILLING_ENFORCED,
     configured: Boolean(env.ASAAS_API_KEY),
+    checkout: env.CHECKOUT_OPEN,
     ...access,
     status: acc.status,
     plan: acc.plan as PlanId | null,

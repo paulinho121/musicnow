@@ -53,6 +53,7 @@ export const billingRoutes = new Hono<AppEnv>()
     ),
     async (c) => {
       const { plan, name, cpfCnpj } = c.req.valid('json')
+      if (env.ASAAS_API_KEY && !env.CHECKOUT_OPEN) throw new HTTPException(409, { message: 'As assinaturas abrem em breve. Por enquanto, tudo está liberado.' })
       return c.json(await startCheckout(c.var.user.id, { plan, name, cpfCnpj: onlyDigits(cpfCnpj), email: c.var.user.email }))
     },
   )
