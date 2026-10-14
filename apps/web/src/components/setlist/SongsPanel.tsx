@@ -209,28 +209,30 @@ export function SongsPanel({ setlist }: { setlist: SetlistDetail }) {
         </div>
       )}
 
-      {/* Dica: lista grande sem blocos (show de barzinho, baile). */}
+      {/* Lista grande sem blocos (barzinho, baile): sugestão discreta de dividir. */}
       {isAdmin && !hasBlocks && setlist.items.length >= 6 && !hideBlockTip.hidden && (
-        <section className="card flex flex-col gap-3 border-accent/40 bg-accent/5 p-4 xl:flex-row xl:items-center">
-          <Layers className="size-6 shrink-0 text-accent" />
-          <div className="min-w-0 flex-1">
-            <p className="font-semibold">Separe o show em blocos</p>
-            <p className="text-sm text-muted">
-              Com {setlist.items.length} músicas, blocos ajudam a banda a se achar: "Bloco 1 · Sertanejo", "Bloco 2 · Pagode"…
-            </p>
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border border-border bg-surface px-4 py-3">
+          <p className="min-w-0 flex-1 text-sm">
+            <span className="font-medium">Organizar em blocos</span>
+            <span className="text-muted"> · {setlist.items.length} músicas em lista única</span>
+          </p>
+          <div className="flex items-center gap-1">
+            <button className="btn-ghost h-8 px-3 text-sm" onClick={() => setSplitting(true)}>
+              Dividir
+            </button>
+            <button className="h-8 rounded-lg px-3 text-sm text-muted transition hover:text-text" onClick={() => setPicking('new')}>
+              Escolher músicas
+            </button>
+            <button
+              className="grid size-8 place-items-center rounded-lg text-muted transition hover:bg-surface-2 hover:text-text"
+              onClick={() => setHideBlockTip({ hidden: true })}
+              aria-label="Dispensar sugestão de blocos"
+              title="Dispensar"
+            >
+              <X className="size-4" />
+            </button>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <button className="btn-primary h-10 text-sm" onClick={() => setSplitting(true)}>
-              <Wand2 className="size-4" /> Dividir automaticamente
-            </button>
-            <button className="btn-ghost h-10 text-sm" onClick={() => setPicking('new')}>
-              <Layers className="size-4" /> Montar um bloco
-            </button>
-            <button className="btn-ghost h-10 px-3 text-sm text-muted" onClick={() => setHideBlockTip({ hidden: true })}>
-              Agora não
-            </button>
-          </div>
-        </section>
+        </div>
       )}
 
       {setlist.items.length === 0 && !hasBlocks ? (

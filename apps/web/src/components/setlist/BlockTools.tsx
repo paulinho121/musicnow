@@ -61,10 +61,7 @@ export function SplitBlocksDialog({ setlist, open, onClose }: { setlist: Setlist
   return (
     <Sheet open={open} onClose={onClose} title="Dividir em blocos">
       <form onSubmit={submit} className="space-y-4">
-        <p className="text-sm text-muted">
-          O app separa as {total} músicas, na ordem em que estão, em blocos do tamanho que você escolher. Depois dá para renomear cada bloco
-          (ex.: "Sertanejo", "Pagode") e mover músicas entre eles.
-        </p>
+        <p className="text-sm text-muted">As {total} músicas são separadas na ordem atual, em blocos de tamanho parecido. Nomes e músicas podem ser ajustados depois.</p>
         <div>
           <p className="label">Até quantas músicas por bloco</p>
           <div className="flex flex-wrap gap-2">
