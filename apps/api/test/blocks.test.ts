@@ -146,3 +146,38 @@ describe('permissões', () => {
     expect(view.data.blocks).toHaveLength(1)
   })
 })
+
+describe('montar blocos de uma vez', () => {
+  it('cria um bloco já com as músicas escolhidas (elas saem de onde estavam)', async () => {
+    const d = await detail()
+    const pick = d.items.slice(0, 2).map((i) => i.id)
+    const r = await call(lider, 'POST', `/setlists/${setlistId}/blocks/arrange`, { blocks: [{ name: 'Bis', itemIds: pick }] })
+    expect(r.status).toBe(201)
+    const after = await detail()
+    const bis = after.blocks.find((b) => b.name === 'Bis')!
+    expect(after.items.filter((i) => i.blockId === bis.id).map((i) => i.id).sort()).toEqual([...pick].sort())
+    expect(after.items).toHaveLength(d.items.length)
+  })
+
+  it('dividir refaz todos os blocos; música de outro repertório é recusada; músico não monta', async () => {
+    const d = await detail()
+    const ids = d.items.map((i) => i.id)
+    const half = Math.ceil(ids.length / 2)
+    const r = await call(lider, 'POST', `/setlists/${setlistId}/blocks/arrange`, {
+      replace: true,
+      blocks: [
+        { name: 'Bloco 1', itemIds: ids.slice(0, half) },
+        { name: 'Bloco 2', itemIds: ids.slice(half) },
+      ],
+    })
+    expect(r.status).toBe(201)
+    const after = await detail()
+    expect(after.blocks.map((b) => b.name)).toEqual(['Bloco 1', 'Bloco 2'])
+    expect(after.items.every((i) => i.blockId)).toBe(true)
+    const bad = await call(lider, 'POST', `/setlists/${setlistId}/blocks/arrange`, {
+      blocks: [{ name: 'X', itemIds: ['00000000-0000-4000-8000-000000000000'] }],
+    })
+    expect(bad.status).toBe(409)
+    expect((await call(musico, 'POST', `/setlists/${setlistId}/blocks/arrange`, { blocks: [{ name: 'X', itemIds: [] }] })).status).toBe(403)
+  })
+})

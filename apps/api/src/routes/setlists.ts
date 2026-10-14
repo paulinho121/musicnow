@@ -156,7 +156,7 @@ const itemInput = z.object({
 /** Escritas que dependem da assinatura (método + caminho depois de /api/setlists). */
 const OWNER_GATED = [
   ['PUT', /^\/[0-9a-f-]{36}$/],
-  ['POST', /^\/[0-9a-f-]{36}\/(items|blocks|import-text|invites)$/],
+  ['POST', /^\/[0-9a-f-]{36}\/(items|blocks|blocks\/arrange|import-text|invites)$/],
   ['PUT', /^\/[0-9a-f-]{36}\/(items\/[^/]+|order|blocks\/[^/]+|members\/[^/]+|suggestions\/[^/]+)$/],
 ] as const
 const billingGate = createMiddleware<AppEnv>(async (c, next) => {
@@ -782,6 +782,52 @@ export const setlistsRoutes = new Hono<AppEnv>()
     })
     return c.json(block, 201)
   })
+
+  // Montar blocos de uma vez: criar blocos já com as músicas escolhidas (as músicas saem de
+  // onde estavam) ou, com replace, refazer todos os blocos (ex.: dividir a cada 6 músicas).
+  .post(
+    '/:id/blocks/arrange',
+    validate('param', idParam),
+    validate(
+      'json',
+      z.object({
+        replace: z.boolean().default(false),
+        blocks: z.array(blockInput.extend({ itemIds: z.array(z.string().uuid()).max(300) })).min(1).max(60),
+      }),
+    ),
+    async (c) => {
+      const uid = c.var.user.id
+      const { id } = c.req.valid('param')
+      const { replace, blocks } = c.req.valid('json')
+      await requireRole(id, uid, 'admin')
+      const created = await db.transaction(async (tx) => {
+        const items = await tx.select({ id: setlistItem.id }).from(setlistItem).where(eq(setlistItem.setlistId, id))
+        const valid = new Set(items.map((i) => i.id))
+        const wanted = blocks.flatMap((b) => b.itemIds)
+        if (wanted.some((i) => !valid.has(i)) || new Set(wanted).size !== wanted.length)
+          throw new HTTPException(409, { message: 'O repertório mudou enquanto você montava os blocos. Atualize e tente de novo.' })
+        if (replace) await tx.delete(setlistBlock).where(eq(setlistBlock.setlistId, id))
+        const [{ count }] = await tx
+          .select({ count: sql<number>`count(*)::int` })
+          .from(setlistBlock)
+          .where(eq(setlistBlock.setlistId, id))
+        if (count + blocks.length > 60) throw new HTTPException(400, { message: 'Limite de 60 blocos por repertório.' })
+        const ids: string[] = []
+        for (const [i, { itemIds, ...b }] of blocks.entries()) {
+          const [row] = await tx
+            .insert(setlistBlock)
+            .values({ ...b, setlistId: id, position: count + i })
+            .returning({ id: setlistBlock.id })
+          ids.push(row.id)
+          if (itemIds.length) await tx.update(setlistItem).set({ blockId: row.id }).where(inArray(setlistItem.id, itemIds))
+        }
+        await renumber(tx, id)
+        await touch(tx, id, uid, replace ? 'split_blocks' : 'add_block', replace ? { count: blocks.length } : { name: blocks.map((b) => b.name).join(', ') })
+        return ids
+      })
+      return c.json({ blockIds: created }, 201)
+    },
+  )
 
   .put(
     '/:id/blocks/:blockId',

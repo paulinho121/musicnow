@@ -1,4 +1,6 @@
 import { atLeast, MAJOR_KEYS, MINOR_KEYS, parseChord } from '@ensaio/shared'
+import { PickSongsDialog, SplitBlocksDialog } from './BlockTools'
+import { useLocalState } from '../../lib/storage'
 import clsx from 'clsx'
 import {
   ArrowDown,
@@ -23,6 +25,8 @@ import {
   StickyNote,
   Trash2,
   X,
+  Wand2,
+  ArrowDownToLine,
 } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router'
@@ -72,7 +76,11 @@ export function SongsPanel({ setlist }: { setlist: SetlistDetail }) {
   const reorder = useReorderLayout(setlist.id)
   const [adding, setAdding] = useState<{ blockId: string | null } | null>(null)
   const [pasting, setPasting] = useState(false)
-  const [editingBlock, setEditingBlock] = useState<SetlistBlock | null | 'new'>(null)
+  const [editingBlock, setEditingBlock] = useState<SetlistBlock | null>(null)
+  // Bloco novo (escolhendo as músicas) ou trazer músicas para um bloco que já existe.
+  const [picking, setPicking] = useState<SetlistBlock | 'new' | null>(null)
+  const [splitting, setSplitting] = useState(false)
+  const [hideBlockTip, setHideBlockTip] = useLocalState(`ef-dica-blocos-${setlist.id}`, { hidden: false })
   const [sharingBlock, setSharingBlock] = useState<string | null>(null)
   const [suggestFor, setSuggestFor] = useState<SetlistItem | null | 'general'>(null)
   // Lista limpa por padrão (como a folha de papel); "Organizar" mostra os controles.
@@ -201,6 +209,30 @@ export function SongsPanel({ setlist }: { setlist: SetlistDetail }) {
         </div>
       )}
 
+      {/* Dica: lista grande sem blocos (show de barzinho, baile). */}
+      {isAdmin && !hasBlocks && setlist.items.length >= 6 && !hideBlockTip.hidden && (
+        <section className="card flex flex-col gap-3 border-accent/40 bg-accent/5 p-4 xl:flex-row xl:items-center">
+          <Layers className="size-6 shrink-0 text-accent" />
+          <div className="min-w-0 flex-1">
+            <p className="font-semibold">Separe o show em blocos</p>
+            <p className="text-sm text-muted">
+              Com {setlist.items.length} músicas, blocos ajudam a banda a se achar: "Bloco 1 · Sertanejo", "Bloco 2 · Pagode"…
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button className="btn-primary h-10 text-sm" onClick={() => setSplitting(true)}>
+              <Wand2 className="size-4" /> Dividir automaticamente
+            </button>
+            <button className="btn-ghost h-10 text-sm" onClick={() => setPicking('new')}>
+              <Layers className="size-4" /> Montar um bloco
+            </button>
+            <button className="btn-ghost h-10 px-3 text-sm text-muted" onClick={() => setHideBlockTip({ hidden: true })}>
+              Agora não
+            </button>
+          </div>
+        </section>
+      )}
+
       {setlist.items.length === 0 && !hasBlocks ? (
         <EmptyState
           icon={Music2}
@@ -319,12 +351,22 @@ export function SongsPanel({ setlist }: { setlist: SetlistDetail }) {
                       <p className="px-4 py-4 text-sm text-muted">Nenhuma música neste bloco ainda.</p>
                     )}
                     {isAdmin && (
-                      <button
-                        className="flex w-full items-center gap-2 border-t border-border px-4 py-2.5 text-sm font-medium text-muted transition hover:bg-surface-2 hover:text-text"
-                        onClick={() => setAdding({ blockId: b.id })}
-                      >
-                        <Plus className="size-4" /> Adicionar música no {b.name}
-                      </button>
+                      <div className="flex border-t border-border text-sm font-medium text-muted">
+                        <button
+                          className="flex flex-1 items-center gap-2 px-4 py-2.5 transition hover:bg-surface-2 hover:text-text"
+                          onClick={() => setAdding({ blockId: b.id })}
+                        >
+                          <Plus className="size-4" /> Adicionar da biblioteca
+                        </button>
+                        {setlist.items.some((it) => it.blockId !== b.id) && (
+                          <button
+                            className="flex flex-1 items-center gap-2 border-l border-border px-4 py-2.5 transition hover:bg-surface-2 hover:text-text"
+                            onClick={() => setPicking(b)}
+                          >
+                            <ArrowDownToLine className="size-4" /> Trazer do repertório
+                          </button>
+                        )}
+                      </div>
                     )}
                   </>
                 )}
@@ -342,9 +384,14 @@ export function SongsPanel({ setlist }: { setlist: SetlistDetail }) {
                 <Plus className="size-4" /> Adicionar música
               </button>
             )}
-            <button className="btn-ghost" onClick={() => setEditingBlock('new')}>
+            <button className="btn-ghost" onClick={() => setPicking('new')}>
               <Layers className="size-4" /> Novo bloco
             </button>
+            {setlist.items.length >= 2 && (
+              <button className="btn-ghost" onClick={() => setSplitting(true)}>
+                <Wand2 className="size-4" /> {hasBlocks ? 'Refazer blocos' : 'Dividir em blocos'}
+              </button>
+            )}
             <button className="btn-ghost" onClick={() => setPasting(true)}>
               <ClipboardPaste className="size-4" /> Colar lista
             </button>
@@ -367,10 +414,12 @@ export function SongsPanel({ setlist }: { setlist: SetlistDetail }) {
             blockName={setlist.blocks.find((b) => b.id === adding?.blockId)?.name ?? null}
           />
           <ImportTextDialog setlistId={setlist.id} open={pasting} onClose={() => setPasting(false)} />
+          <SplitBlocksDialog setlist={setlist} open={splitting} onClose={() => setSplitting(false)} />
+          <PickSongsDialog setlist={setlist} target={picking} onClose={() => setPicking(null)} />
           <BlockDialog
             setlistId={setlist.id}
             open={editingBlock !== null}
-            block={editingBlock === 'new' ? null : editingBlock}
+            block={editingBlock}
             onClose={() => setEditingBlock(null)}
             suggestedName={`Bloco ${setlist.blocks.length + 1}`}
           />

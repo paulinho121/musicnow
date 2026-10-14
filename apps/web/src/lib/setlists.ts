@@ -180,6 +180,12 @@ export const useSaveBlock = (id: string) =>
       : api<{ id: string }>(`/setlists/${id}/blocks`, { method: 'POST', json: body }),
   )
 
+/** Criar blocos já com as músicas (ou, com replace, refazer todos: dividir a cada N músicas). */
+export const useArrangeBlocks = (id: string) =>
+  useSetlistMutation(id, (body: { replace?: boolean; blocks: (BlockInput & { itemIds: string[] })[] }) =>
+    api<{ blockIds: string[] }>(`/setlists/${id}/blocks/arrange`, { method: 'POST', json: body }),
+  )
+
 export const useDeleteBlock = (id: string) =>
   useSetlistMutation(id, (blockId: string) => api(`/setlists/${id}/blocks/${blockId}`, { method: 'DELETE' }))
 
