@@ -212,11 +212,12 @@ export function SongsPanel({ setlist }: { setlist: SetlistDetail }) {
       {/* Lista grande sem blocos (barzinho, baile): sugestão discreta de dividir. */}
       {isAdmin && !hasBlocks && setlist.items.length >= 6 && !hideBlockTip.hidden && (
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border border-border bg-surface px-4 py-3">
-          <p className="min-w-0 flex-1 text-sm">
+          {/* No celular o texto ocupa a linha toda e os botões descem. */}
+          <p className="min-w-0 basis-full text-sm sm:basis-auto sm:flex-1">
             <span className="font-medium">Organizar em blocos</span>
             <span className="text-muted"> · {setlist.items.length} músicas em lista única</span>
           </p>
-          <div className="flex items-center gap-1">
+          <div className="-ml-1 flex w-full items-center gap-1 sm:ml-0 sm:w-auto">
             <button className="btn-ghost h-8 px-3 text-sm" onClick={() => setSplitting(true)}>
               Dividir
             </button>
@@ -224,7 +225,7 @@ export function SongsPanel({ setlist }: { setlist: SetlistDetail }) {
               Escolher músicas
             </button>
             <button
-              className="grid size-8 place-items-center rounded-lg text-muted transition hover:bg-surface-2 hover:text-text"
+              className="ml-auto grid size-8 place-items-center rounded-lg text-muted transition hover:bg-surface-2 hover:text-text"
               onClick={() => setHideBlockTip({ hidden: true })}
               aria-label="Dispensar sugestão de blocos"
               title="Dispensar"
@@ -512,14 +513,15 @@ function ItemRow({
         <button className="min-w-0 flex-1 text-left" onClick={onPlay}>
           <p className="line-clamp-2 leading-snug font-semibold break-words sm:truncate">
             {item.song.title}
-            {!item.song.hasContent && (
-              <span className="ml-1.5 inline-block rounded bg-surface-2 px-1.5 py-px align-[1px] text-[10px] font-semibold tracking-wide text-muted uppercase">
-                sem cifra
-              </span>
-            )}
           </p>
-          <p className="truncate text-sm text-muted">
-            {[item.song.artist, (item.bpm ?? item.song.bpm) ? `${item.bpm ?? item.song.bpm} BPM` : null].filter(Boolean).join(' · ')}
+          {/* "Sem cifra" fica na linha de baixo: não corta o nome da música no celular. */}
+          <p className="flex min-w-0 items-center gap-1.5 text-sm text-muted">
+            {!item.song.hasContent && (
+              <span className="shrink-0 rounded bg-surface-2 px-1.5 py-px text-[10px] font-semibold tracking-wide uppercase">sem cifra</span>
+            )}
+            <span className="truncate">
+              {[item.song.artist, (item.bpm ?? item.song.bpm) ? `${item.bpm ?? item.song.bpm} BPM` : null].filter(Boolean).join(' · ')}
+            </span>
           </p>
         </button>
         {/* No celular o tom desce para a linha de ações: o nome da música fica legível. */}
