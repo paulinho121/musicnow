@@ -1,4 +1,4 @@
-import { chordBassLine, isChordLine, parseSheet, SECTION_LABELS, splitChordLine, wrapChordPair, type SectionType, type SheetLine } from '@ensaio/shared'
+import { chordBassLine, isBarLine, isChordLine, parseChord, parseSheet, SECTION_LABELS, splitChordLine, wrapChordPair, type SectionType, type SheetLine } from '@ensaio/shared'
 import clsx from 'clsx'
 import { memo, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useAccidentals } from '../lib/accidentals'
@@ -118,7 +118,8 @@ export const ChordSheet = memo(function ChordSheet({
     for (const mark of marks) {
       // Marcação numa linha de letra sobe para cima do acorde dela: não separa o acorde da sílaba.
       const i = mark.lineIndex
-      const anchor = lines[i]?.kind === 'lyrics' && lines[i - 1]?.kind === 'chords' ? i - 1 : i
+      const above = lines[i - 1]
+      const anchor = lines[i]?.kind === 'lyrics' && above?.kind === 'chords' && !isBarLine(above.text) ? i - 1 : i
       m.set(anchor, [...(m.get(anchor) ?? []), mark])
     }
     return m
@@ -139,9 +140,10 @@ export const ChordSheet = memo(function ChordSheet({
         const lineMarks = marksByLine.get(i)
         // Com quebra, a letra que fica embaixo de uma linha de acordes é desenhada junto com ela.
         const pairedBelow =
-          cols !== null && showChords && !hideLyrics && line.kind === 'chords' && lines[i + 1]?.kind === 'lyrics'
+          cols !== null && showChords && !hideLyrics && line.kind === 'chords' && !isBarLine(line.text) && lines[i + 1]?.kind === 'lyrics'
+        const prev = lines[i - 1]
         const pairedAbove =
-          cols !== null && showChords && !hideLyrics && line.kind === 'lyrics' && lines[i - 1]?.kind === 'chords'
+          cols !== null && showChords && !hideLyrics && line.kind === 'lyrics' && prev?.kind === 'chords' && !isBarLine(prev.text)
         const pair = pairedBelow ? (lines[i + 1] as { text: string }).text : null
         const hidden =
           (hideLyrics && line.kind === 'blank' && lines[i + 1]?.kind !== 'section') ||
@@ -255,6 +257,7 @@ function Line({
       return <div className={clsx(cols && 'whitespace-pre-wrap')}>{singer ? line.text.trim() : line.text}</div>
     case 'chords':
       if (!showChords) return null
+      if (isBarLine(line.text)) return <BarRow text={line.text} line={index} cols={cols} bass={bass} onChordClick={onChordClick} />
       if (cols) {
         // Cada pedaço da linha quebrada continua a contagem dos acordes do anterior.
         let before = 0
@@ -352,5 +355,138 @@ function Chords({
         )
       })}
     </>
+  )
+}
+
+/** O acorde escrito como nas partituras de acordes: a extensão pequena e no alto (C⁷ᴹ, Am⁷). */
+function ChordLabel({ chord }: { chord: string }) {
+  const c = parseChord(chord)
+  if (!c) return <>{chord}</>
+  const minor = /^m(?!aj)/.test(c.suffix) ? 'm' : ''
+  const ext = c.suffix.slice(minor.length)
+  return (
+    <>
+      {c.root}
+      {minor}
+      {ext && <sup className="ml-px text-[0.68em] font-semibold">{ext}</sup>}
+      {c.bass && <>/{c.bass}</>}
+    </>
+  )
+}
+
+interface Bar {
+  text: string
+  /** Começa ou termina um trecho de repetição ("||:" e ":||"). */
+  open: boolean
+  close: boolean
+  /** Barra dupla antes do compasso ("||"): começo de parte. */
+  double: boolean
+  /** Barra dupla depois do último compasso ("| G ||"): fim de parte. */
+  end?: boolean
+}
+
+/** Divide "||: C | F G :|| x2" em compassos e o que sobra depois da última barra ("x2"). */
+function splitBars(text: string): { bars: Bar[]; note: string } {
+  const segs = text.split('|')
+  const lead = segs.shift() ?? ''
+  const tail = segs.pop() ?? ''
+  const tailIsBar = isChordLine(tail)
+  const raw = [...(lead.trim() ? [lead] : []), ...segs, ...(tailIsBar ? [tail] : [])]
+  const bars: Bar[] = []
+  let double = false
+  for (const seg of raw) {
+    let t = seg.trim()
+    if (!t) {
+      double = true
+      continue
+    }
+    const open = t.startsWith(':')
+    const close = t.endsWith(':')
+    t = t.replace(/^:|:$/g, '').trim()
+    bars.push({ text: t, open, close, double: double || open })
+    double = false
+  }
+  // Barra dupla no fim ("... | G ||") fecha o último compasso com traço grosso.
+  if (double && bars.length) bars[bars.length - 1].end = true
+  return { bars, note: tailIsBar ? '' : tail.trim().replace(/^\(|\)$/g, '') }
+}
+
+/**
+ * Linha de compassos ("| C | F G | Am |"), desenhada como numa partitura de acordes: uma caixa
+ * por compasso, com as barras, as repetições e os acordes clicáveis (abrem o dicionário).
+ */
+function BarRow({
+  text,
+  line,
+  cols,
+  bass,
+  onChordClick,
+}: {
+  text: string
+  line: number
+  cols?: number | null
+  bass: boolean
+  onChordClick?: OnChordClick
+}) {
+  const { bars, note } = splitBars(text)
+  // Se a linha não cabe inteira, quebra em 4 ou 2 por linha (a frase musical fica 2 + 2, não 3 + 1).
+  const fit = cols ? Math.floor(cols / 11) : bars.length
+  const k = bars.length <= fit ? bars.length : fit >= 4 ? 4 : fit >= 2 ? 2 : 1
+  let occurrence = 0
+  return (
+    <div className="my-1 flex items-center gap-3">
+      <div className="grid" style={{ gridTemplateColumns: `repeat(${k}, minmax(9ch, max-content))` }}>
+        {bars.map((b, i) => {
+          const last = i % k === k - 1 || i === bars.length - 1
+          return (
+            <div
+              key={i}
+              className={clsx(
+                'flex min-h-[2.4em] items-center gap-[1.4ch] py-0.5 pr-[1.2ch] pl-[1ch]',
+                b.double ? 'border-l-4' : 'border-l-2',
+                last && (b.close || b.end ? 'border-r-4' : 'border-r-2'),
+                'border-muted/60',
+              )}
+            >
+              {b.open && <span className="-ml-[0.6ch] font-black text-muted">:</span>}
+              {splitChordLine(b.text)
+                .filter((p) => p.text.trim())
+                .map((p, j) => {
+                  if (!p.chord) return <span key={j} className="text-muted">{p.text.trim()}</span>
+                  const at = { line, occurrence: occurrence++ }
+                  const chord = p.chord
+                  const label = bass ? (
+                    <span className="flex flex-col items-start leading-tight">
+                      <span className="font-black">{parseChord(chord)?.bass ?? parseChord(chord)?.root}</span>
+                      <span className="text-[0.75em] font-semibold text-muted">
+                        <ChordLabel chord={chord} />
+                      </span>
+                    </span>
+                  ) : (
+                    <ChordLabel chord={chord} />
+                  )
+                  return onChordClick ? (
+                    <button
+                      key={j}
+                      type="button"
+                      className="cursor-pointer rounded-sm font-bold text-chord hover:bg-chord/15 focus-visible:bg-chord/15"
+                      onClick={() => onChordClick(chord, at)}
+                      title={`Como tocar ${chord}`}
+                    >
+                      {label}
+                    </button>
+                  ) : (
+                    <span key={j} className="font-bold text-chord">
+                      {label}
+                    </span>
+                  )
+                })}
+              {b.close && <span className="ml-auto -mr-[0.6ch] font-black text-muted">:</span>}
+            </div>
+          )
+        })}
+      </div>
+      {note && <span className="rounded-md bg-surface-2 px-2 py-0.5 font-sans text-[0.75em] font-bold text-muted">{note}</span>}
+    </div>
   )
 }

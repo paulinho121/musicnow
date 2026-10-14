@@ -9,6 +9,7 @@ import {
   guessKey,
   isChord,
   isChordLine,
+  isBarLine,
   wrapChordPair,
   moveChordInLine,
   normalizeOffset,
@@ -295,5 +296,32 @@ describe('tablatura acompanha o tom', () => {
 
   it('a letra oculta (quem não cadastrou) mantém a tablatura', () => {
     expect(stripLyrics(['Letra', tab[2]].join('\n'))).toBe(['', tab[2]].join('\n'))
+  })
+})
+
+describe('mapa de compassos', () => {
+  it('reconhece compassos com e sem espaço, com repetição', () => {
+    expect(isBarLine('| C | F | G | G |')).toBe(true)
+    expect(isBarLine('|C|F|Bb|Eb|')).toBe(true)
+    expect(isBarLine('||: Am7 | D7 G :|| x2')).toBe(true)
+    expect(isBarLine('| C % | % |')).toBe(true)
+    expect(isBarLine('C  G  Am  F')).toBe(false) // linha de acordes comum
+    expect(isBarLine('E|---3---|')).toBe(false) // tablatura
+    expect(isBarLine('| Senhor | meu Deus |')).toBe(false)
+  })
+
+  it('transpõe mantendo as barras (e as colunas)', () => {
+    expect(transposeChordLine('|C|F|Bb|Eb|', 2, false)).toBe('|D|G|C |F |') // o compasso seguinte fica na mesma coluna
+    expect(transposeChordLine('| A  | E  | B  |', 1, false)).toBe('| A# | F  | C  |')
+    expect(transposeChordLine('| C  | G  |', 1, false)).toBe('| C# | G# |')
+    expect(transposeSheet('[Intro]\n|C|G|\nletra', 2)).toBe('[Intro]\n|D|A|\nletra')
+  })
+
+  it('a correção de acorde acha o acorde certo dentro do compasso', () => {
+    expect(replaceChordAt('|C|F|G|', 0, 1, 'F7M')).toBe('|C|F7M|G|')
+  })
+
+  it('parseSheet trata a linha de compassos como acordes', () => {
+    expect(parseSheet('|C|F|', 5)).toEqual([{ kind: 'chords', text: '|F|A#|' }])
   })
 })

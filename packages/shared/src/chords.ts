@@ -181,7 +181,9 @@ export function sectionTypeFromLabel(label: string): SectionType | null {
 const NOISE_RE = /^(\||\|\||\(|\)|x\d+|\d+x|%|-+|\/+|\.+|:)$/i
 
 export function isChordLine(line: string): boolean {
-  const tokens = line.trim().split(/\s+/).filter(Boolean)
+  if (isTabLine(line)) return false
+  // A barra de compasso separa acordes como um espaço: "|C|F|" = "| C | F |".
+  const tokens = line.trim().split(/[\s|]+/).filter(Boolean)
   if (tokens.length === 0) return false
   let chords = 0
   let other = 0
@@ -196,20 +198,29 @@ export function isChordLine(line: string): boolean {
 
 /** Transpõe apenas os acordes de uma linha, preservando o alinhamento das colunas. */
 export function transposeChordLine(line: string, semitones: number, useFlats: boolean): string {
-  let out = ''
-  const re = /\S+/g
-  let m: RegExpExecArray | null
-  while ((m = re.exec(line))) {
-    const token = m[0]
-    const lead = token.startsWith('(') ? '(' : ''
-    const trail = token.endsWith(')') && !isChord(token) ? ')' : ''
-    const core = token.slice(lead.length, token.length - trail.length)
-    const next = isChord(core) ? lead + transposeChord(core, semitones, useFlats) + trail : token
-    // Mantém a coluna original; se o acorde anterior cresceu, empurra só o necessário.
-    const col = Math.max(m.index, out.length === 0 ? 0 : out.length + 1)
-    out = out.padEnd(col, ' ') + next
+  return mapChordsInLine(line, (c) => transposeChord(c, semitones, useFlats))
+}
+
+/** Linha de compassos ("| C | F G | Am |"): acordes separados por barras, sem letra. */
+export function isBarLine(line: string): boolean {
+  return (line.match(/\|/g)?.length ?? 0) >= 2 && isChordLine(line)
+}
+
+/**
+ * O que fica entre dois tokens quando o anterior mudou de tamanho: as barras de compasso
+ * ficam; se o acorde cresceu, saem só espaços (sobra pelo menos um entre dois tokens); se
+ * encolheu, entram espaços, para o próximo continuar na mesma coluna.
+ */
+function fitGap(gap: string, room: number, first: boolean): string {
+  if (room >= gap.length) return ' '.repeat(room - gap.length) + gap
+  let excess = gap.length - room
+  const keep = first || /\|/.test(gap) ? 0 : 1
+  let g = gap
+  while (excess > 0 && (g.match(/ /g)?.length ?? 0) > keep) {
+    g = g.replace(' ', '')
+    excess--
   }
-  return out
+  return g
 }
 
 /**
@@ -219,7 +230,8 @@ export function transposeChordLine(line: string, semitones: number, useFlats: bo
 function mapChordsInLine(line: string, fn: (chord: string, index: number) => string): string {
   let out = ''
   let k = 0
-  const re = /\S+/g
+  let pos = 0
+  const re = /[^\s|]+/g
   let m: RegExpExecArray | null
   while ((m = re.exec(line))) {
     const token = m[0]
@@ -227,10 +239,12 @@ function mapChordsInLine(line: string, fn: (chord: string, index: number) => str
     const trail = token.endsWith(')') && !isChord(token) ? ')' : ''
     const core = token.slice(lead.length, token.length - trail.length)
     const next = isChord(core) ? lead + fn(core, k++) + trail : token
-    const col = Math.max(m.index, out.length === 0 ? 0 : out.length + 1)
-    out = out.padEnd(col, ' ') + next
+    out += fitGap(line.slice(pos, m.index), m.index - out.length, out.length === 0) + next
+    pos = m.index + token.length
   }
-  return out
+  // Depois do último acorde só interessa a barra final ("| G |"), que acompanha a coluna.
+  const tail = line.slice(pos)
+  return /\|/.test(tail) ? out + fitGap(tail, line.length - out.length, true) : out
 }
 
 /** Aplica `fn` às linhas de acordes da cifra (inclusive os acordes ao lado do nome da seção). */

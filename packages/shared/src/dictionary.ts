@@ -368,7 +368,8 @@ export function splitChordLine(line: string): ChordLinePart[] {
     else parts.push({ text, chord })
   }
   let pos = 0
-  const re = /\S+/g
+  // A barra de compasso separa os acordes ("|C|F|"), como um espaço.
+  const re = /[^\s|]+/g
   let m: RegExpExecArray | null
   while ((m = re.exec(line))) {
     push(line.slice(pos, m.index))

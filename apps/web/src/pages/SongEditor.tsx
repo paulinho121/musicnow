@@ -309,7 +309,8 @@ export function SongEditor() {
             <p className="mt-2 flex gap-2 text-xs text-muted">
               <HelpCircle className="size-4 shrink-0" />
               Escreva os acordes na linha de cima da letra. Seções entre colchetes: [Intro], [Verso], [Pré-refrão], [Refrão],
-              [Ponte], [Solo], [Final]. Pode colar cifras de outros sites.
+              [Ponte], [Solo], [Final]. Só os acordes, em compassos: <code className="font-mono">| C | F | G | G |</code>{' '}
+              (repetição: <code className="font-mono">||: Am | D7 :|| x2</code>). Pode colar cifras de outros sites.
             </p>
             {form.title.trim() && !form.content.trim() && (
               <div className="mt-3 rounded-xl bg-surface-2 p-3">
