@@ -4,6 +4,7 @@ import { CalendarDays, ChevronRight, Clock, FileUp, Globe, Guitar, ImagePlus, Ma
 import { type FormEvent, useState } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { AgendaSummary } from '../components/AgendaSummary'
+import { PendingSchedule } from '../components/MySchedule'
 import { Avatar } from '../components/Avatar'
 import { GettingStarted } from '../components/GettingStarted'
 import { HeroBackground, HeroCustomizeDialog } from '../components/HeroBackground'
@@ -124,6 +125,7 @@ export function Dashboard() {
       </nav>
 
       {data?.onboarding && <GettingStarted progress={data.onboarding} />}
+      <PendingSchedule />
       <AgendaSummary />
 
       {error ? (

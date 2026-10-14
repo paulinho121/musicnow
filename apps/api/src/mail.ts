@@ -102,6 +102,27 @@ export async function sendSetlistInviteEmail(to: string, fromName: string, setli
   })
 }
 
+export async function sendAssignmentEmail(to: string, fromName: string, setlistName: string, eventDate: Date | null, url: string) {
+  const when = eventDate
+    ? eventDate.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', weekday: 'long', day: '2-digit', month: 'long', hour: '2-digit', minute: '2-digit' })
+    : null
+  await sendMail({
+    to,
+    subject: `Você foi escalado: ${setlistName}${when ? ` (${when})` : ''}`,
+    text: `${fromName} te escalou para "${setlistName}"${when ? `, ${when}` : ''}.
+
+Confirme se você pode tocar:
+${url}`,
+    html: layout({
+      title: `Escala: ${setlistName}`,
+      body: `<p style="font-size:15px;line-height:1.5"><b>${escapeHtml(fromName)}</b> te escalou para <b>${escapeHtml(setlistName)}</b>${
+        when ? `, <b>${escapeHtml(when)}</b>` : ''
+      }. Abra o repertório e responda se você pode tocar.</p>`,
+      button: { label: 'Confirmar presença', url },
+    }),
+  })
+}
+
 // ---------------------------------------------------------------- ciclo de vida da conta
 
 const p = (html: string) => `<p style="font-size:15px;line-height:1.5">${html}</p>`

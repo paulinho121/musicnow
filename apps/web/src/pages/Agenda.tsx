@@ -1,4 +1,5 @@
 import clsx from 'clsx'
+import { ScheduleSection } from '../components/MySchedule'
 import {
   CalendarDays,
   CalendarPlus,
@@ -130,6 +131,8 @@ export function Agenda() {
           ))}
         </ol>
       )}
+
+      <ScheduleSection />
 
       <GigDialog gig={editing === 'new' ? null : editing} open={editing !== null} onClose={() => setEditing(null)} />
     </div>

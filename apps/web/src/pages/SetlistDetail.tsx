@@ -20,6 +20,7 @@ import {
 import { useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
 import { BandPanel } from '../components/setlist/BandPanel'
+import { SchedulePanel } from '../components/setlist/SchedulePanel'
 import { ExportButton } from '../components/setlist/ExportButton'
 import { OfflineButton } from '../components/setlist/OfflineButton'
 import { HistoryPanel } from '../components/setlist/HistoryPanel'
@@ -37,6 +38,7 @@ const dateFmt = new Intl.DateTimeFormat('pt-BR', { weekday: 'long', day: '2-digi
 const TABS = [
   { id: 'musicas', label: 'Músicas' },
   { id: 'banda', label: 'Banda' },
+  { id: 'escala', label: 'Escala' },
   { id: 'historico', label: 'Histórico' },
 ] as const
 
@@ -201,6 +203,7 @@ export function SetlistDetail() {
 
       {tab === 'musicas' && <SongsPanel setlist={s} />}
       {tab === 'banda' && <BandPanel setlist={s} />}
+      {tab === 'escala' && <SchedulePanel setlist={s} />}
       {tab === 'historico' && <HistoryPanel setlist={s} />}
 
       <Sheet open={menu} onClose={() => setMenu(false)} title="Repertório">

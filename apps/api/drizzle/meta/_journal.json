@@ -141,6 +141,13 @@
       "when": 1791330011601,
       "tag": "0019_adiantamento",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1791997299819,
+      "tag": "0020_escala",
+      "breakpoints": true
     }
   ]
 }

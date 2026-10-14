@@ -1,5 +1,5 @@
 import { relations, sql } from 'drizzle-orm'
-import { boolean, index, integer, jsonb, pgEnum, pgTable, primaryKey, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core'
+import { boolean, date, index, integer, jsonb, pgEnum, pgTable, primaryKey, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core'
 
 const timestamps = {
   createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
@@ -613,6 +613,47 @@ export const gig = pgTable(
     ...timestamps,
   },
   (t) => [index().on(t.userId, t.startsAt)],
+)
+
+export const assignmentStatus = pgEnum('assignment_status', ['pendente', 'confirmado', 'recusado'])
+
+/**
+ * Escala: quem toca neste repertório (culto, show), com qual instrumento, e a resposta de cada
+ * um (confirmo / não posso). Só quem participa do repertório (ou o dono) pode ser escalado.
+ */
+export const setlistAssignment = pgTable(
+  'setlist_assignment',
+  {
+    setlistId: uuid()
+      .notNull()
+      .references(() => setlist.id, { onDelete: 'cascade' }),
+    userId: text()
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    instrument: instrument(),
+    status: assignmentStatus().notNull().default('pendente'),
+    /** Recado de quem respondeu ("chego às 19h", "estou viajando"). */
+    note: text(),
+    respondedAt: timestamp({ withTimezone: true }),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.setlistId, t.userId] }), index().on(t.userId)],
+)
+
+/** Datas em que o músico não pode tocar: quem monta a escala vê o aviso. */
+export const unavailability = pgTable(
+  'unavailability',
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    userId: text()
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    startsOn: date({ mode: 'string' }).notNull(),
+    endsOn: date({ mode: 'string' }).notNull(),
+    note: text(),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index().on(t.userId, t.startsOn)],
 )
 
 /** Pedidos de ajuda (aba Ajuda): problema, dúvida ou sugestão, com a tela e o aparelho. */
