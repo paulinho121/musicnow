@@ -656,6 +656,54 @@ export const unavailability = pgTable(
   (t) => [index().on(t.userId, t.startsOn)],
 )
 
+/**
+ * Ensaio marcado num estúdio, ligado ao repertório (a banda): data, estúdio, sala e quanto
+ * custou. O valor é dividido entre os músicos (rehearsal_share).
+ */
+export const rehearsal = pgTable(
+  'rehearsal',
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    setlistId: uuid()
+      .notNull()
+      .references(() => setlist.id, { onDelete: 'cascade' }),
+    createdBy: text()
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    startsAt: timestamp({ withTimezone: true }).notNull(),
+    /** Duração reservada, em minutos. */
+    durationMin: integer().notNull().default(120),
+    studioName: text(),
+    room: text(),
+    address: text(),
+    /** Telefone/WhatsApp do estúdio. */
+    phone: text(),
+    /** Valor total do ensaio, em centavos (null = sem custo combinado). */
+    costCents: integer(),
+    /** Quem pagou o estúdio: os outros devem a parte deles a essa pessoa. */
+    paidBy: text().references(() => user.id, { onDelete: 'set null' }),
+    notes: text(),
+    ...timestamps,
+  },
+  (t) => [index().on(t.setlistId, t.startsAt)],
+)
+
+/** A parte de cada músico no custo do ensaio e se já acertou. */
+export const rehearsalShare = pgTable(
+  'rehearsal_share',
+  {
+    rehearsalId: uuid()
+      .notNull()
+      .references(() => rehearsal.id, { onDelete: 'cascade' }),
+    userId: text()
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    amountCents: integer().notNull(),
+    paidAt: timestamp({ withTimezone: true }),
+  },
+  (t) => [primaryKey({ columns: [t.rehearsalId, t.userId] }), index().on(t.userId)],
+)
+
 /** Pedidos de ajuda (aba Ajuda): problema, dúvida ou sugestão, com a tela e o aparelho. */
 export const supportTicket = pgTable(
   'support_ticket',

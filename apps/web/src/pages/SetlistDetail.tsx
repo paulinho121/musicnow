@@ -21,6 +21,7 @@ import { useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
 import { BandPanel } from '../components/setlist/BandPanel'
 import { SchedulePanel } from '../components/setlist/SchedulePanel'
+import { RehearsalsPanel } from '../components/setlist/RehearsalsPanel'
 import { ExportButton } from '../components/setlist/ExportButton'
 import { OfflineButton } from '../components/setlist/OfflineButton'
 import { HistoryPanel } from '../components/setlist/HistoryPanel'
@@ -39,6 +40,7 @@ const TABS = [
   { id: 'musicas', label: 'Músicas' },
   { id: 'banda', label: 'Banda' },
   { id: 'escala', label: 'Escala' },
+  { id: 'ensaios', label: 'Ensaios' },
   { id: 'historico', label: 'Histórico' },
 ] as const
 
@@ -179,7 +181,7 @@ export function SetlistDetail() {
 
       <ShareSetlistDialog setlist={s} open={sharing} onClose={() => setSharing(false)} />
 
-      <div className="flex gap-1 border-b border-border" role="tablist">
+      <div className="flex gap-1 overflow-x-auto border-b border-border [scrollbar-width:none]" role="tablist">
         {TABS.map((t) => (
           <button
             key={t.id}
@@ -187,7 +189,7 @@ export function SetlistDetail() {
             aria-selected={tab === t.id}
             onClick={() => setParams({ aba: t.id }, { replace: true })}
             className={clsx(
-              '-mb-px border-b-2 px-4 py-2.5 text-sm font-medium transition',
+              '-mb-px shrink-0 border-b-2 px-3.5 py-2.5 text-sm font-medium whitespace-nowrap transition',
               tab === t.id ? 'border-accent text-text' : 'border-transparent text-muted hover:text-text',
             )}
           >
@@ -204,6 +206,7 @@ export function SetlistDetail() {
       {tab === 'musicas' && <SongsPanel setlist={s} />}
       {tab === 'banda' && <BandPanel setlist={s} />}
       {tab === 'escala' && <SchedulePanel setlist={s} />}
+      {tab === 'ensaios' && <RehearsalsPanel setlist={s} />}
       {tab === 'historico' && <HistoryPanel setlist={s} />}
 
       <Sheet open={menu} onClose={() => setMenu(false)} title="Repertório">

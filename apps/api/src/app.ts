@@ -22,6 +22,7 @@ import { partnersRoutes } from './routes/partners'
 import { supportRoutes } from './routes/support'
 import { gigsRoutes } from './routes/gigs'
 import { scheduleRoutes } from './routes/schedule'
+import { rehearsalsRoutes } from './routes/rehearsals'
 import { recordError } from './errors'
 import { adminRoutes } from './routes/admin'
 
@@ -51,6 +52,7 @@ const api = new Hono<AppEnv>()
   .route('/support', supportRoutes)
   .route('/gigs', gigsRoutes)
   .route('/escala', scheduleRoutes)
+  .route('/ensaios', rehearsalsRoutes)
   .route('/admin', adminRoutes)
 
 const KB = 1024

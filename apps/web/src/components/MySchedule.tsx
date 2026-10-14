@@ -1,6 +1,6 @@
 import { INSTRUMENTS } from '@ensaio/shared'
 import clsx from 'clsx'
-import { CalendarCheck, CalendarX, Check, Plus, Trash2, X } from 'lucide-react'
+import { CalendarCheck, CalendarX, Check, Drum, Plus, Trash2, X } from 'lucide-react'
 import { type FormEvent, useState } from 'react'
 import { Link } from 'react-router'
 import {
@@ -12,6 +12,9 @@ import {
   useUnavailability,
   type MyAssignment,
 } from '../lib/schedule'
+import { brl } from '../lib/gigs'
+import { useMyRehearsals, useSharePaid } from '../lib/rehearsals'
+import { useSession } from '../lib/auth'
 import { useToast } from './ui'
 
 const dayFmt = new Intl.DateTimeFormat('pt-BR', { weekday: 'short', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
@@ -97,6 +100,7 @@ export function ScheduleSection() {
   const { data: mine } = useMySchedule()
   return (
     <div className="space-y-6">
+      <MyRehearsals />
       {mine && mine.length > 0 && (
         <section>
           <h2 className="mb-2 flex items-center gap-2 font-semibold">
@@ -186,6 +190,53 @@ function UnavailabilityCard() {
           <Plus className="size-4" /> Anotar
         </button>
       </form>
+    </section>
+  )
+}
+
+/** Agenda: os próximos ensaios no estúdio e as partes que ainda falta acertar. */
+function MyRehearsals() {
+  const { data } = useMyRehearsals()
+  const { data: session } = useSession()
+  const paid = useSharePaid()
+  const toast = useToast()
+  if (!data?.length) return null
+  const owed = data.filter((r) => r.amountCents && !r.paidAt).reduce((n, r) => n + (r.amountCents ?? 0), 0)
+  return (
+    <section>
+      <h2 className="mb-2 flex flex-wrap items-center gap-2 font-semibold">
+        <Drum className="size-5 text-accent" /> Meus ensaios
+        {owed > 0 && <span className="text-sm font-normal text-muted">· falta acertar {brl(owed)}</span>}
+      </h2>
+      <ul className="card divide-y divide-border">
+        {data.map((r) => (
+          <li key={r.id} className="flex flex-wrap items-center gap-3 p-3">
+            <Link to={`/repertorios/${r.setlistId}?aba=ensaios`} className="min-w-0 flex-1">
+              <p className="truncate font-medium">{[r.studioName ?? 'Ensaio', r.room].filter(Boolean).join(' · ')}</p>
+              <p className="text-xs text-muted">
+                {dayFmt.format(new Date(r.startsAt))} · {r.setlistName}
+              </p>
+            </Link>
+            {r.amountCents ? (
+              <button
+                className={clsx('btn-ghost h-9 px-3 text-sm', r.paidAt && 'border-ok/50 text-ok')}
+                disabled={paid.isPending || !session}
+                onClick={() =>
+                  session &&
+                  paid.mutate(
+                    { id: r.id, userId: session.user.id, paid: !r.paidAt },
+                    { onError: (e) => toast(e.message, 'error') },
+                  )
+                }
+                title={r.paidByName ? `Sua parte vai para ${r.paidByName}` : undefined}
+              >
+                {r.paidAt ? <Check className="size-4" /> : null}
+                {brl(r.amountCents)} {r.paidAt ? 'pago' : '· marcar pago'}
+              </button>
+            ) : null}
+          </li>
+        ))}
+      </ul>
     </section>
   )
 }

@@ -148,6 +148,13 @@
       "when": 1791997299819,
       "tag": "0020_escala",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1791997878292,
+      "tag": "0021_ensaio_estudio",
+      "breakpoints": true
     }
   ]
 }
