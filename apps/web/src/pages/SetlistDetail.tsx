@@ -10,12 +10,12 @@ import {
   MapPin,
   Megaphone,
   MoreVertical,
+  Music2,
   Pencil,
   Play,
   Radio,
   Trash2,
   UserPlus,
-  Users,
 } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
@@ -33,7 +33,9 @@ import { ErrorState, PageSpinner, useToast } from '../components/ui'
 import { useSession } from '../lib/auth'
 import { useSetlistLive } from '../lib/live'
 import { useArchiveSetlist, useDeleteSetlist, useDuplicateSetlist, useSetlist } from '../lib/setlists'
-import { roleLabel, StatusChip } from './Setlists'
+import { CoverMosaic, DateBadge, roleLabel, StatusChip, whenLabel } from './Setlists'
+import { Avatar } from '../components/Avatar'
+import { CoverGlow } from '../components/SongCover'
 
 const dateFmt = new Intl.DateTimeFormat('pt-BR', { weekday: 'long', day: '2-digit', month: 'long', hour: '2-digit', minute: '2-digit' })
 
@@ -83,50 +85,80 @@ export function SetlistDetail() {
 
   return (
     <div className="space-y-5">
-      <div className="flex items-start gap-2">
-        <Link to="/repertorios" className="btn-icon shrink-0 border-transparent bg-transparent" aria-label="Voltar">
-          <ArrowLeft className="size-5" />
+      <div className="flex items-center justify-between gap-2">
+        <Link to="/repertorios" className="btn-ghost h-9 border-transparent bg-transparent px-2 text-sm text-muted hover:text-text">
+          <ArrowLeft className="size-4" /> Repertórios
         </Link>
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <h1 className="text-xl sm:text-2xl leading-tight font-bold">{s.name}</h1>
-            <StatusChip status={s.status} />
-            {s.archived && <span className="rounded-md bg-surface-2 px-2 py-0.5 text-xs text-muted">Arquivado</span>}
-          </div>
-          <p className="mt-1 text-sm text-muted">
-            {roleLabel(s.role)}
-            {s.role !== 'owner' && ` · de ${s.ownerName}`}
-          </p>
-        </div>
         {isAdmin && (
-          <button className="btn-icon shrink-0" aria-label="Mais opções" onClick={() => setMenu(true)}>
-            <MoreVertical className="size-5" />
-          </button>
+          <div className="flex gap-2">
+            <Link to={`/repertorios/${s.id}/editar`} className="btn-ghost h-9 px-3 text-sm">
+              <Pencil className="size-4" /> <span className="hidden sm:inline">Editar</span>
+            </Link>
+            <button className="btn-icon size-9 shrink-0" aria-label="Mais opções" onClick={() => setMenu(true)}>
+              <MoreVertical className="size-5" />
+            </button>
+          </div>
         )}
       </div>
 
-      <div className="flex flex-wrap gap-x-5 gap-y-1.5 text-sm text-muted">
+      {/* Destaque: capas, nome, data e a banda */}
+      <section className="relative overflow-hidden rounded-3xl border border-border bg-surface">
+        {s.items[0] && <CoverGlow song={s.items[0].song} />}
+        <div className="relative flex items-start gap-4 p-4 sm:items-center sm:gap-6 sm:p-6">
+          <CoverMosaic
+            songs={s.items.slice(0, 4).map((i) => i.song)}
+            className="size-24 rounded-2xl shadow-2xl shadow-black/50 sm:size-36"
+          />
+          <div className="min-w-0 flex-1">
+            <p className="flex flex-wrap items-center gap-2 text-[11px] font-bold tracking-widest text-muted uppercase">
+              {s.groupName ?? 'Repertório'}
+              <StatusChip status={s.status} />
+              {s.archived && <span className="rounded-md bg-surface-2 px-2 py-0.5 tracking-normal normal-case">Arquivado</span>}
+            </p>
+            <h1 className="mt-1 line-clamp-3 text-xl leading-tight font-extrabold tracking-tight break-words sm:text-3xl">{s.name}</h1>
+            <p className="mt-0.5 text-sm text-muted">
+              {roleLabel(s.role)}
+              {s.role !== 'owner' && ` · de ${s.ownerName}`}
+            </p>
+            <div className="mt-3 flex flex-wrap items-center gap-1.5 text-xs">
+              <HeroChip>
+                <Music2 className="size-3.5" /> {s.items.length} {s.items.length === 1 ? 'música' : 'músicas'}
+              </HeroChip>
+              {s.location && (
+                <HeroChip>
+                  <MapPin className="size-3.5" /> <span className="max-w-48 truncate">{s.location}</span>
+                </HeroChip>
+              )}
+              {s.parent && (
+                <Link to={`/repertorios/${s.parent.id}`} className="hover:text-text">
+                  <HeroChip>
+                    <GitBranch className="size-3.5" /> Versão de “{s.parent.name}”
+                  </HeroChip>
+                </Link>
+              )}
+              <button onClick={() => setParams({ aba: 'banda' }, { replace: true })} className="flex items-center pl-1.5" title="Ver a banda">
+                {s.members.slice(0, 5).map((m) => (
+                  <Avatar key={m.userId} name={m.name} image={m.image} className="-ml-1.5 size-7 text-[10px] ring-2 ring-surface" />
+                ))}
+                <span className="ml-1.5 text-muted">
+                  {s.members.length} na banda
+                </span>
+              </button>
+            </div>
+          </div>
+        </div>
         {s.eventDate && (
-          <span className="inline-flex items-center gap-1.5 first-letter:uppercase">
-            <CalendarDays className="size-4" /> {dateFmt.format(new Date(s.eventDate))}
-          </span>
+          <div className="relative flex items-center gap-3 border-t border-white/5 bg-black/20 px-4 py-3 sm:px-6">
+            <DateBadge iso={s.eventDate} />
+            <div className="min-w-0 text-sm">
+              <p className="font-semibold first-letter:uppercase">{dateFmt.format(new Date(s.eventDate))}</p>
+              {whenLabel(s.eventDate) && <p className="text-xs font-semibold text-accent">{whenLabel(s.eventDate)}</p>}
+            </div>
+            <CalendarDays className="ml-auto size-5 text-muted" />
+          </div>
         )}
-        {s.location && (
-          <span className="inline-flex items-center gap-1.5">
-            <MapPin className="size-4" /> {s.location}
-          </span>
-        )}
-        {s.groupName && (
-          <span className="inline-flex items-center gap-1.5">
-            <Users className="size-4" /> {s.groupName}
-          </span>
-        )}
-        {s.parent && (
-          <Link to={`/repertorios/${s.parent.id}`} className="inline-flex items-center gap-1.5 hover:text-text">
-            <GitBranch className="size-4" /> Versão de “{s.parent.name}”
-          </Link>
-        )}
-      </div>
+      </section>
+
       {s.notes && <p className="rounded-xl border-l-4 border-accent bg-accent/10 px-3 py-2 text-sm whitespace-pre-line">{s.notes}</p>}
 
       {live.stage && s.items[live.stage.position] && (
@@ -152,23 +184,29 @@ export function SetlistDetail() {
         </button>
       )}
 
-      {/* Celular: o botão principal ocupa a linha toda; os outros dividem a de baixo. */}
-      <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
-        {isAdmin && !live.stage && s.items.length > 0 && (
-          <button
-            className="btn-primary col-span-2 sm:col-auto border-red-500/30 bg-red-600 hover:bg-red-700 text-white font-semibold"
-            onClick={() => navigate(`/repertorios/${s.id}/tocar/0?lead=1`)}
-          >
-            <Radio className="size-4 animate-pulse" /> Comandar Banda ao Vivo
-          </button>
-        )}
-        <button
-          className="btn-primary col-span-2 sm:col-auto"
-          disabled={!s.items.length}
-          onClick={() => navigate(`/repertorios/${s.id}/tocar/0`)}
-        >
+      {/* Principais: tocar e comandar a banda. */}
+      <div className={clsx('grid gap-2 sm:flex sm:flex-wrap', isAdmin && !live.stage && s.items.length > 0 ? 'grid-cols-2' : 'grid-cols-1')}>
+        <button className="btn-primary h-12 sm:h-11" disabled={!s.items.length} onClick={() => navigate(`/repertorios/${s.id}/tocar/0`)}>
           <Play className="size-4" /> {s.status === 'ensaio' ? 'Ensaiar' : 'Tocar'}
         </button>
+        {isAdmin && !live.stage && s.items.length > 0 && (
+          <button
+            className="btn-primary h-12 border-red-500/30 bg-red-600 font-semibold text-white hover:bg-red-700 sm:h-11"
+            onClick={() => navigate(`/repertorios/${s.id}/tocar/0?lead=1`)}
+            title="Você passa as músicas e a banda acompanha no celular de cada um"
+          >
+            <Radio className="size-4 animate-pulse" /> <span className="sm:hidden">Ao vivo</span>
+            <span className="hidden sm:inline">Comandar Banda ao Vivo</span>
+          </button>
+        )}
+      </div>
+      {/* Secundários: no celular, uma linha de atalhos com ícone em cima e o nome embaixo. */}
+      <div
+        className={clsx(
+          'flex gap-2 sm:flex-wrap',
+          'max-sm:[&>*]:h-auto max-sm:[&>*]:min-w-0 max-sm:[&>*]:flex-1 max-sm:[&>*]:flex-col max-sm:[&>*]:gap-1 max-sm:[&>*]:px-1 max-sm:[&>*]:py-2 max-sm:[&>*]:text-[11px] max-sm:[&>*]:leading-tight',
+        )}
+      >
         <ExportButton setlist={s} />
         <OfflineButton setlist={s} />
         <button className="btn-ghost" onClick={() => setSharing(true)} disabled={!s.items.length}>
@@ -176,13 +214,15 @@ export function SetlistDetail() {
         </button>
         {isAdmin && (
           <button className="btn-ghost" onClick={() => setParams({ aba: 'banda' }, { replace: true })}>
-            <UserPlus className="size-4" /> Convidar Músicos
+            <UserPlus className="size-4" /> Convidar
           </button>
         )}
       </div>
 
       <ShareSetlistDialog setlist={s} open={sharing} onClose={() => setSharing(false)} />
 
+      {/* Abas: grudam no topo ao rolar a lista de músicas. */}
+      <div className="sticky top-0 z-10 -mx-1 bg-bg/90 px-1 pt-1 backdrop-blur">
       <div className="flex gap-1 overflow-x-auto border-b border-border [scrollbar-width:none]" role="tablist">
         {TABS.map((t) => (
           <button
@@ -203,6 +243,7 @@ export function SetlistDetail() {
             )}
           </button>
         ))}
+      </div>
       </div>
 
       {tab === 'musicas' && <SongsPanel setlist={s} />}
@@ -257,5 +298,11 @@ export function SetlistDetail() {
         </div>
       </Sheet>
     </div>
+  )
+}
+
+function HeroChip({ children }: { children: React.ReactNode }) {
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-black/25 px-2.5 py-1 backdrop-blur-sm">{children}</span>
   )
 }

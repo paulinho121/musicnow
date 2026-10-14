@@ -170,8 +170,8 @@ export function SongsPanel({ setlist }: { setlist: SetlistDetail }) {
       {!isAdmin && setlist.suggestions.length > 0 && <MySuggestions setlist={setlist} />}
 
       {(setlist.items.length > 0 || hasBlocks) && (
-        <div className="flex items-center justify-between gap-3">
-          <p className="text-sm text-muted">
+        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+          <p className="text-sm whitespace-nowrap text-muted">
             {setlist.items.length} {setlist.items.length === 1 ? 'música' : 'músicas'}
             {hasBlocks && ` · ${setlist.blocks.length} ${setlist.blocks.length === 1 ? 'bloco' : 'blocos'}`}
           </p>

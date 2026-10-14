@@ -17,7 +17,7 @@ import {
 import { type FormEvent, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { Avatar } from '../components/Avatar'
-import { SongCover } from '../components/SongCover'
+import { type CoverSong, SongCover } from '../components/SongCover'
 import { PlaylistImport } from '../components/setlist/PlaylistImport'
 import { EmptyState, ErrorState, Skeleton } from '../components/ui'
 import { useLocalState } from '../lib/storage'
@@ -56,7 +56,7 @@ const norm = (s: string) =>
     .toLowerCase()
 
 /** Quantos dias faltam (no calendário, não em horas): 0 = hoje. */
-function daysUntil(iso: string) {
+export function daysUntil(iso: string) {
   const d = new Date(iso)
   const a = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime()
   const now = new Date()
@@ -64,7 +64,7 @@ function daysUntil(iso: string) {
   return Math.round((a - b) / 86_400_000)
 }
 
-function whenLabel(iso: string) {
+export function whenLabel(iso: string) {
   const n = daysUntil(iso)
   if (n === 0) return 'Hoje'
   if (n === 1) return 'Amanhã'
@@ -317,18 +317,18 @@ export function Setlists() {
   )
 }
 
-/** Capa do repertório: as capas das 4 primeiras músicas (ou a data, se ainda não tem músicas). */
-function Cover({ s }: { s: SetlistSummary }) {
-  const box = 'size-20 shrink-0 overflow-hidden rounded-xl sm:size-24'
-  if (s.songs.length >= 4)
+/** Capa do repertório: as capas das 4 primeiras músicas (ou um ícone, se ainda não tem músicas). */
+export function CoverMosaic({ songs, className = 'size-20 rounded-xl sm:size-24' }: { songs: CoverSong[]; className?: string }) {
+  const box = clsx('shrink-0 overflow-hidden', className)
+  if (songs.length >= 4)
     return (
       <div className={clsx(box, 'grid grid-cols-2')}>
-        {s.songs.map((song, i) => (
+        {songs.slice(0, 4).map((song, i) => (
           <SongCover key={i} song={song} className="aspect-square w-full rounded-none" />
         ))}
       </div>
     )
-  if (s.songs.length) return <SongCover song={s.songs[0]} className={box} />
+  if (songs.length) return <SongCover song={songs[0]} className={box} />
   return (
     <div className={clsx(box, 'grid place-items-center bg-surface-2 text-muted')}>
       <ListMusic className="size-8" />
@@ -336,7 +336,7 @@ function Cover({ s }: { s: SetlistSummary }) {
   )
 }
 
-function DateBadge({ iso }: { iso: string }) {
+export function DateBadge({ iso }: { iso: string }) {
   const d = new Date(iso)
   return (
     <div className="flex w-12 shrink-0 flex-col items-center overflow-hidden rounded-lg border border-border text-center leading-none">
@@ -359,7 +359,7 @@ function SetlistCard({ s }: { s: SetlistSummary }) {
         pending && 'border-accent/60',
       )}
     >
-      <Cover s={s} />
+      <CoverMosaic songs={s.songs} />
       <div className="flex min-w-0 flex-1 flex-col">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
