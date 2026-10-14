@@ -1,5 +1,6 @@
 import clsx from 'clsx'
 import { ScheduleSection } from '../components/MySchedule'
+import { MonthFinance } from '../components/setlist/FinancePanel'
 import {
   CalendarDays,
   CalendarPlus,
@@ -132,6 +133,7 @@ export function Agenda() {
         </ol>
       )}
 
+      <MonthFinance month={fromKey(month)} />
       <ScheduleSection />
 
       <GigDialog gig={editing === 'new' ? null : editing} open={editing !== null} onClose={() => setEditing(null)} />

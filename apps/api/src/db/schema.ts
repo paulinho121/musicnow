@@ -704,6 +704,31 @@ export const rehearsalShare = pgTable(
   (t) => [primaryKey({ columns: [t.rehearsalId, t.userId] }), index().on(t.userId)],
 )
 
+export const entryKind = pgEnum('entry_kind', ['receita', 'despesa', 'cache'])
+
+/**
+ * Financeiro do show (repertório): o que entrou (receita), o que saiu (despesa) e o cachê de
+ * cada músico. Quem administra vê tudo; cada músico vê só o próprio cachê.
+ */
+export const setlistEntry = pgTable(
+  'setlist_entry',
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    setlistId: uuid()
+      .notNull()
+      .references(() => setlist.id, { onDelete: 'cascade' }),
+    kind: entryKind().notNull(),
+    description: text().notNull(),
+    amountCents: integer().notNull(),
+    /** Cachê: de qual músico. */
+    userId: text().references(() => user.id, { onDelete: 'set null' }),
+    /** Recebido (receita) ou pago (despesa, cachê). */
+    settledAt: timestamp({ withTimezone: true }),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index().on(t.setlistId), index().on(t.userId)],
+)
+
 /** Pedidos de ajuda (aba Ajuda): problema, dúvida ou sugestão, com a tela e o aparelho. */
 export const supportTicket = pgTable(
   'support_ticket',

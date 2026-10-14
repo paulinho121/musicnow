@@ -22,6 +22,7 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
 import { BandPanel } from '../components/setlist/BandPanel'
 import { SchedulePanel } from '../components/setlist/SchedulePanel'
 import { RehearsalsPanel } from '../components/setlist/RehearsalsPanel'
+import { FinancePanel } from '../components/setlist/FinancePanel'
 import { ExportButton } from '../components/setlist/ExportButton'
 import { OfflineButton } from '../components/setlist/OfflineButton'
 import { HistoryPanel } from '../components/setlist/HistoryPanel'
@@ -41,6 +42,7 @@ const TABS = [
   { id: 'banda', label: 'Banda' },
   { id: 'escala', label: 'Escala' },
   { id: 'ensaios', label: 'Ensaios' },
+  { id: 'financeiro', label: 'Financeiro' },
   { id: 'historico', label: 'Histórico' },
 ] as const
 
@@ -207,6 +209,7 @@ export function SetlistDetail() {
       {tab === 'banda' && <BandPanel setlist={s} />}
       {tab === 'escala' && <SchedulePanel setlist={s} />}
       {tab === 'ensaios' && <RehearsalsPanel setlist={s} />}
+      {tab === 'financeiro' && <FinancePanel setlist={s} />}
       {tab === 'historico' && <HistoryPanel setlist={s} />}
 
       <Sheet open={menu} onClose={() => setMenu(false)} title="Repertório">

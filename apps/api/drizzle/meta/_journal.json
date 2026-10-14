@@ -155,6 +155,13 @@
       "when": 1791997878292,
       "tag": "0021_ensaio_estudio",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1791998271230,
+      "tag": "0022_financeiro_show",
+      "breakpoints": true
     }
   ]
 }
