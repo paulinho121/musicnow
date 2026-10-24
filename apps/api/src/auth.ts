@@ -2,7 +2,7 @@ import { TRIAL_DAYS } from '@ensaio/shared'
 import { betterAuth } from 'better-auth'
 import { APIError } from 'better-auth/api'
 import { drizzleAdapter } from 'better-auth/adapters/drizzle'
-import { eq } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 import { db, schema } from './db'
 import { env } from './env'
 import { sendPasswordChangedEmail, sendPasswordResetEmail } from './mail'
@@ -20,6 +20,28 @@ if (env.APPLE_CLIENT_ID && env.APPLE_CLIENT_SECRET) {
 }
 
 export const enabledProviders = Object.keys(socialProviders)
+
+/**
+ * Entrar com o Google numa conta que já existia (criada com e-mail e senha) junta as duas.
+ * Se o e-mail dessa conta nunca foi verificado, a senha antiga sai: senão alguém poderia ter
+ * criado a conta com o e-mail de outra pessoa, esperado ela entrar pelo Google e continuar
+ * entrando com a senha que só ele sabe. Quem quiser senha de novo usa "Esqueci minha senha".
+ */
+export async function secureSocialLink(account: { userId: string; providerId: string }) {
+  if (account.providerId === 'credential') return
+  const [u] = await db
+    .select({ emailVerified: schema.user.emailVerified })
+    .from(schema.user)
+    .where(eq(schema.user.id, account.userId))
+  if (!u) return
+  if (!u.emailVerified) {
+    await db
+      .delete(schema.account)
+      .where(and(eq(schema.account.userId, account.userId), eq(schema.account.providerId, 'credential')))
+  }
+  // O Google (ou a Apple) confirmou que o e-mail é dessa pessoa.
+  await db.update(schema.user).set({ emailVerified: true }).where(eq(schema.user.id, account.userId))
+}
 
 export const auth = betterAuth({
   appName: 'Ensaio Fácil',
@@ -68,6 +90,10 @@ export const auth = betterAuth({
     },
   },
   socialProviders,
+  account: {
+    // Quem já tinha conta com o mesmo e-mail entra pelo Google (veja secureSocialLink).
+    accountLinking: { enabled: true, trustedProviders: ['google', 'apple'], requireLocalEmailVerified: false },
+  },
   user: {
     // Papel e bloqueio vêm do banco para a sessão; input: false = ninguém altera pela própria conta.
     additionalFields: {
@@ -81,6 +107,14 @@ export const auth = betterAuth({
     },
   },
   databaseHooks: {
+    account: {
+      create: {
+        // Antes de gravar o vínculo: confere o estado do e-mail da conta que já existia.
+        before: async (account) => {
+          await secureSocialLink(account)
+        },
+      },
+    },
     session: {
       create: {
         // Conta bloqueada não entra (nem por senha, nem por Google).
