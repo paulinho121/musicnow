@@ -9,6 +9,7 @@ import {
   guessKey,
   isChord,
   isChordLine,
+  cleanSheetText,
   isBarLine,
   chordDurations,
   barEvents,
@@ -363,5 +364,15 @@ describe('ataques, pausa e casas', () => {
   })
   it('transpõe o acorde e deixa x e N.C. como estão', () => {
     expect(transposeChordLine('| C x x | N.C. |', 2, false)).toBe('| D x x | N.C. |')
+  })
+})
+
+describe('texto colado com caracteres invisíveis', () => {
+  // Espaço de largura zero, marca de direção, espaço não separável e ♯: comuns em cifras copiadas.
+  const colado = '\u200B[Intro] G7(4/9)\u00A0 G7(9)\r\n\u200E      Bm7(9)\u00A0\u00A0 C\u266Fm7(9)\nEii   mama'
+  it('limpa e reconhece seção e acordes', () => {
+    expect(cleanSheetText(colado)).toBe('[Intro] G7(4/9)  G7(9)\n      Bm7(9)   C#m7(9)\nEii   mama')
+    expect(parseSheet(colado).map((l) => l.kind)).toEqual(['section', 'chords', 'lyrics'])
+    expect(isChordLine(cleanSheetText('\u200BB7(4/9)\u2009E7'))).toBe(true)
   })
 })

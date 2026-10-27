@@ -1,6 +1,6 @@
 // Importação de cifras: converte ChordPro, OnSong, OpenSong e texto colado
 // para o formato do Ensaio Fácil (acordes sobre a letra, seções entre colchetes).
-import { guessKey, isChord, isChordLine, parseChord, sectionTypeFromLabel, transposeKey } from './chords'
+import { guessKey, isChord, isChordLine, parseChord, sectionTypeFromLabel, transposeKey, cleanSheetText } from './chords'
 
 export type ImportFormat = 'chordpro' | 'onsong' | 'opensong' | 'text' | 'guitarpro' | 'word'
 
@@ -195,7 +195,7 @@ function parseChordProLike(text: string, format: 'chordpro' | 'onsong', fileName
   const out: string[] = []
   let inTab = false
   let headerDone = false
-  const rawLines = text.replace(/\r\n?/g, '\n').split('\n')
+  const rawLines = cleanSheetText(text).split('\n')
 
   // OnSong: as primeiras linhas sem ":" são título e artista.
   if (format === 'onsong') {
@@ -331,7 +331,7 @@ function parseOpenSong(xml: string, fileName?: string): ImportedSong {
 function parsePlainText(text: string, fileName?: string): ImportedSong {
   const warnings: string[] = []
   const meta: Meta = {}
-  const lines = text.replace(/\r\n?/g, '\n').split('\n')
+  const lines = cleanSheetText(text).split('\n')
 
   // Cabeçalho = linhas antes da primeira linha de acordes ou seção.
   let start = 0
