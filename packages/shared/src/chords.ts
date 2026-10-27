@@ -180,6 +180,21 @@ export function sectionTypeFromLabel(label: string): SectionType | null {
 // Tokens que podem aparecer numa linha de acordes sem serem acordes.
 const NOISE_RE = /^(\||\|\||\(|\)|x\d+|\d+x|%|-+|\/+|\.+|:|x|×|n\.?c\.?|\d\.)$/i
 
+/**
+ * Limpa o texto colado de sites, PDF e WhatsApp: tira os caracteres invisíveis (espaço de
+ * largura zero, marcas de direção do texto, hífen oculto), troca os espaços "especiais"
+ * (não separável, fino...) por espaço comum, ♯/♭ por #/b e padroniza as quebras de linha.
+ * Sem isso, uma linha de acordes com um caractere invisível vira texto comum.
+ */
+export function cleanSheetText(text: string): string {
+  return text
+    .replace(/\r\n?|[\u2028\u2029\u0085]/g, '\n')
+    .replace(/[\u200B-\u200F\u202A-\u202E\u2060-\u2064\u2066-\u2069\uFEFF\u00AD\u180E]/g, '')
+    .replace(/[\u00A0\u1680\u2000-\u200A\u202F\u205F\u3000]/g, ' ')
+    .replace(/♯/g, '#')
+    .replace(/♭/g, 'b')
+}
+
 export function isChordLine(line: string): boolean {
   if (isTabLine(line)) return false
   // A barra de compasso separa acordes como um espaço: "|C|F|" = "| C | F |".
@@ -299,8 +314,7 @@ function mapChordsInLine(line: string, fn: (chord: string, index: number) => str
 
 /** Aplica `fn` às linhas de acordes da cifra (inclusive os acordes ao lado do nome da seção). */
 function mapChordLines(content: string, fn: (line: string, lineIndex: number) => string): string {
-  return content
-    .replace(/\r\n?/g, '\n')
+  return cleanSheetText(content)
     .split('\n')
     .map((line, i) => {
       const sec = matchSection(line)
@@ -422,7 +436,7 @@ export type SheetLine =
 /** Converte o texto da cifra em linhas classificadas, já transpostas. */
 export function parseSheet(content: string, semitones = 0, targetKey?: string | null, accidentals: Accidentals = 'auto'): SheetLine[] {
   const shift = (l: string) => shiftLine(l, semitones, targetKey, accidentals)
-  return transposeTabs(content.replace(/\r\n?/g, '\n').split('\n'), semitones).map((raw): SheetLine => {
+  return transposeTabs(cleanSheetText(content).split('\n'), semitones).map((raw): SheetLine => {
     const line = raw.replace(/\s+$/, '')
     if (line.trim() === '') return { kind: 'blank' }
     if (isTabLine(line)) return { kind: 'tab', text: line }
@@ -443,7 +457,7 @@ export function parseSheet(content: string, semitones = 0, targetKey?: string | 
 
 /** Transpõe o texto inteiro da cifra (para exportar ou salvar em outro tom). */
 export function transposeSheet(content: string, semitones: number, targetKey?: string | null, accidentals: Accidentals = 'auto'): string {
-  return transposeTabs(content.replace(/\r\n?/g, '\n').split('\n'), semitones)
+  return transposeTabs(cleanSheetText(content).split('\n'), semitones)
     .map((line) => {
       if (isTabLine(line)) return line
       const sec = matchSection(line)
@@ -478,8 +492,7 @@ export function guessKey(content: string): string | null {
  * não tem autorização para ser exibida a outras pessoas.
  */
 export function stripLyrics(content: string): string {
-  return content
-    .replace(/\r\n?/g, '\n')
+  return cleanSheetText(content)
     .split('\n')
     .map((line) => {
       if (!line.trim()) return ''

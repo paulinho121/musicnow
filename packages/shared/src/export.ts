@@ -1,7 +1,7 @@
 // Exportação para ChordPro (.cho): o formato aberto que OnSong, SongbookPro,
 // Planning Center e outros apps de cifra leem. É o inverso do importador:
 // "acordes sobre a letra" vira "[C]acorde dentro da letra".
-import { isChord, isChordLine, sectionTypeFromLabel, transposeSheet, type SectionType } from './chords'
+import { isChord, isChordLine, sectionTypeFromLabel, transposeSheet, type SectionType, cleanSheetText } from './chords'
 
 export interface ExportableSong {
   title: string
@@ -74,7 +74,7 @@ export function toChordPro(song: ExportableSong): string {
   if (song.notes) out.push(`{comment: ${song.notes.replace(/\s*\n\s*/g, ' ')}}`)
   out.push('')
 
-  const lines = song.content.replace(/\r\n?/g, '\n').split('\n')
+  const lines = cleanSheetText(song.content).split('\n')
   let open: string | null = null
   const close = () => {
     if (open) out.push(`{end_of_${open}}`)

@@ -1,4 +1,4 @@
-import { atLeast, guessKey, isChord, isShortMusicLink, normalizeSearch, parseMusicLink, PUBLIC_LICENSES, stripLyrics } from '@ensaio/shared'
+import { atLeast, guessKey, isChord, isShortMusicLink, normalizeSearch, parseMusicLink, PUBLIC_LICENSES, stripLyrics, cleanSheetText } from '@ensaio/shared'
 import { and, asc, desc, eq, exists, ilike, isNull, or, sql, type SQL } from 'drizzle-orm'
 import { Hono } from 'hono'
 import { HTTPException } from 'hono/http-exception'
@@ -41,7 +41,8 @@ const songFields = z.object({
   style: z.string().trim().max(60).nullish(),
   notes: z.string().max(5000).nullish(),
   tags: z.array(z.string().trim().min(1).max(40)).max(20).default([]),
-  content: z.string().max(100_000).default(''),
+  // Tira os caracteres invisíveis do texto colado (senão a linha de acordes vira texto).
+  content: z.string().max(100_000).default('').transform(cleanSheetText),
   lyricsAuthorized: z.boolean().default(false),
   visibility: z.enum(['private', 'shared', 'public']).default('private'),
   license: z.enum(schema.songLicense.enumValues).default('unknown'),
