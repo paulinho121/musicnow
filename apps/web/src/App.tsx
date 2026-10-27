@@ -41,6 +41,7 @@ const SharedSongAccept = page(() => import('./pages/SharedSongAccept'), 'SharedS
 const Setlists = page(() => import('./pages/Setlists'), 'Setlists')
 const SongEditor = page(() => import('./pages/SongEditor'), 'SongEditor')
 const SongView = page(() => import('./pages/SongView'), 'SongView')
+const RehearsalRoom = page(() => import('./pages/RehearsalRoom'), 'RehearsalRoom')
 const Subscription = page(() => import('./pages/Subscription'), 'Subscription')
 const Checkout = page(() => import('./pages/Checkout'), 'Checkout')
 const Help = page(() => import('./pages/Help'), 'Help')
@@ -143,6 +144,8 @@ export const router = createBrowserRouter([
         children: [
           // A tela da música ocupa a tela toda (sem menu), para leitura no palco.
           { path: '/musicas/:id', element: <SongView /> },
+          // Sala de ensaio: tocar junto com o YouTube ou o áudio guia (velocidade, tom e loop).
+          { path: '/musicas/:id/ensaio', element: <RehearsalRoom /> },
           { path: '/repertorios/:id/tocar/:pos', element: <SetlistPlay /> },
           { path: '/musicas/:id/imprimir', element: <PrintSong /> },
           { path: '/repertorios/:id/imprimir', element: <PrintSetlist /> },

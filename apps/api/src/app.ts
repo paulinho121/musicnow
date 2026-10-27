@@ -25,6 +25,7 @@ import { scheduleRoutes } from './routes/schedule'
 import { rehearsalsRoutes } from './routes/rehearsals'
 import { financeRoutes } from './routes/finance'
 import { bandsRoutes, publicBandsRoutes } from './routes/bands'
+import { audioRoutes } from './routes/audio'
 import { recordError } from './errors'
 import { adminRoutes } from './routes/admin'
 
@@ -46,6 +47,7 @@ const api = new Hono<AppEnv>()
   .route('/invites', invitesRoutes)
   .route('/catalog', catalogRoutes)
   .route('/scores', scoresRoutes)
+  .route('/audio', audioRoutes)
   .route('/billing', billingRoutes)
   .route('/analytics', analyticsRoutes)
   .route('/errors', errorsRoutes)
@@ -73,8 +75,10 @@ export const app = new Hono()
   .use('/api/scores', bodyLimit({ maxSize: 16 * KB * KB, onError: tooLarge }))
   // Imagem do destaque do início (já reduzida no aparelho).
   .use('/api/me/hero', bodyLimit({ maxSize: 2 * KB * KB, onError: tooLarge }))
+  // Áudio guia da Sala de ensaio (até 25 MB).
+  .use('/api/audio', bodyLimit({ maxSize: 26 * KB * KB, onError: tooLarge }))
   .use('/api/*', async (c, next) =>
-    c.req.path === '/api/songs/import' || c.req.path === '/api/scores' || c.req.path === '/api/me/hero'
+    c.req.path === '/api/songs/import' || c.req.path === '/api/scores' || c.req.path === '/api/me/hero' || c.req.path === '/api/audio'
       ? next()
       : bodyLimit({ maxSize: 1 * KB * KB, onError: tooLarge })(c, next),
   )

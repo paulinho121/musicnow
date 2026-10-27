@@ -34,6 +34,7 @@ import {
   AudioWaveform,
   Music2,
   Timer,
+  Headphones,
   LogOut,
   Minus,
   MoveHorizontal,
@@ -666,6 +667,13 @@ export function SongViewer({ songId, setlist }: { songId: string; setlist?: Setl
               {song.scores?.length ? 'Adicionar outra parte' : 'Anexar partitura (.gp, .gp5 ou PDF)'}
             </button>
           )}
+          {/* Sala de ensaio: tocar junto com o vídeo ou o áudio guia (velocidade, tom e loop). */}
+          <Link
+            to={`/musicas/${song.id}/ensaio`}
+            className="btn-ghost flex h-8 items-center gap-1.5 px-2.5 text-xs text-muted hover:text-text"
+          >
+            <Headphones className="size-3.5 text-accent" /> Sala de ensaio
+          </Link>
         </div>
 
         {viewMode === 'score' && song.scores && song.scores.length > 0 ? (
