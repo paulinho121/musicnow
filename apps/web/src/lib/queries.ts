@@ -119,6 +119,19 @@ export function useSavePersonalKey(id: string) {
   })
 }
 
+/** Sala de ensaio: anotações e link do YouTube da pessoa. */
+export function useSavePractice(id: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (input: { notes?: string | null; url?: string | null }) =>
+      api<{ practiceNotes?: string | null; practiceUrl?: string | null; referenceUrl: string | null }>(`/songs/${id}/practice`, {
+        method: 'PUT',
+        json: input,
+      }),
+    onSuccess: (res) => qc.setQueriesData<SongDetail>({ queryKey: ['song', id] }, (s) => (s ? { ...s, ...res } : s)),
+  })
+}
+
 export function useSaveProfile() {
   const qc = useQueryClient()
   return useMutation({

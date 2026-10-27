@@ -91,3 +91,24 @@ describe('áudio guia', () => {
     expect((await json(await call(dono, 'GET', `/audio/song/${songId}`))).data.audio).toBeNull()
   })
 })
+
+describe('anotações e link do YouTube na Sala de ensaio', () => {
+  it('cada um guarda as próprias; o dono sem gravação de referência ganha o link na música', async () => {
+    const r = await json(
+      await call(dono, 'PUT', `/songs/${songId}/practice`, { notes: '[0:42] errei a virada', url: 'https://youtu.be/KJzBxJ8ExRk' }),
+    )
+    expect(r.status).toBe(200)
+    const song = await json(await call(dono, 'GET', `/songs/${songId}`))
+    expect(song.data).toMatchObject({ practiceNotes: '[0:42] errei a virada', practiceUrl: 'https://youtu.be/KJzBxJ8ExRk' })
+    expect(song.data.referenceUrl).toContain('KJzBxJ8ExRk')
+  })
+
+  it('link que não é do YouTube é recusado; quem não vê a música não grava', async () => {
+    expect((await call(dono, 'PUT', `/songs/${songId}/practice`, { url: 'https://example.com/x' })).status).toBe(400)
+    expect((await call(outro, 'PUT', `/songs/${songId}/practice`, { notes: 'x' })).status).toBe(404)
+    // Apagar as anotações e o link.
+    await call(dono, 'PUT', `/songs/${songId}/practice`, { notes: '', url: '' })
+    const song = await json(await call(dono, 'GET', `/songs/${songId}`))
+    expect(song.data).toMatchObject({ practiceNotes: null, practiceUrl: null })
+  })
+})

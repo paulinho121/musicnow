@@ -412,6 +412,10 @@ export const songUserState = pgTable(
       .notNull()
       .references(() => song.id, { onDelete: 'cascade' }),
     personalKey: text(),
+    /** Sala de ensaio: anotações da pessoa sobre a música (só ela vê). */
+    practiceNotes: text(),
+    /** Sala de ensaio: link do YouTube que a pessoa usa para treinar (só ela vê). */
+    practiceUrl: text(),
     lastViewedAt: timestamp({ withTimezone: true }),
     viewCount: integer().notNull().default(0),
   },

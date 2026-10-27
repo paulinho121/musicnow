@@ -1,4 +1,4 @@
-import { atLeast, guessKey, isChord, isShortMusicLink, normalizeSearch, parseMusicLink, PUBLIC_LICENSES, stripLyrics, cleanSheetText } from '@ensaio/shared'
+import { atLeast, guessKey, isChord, isShortMusicLink, normalizeSearch, parseMusicLink, PUBLIC_LICENSES, stripLyrics, cleanSheetText, youtubeId } from '@ensaio/shared'
 import { and, asc, desc, eq, exists, ilike, isNull, or, sql, type SQL } from 'drizzle-orm'
 import { Hono } from 'hono'
 import { HTTPException } from 'hono/http-exception'
@@ -424,6 +424,8 @@ export const songsRoutes = new Hono<AppEnv>()
         isFavorite: row.isFavorite,
         canEdit: isOwner,
         personalKey: state?.personalKey ?? null,
+        practiceNotes: state?.practiceNotes ?? null,
+        practiceUrl: state?.practiceUrl ?? null,
         marks: marks.map((m) => ({ ...m.mark, authorName: m.authorName })),
         scores,
         /** Recebida pelo link de compartilhamento (pode sair dela). */
@@ -615,6 +617,48 @@ export const songsRoutes = new Hono<AppEnv>()
           set: { personalKey: personalKey ?? null },
         })
       return c.json({ personalKey: personalKey ?? null })
+    },
+  )
+
+  // Sala de ensaio: anotações e link do YouTube de cada pessoa (só ela vê). Quem cadastrou a
+  // música e ainda não tem gravação de referência passa a ter esse link para a banda também.
+  .put(
+    '/:id/practice',
+    validate('param', z.object({ id: z.string().uuid() })),
+    validate(
+      'json',
+      z.object({
+        notes: z.string().max(5000).nullish(),
+        url: z
+          .string()
+          .trim()
+          .max(500)
+          .refine((u) => u === '' || Boolean(youtubeId(u)), 'Cole um link do YouTube.')
+          .nullish(),
+      }),
+    ),
+    async (c) => {
+      const uid = c.var.user.id
+      const { id } = c.req.valid('param')
+      const { notes, url } = c.req.valid('json')
+      const [visible] = await db
+        .select({ ownerId: song.ownerId, referenceUrl: song.referenceUrl })
+        .from(song)
+        .where(and(eq(song.id, id), canViewSong(uid)))
+      if (!visible) notFound('Música')
+      const patch: { practiceNotes?: string | null; practiceUrl?: string | null } = {}
+      if (notes !== undefined) patch.practiceNotes = notes?.trim() ? notes : null
+      if (url !== undefined) patch.practiceUrl = url || null
+      await db
+        .insert(songUserState)
+        .values({ userId: uid, songId: id, ...patch })
+        .onConflictDoUpdate({ target: [songUserState.userId, songUserState.songId], set: patch })
+      let referenceUrl = visible.referenceUrl
+      if (url && visible.ownerId === uid && !visible.referenceUrl) {
+        referenceUrl = (await normalizeReference(url)) ?? url
+        await db.update(song).set({ referenceUrl }).where(eq(song.id, id))
+      }
+      return c.json({ ...patch, referenceUrl })
     },
   )
 

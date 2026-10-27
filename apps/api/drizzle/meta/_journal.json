@@ -169,6 +169,13 @@
       "when": 1791998958666,
       "tag": "0023_pagina_banda",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1793110662464,
+      "tag": "0024_sala_anotacoes",
+      "breakpoints": true
     }
   ]
 }

@@ -3,6 +3,10 @@ import clsx from 'clsx'
 import {
   ArrowLeft,
   Bookmark,
+  Check,
+  Clock,
+  Link2,
+  NotebookPen,
   FileAudio,
   Loader2,
   Minus,
@@ -20,7 +24,7 @@ import { type ChangeEvent, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router'
 import { ChordSheet, useSheet } from '../components/ChordSheet'
 import { ErrorState, PageSpinner, useToast } from '../components/ui'
-import { useSong } from '../lib/queries'
+import { useSavePractice, useSong } from '../lib/queries'
 import {
   type Player,
   useAudioPlayer,
@@ -70,7 +74,8 @@ export function RehearsalRoom() {
   })
   const set = <K extends keyof Practice>(k: K, v: Practice[K]) => setPrefs((p) => ({ ...p, [k]: v }))
 
-  const ytId = youtubeId(song?.referenceUrl)
+  // O link da própria pessoa (Sala de ensaio) vale antes da gravação de referência da música.
+  const ytId = youtubeId(song?.practiceUrl) ?? youtubeId(song?.referenceUrl)
   const audio = audioInfo?.audio ?? null
   const available: Source[] = [...(ytId ? (['youtube'] as const) : []), ...(audio ? (['audio'] as const) : [])]
   const source: Source | null = prefs.source && available.includes(prefs.source) ? prefs.source : (available[0] ?? null)
@@ -157,6 +162,8 @@ export function RehearsalRoom() {
       </header>
 
       <main className="mx-auto max-w-4xl space-y-4 px-3 pt-4">
+        <YoutubeLinkCard songId={id} hasVideo={Boolean(ytId)} current={song.practiceUrl ?? (ytId ? song.referenceUrl : null)} />
+
         {/* Fonte */}
         {source === 'youtube' && ytId && (
           <div className="aspect-video overflow-hidden rounded-2xl border border-border bg-black">
@@ -169,6 +176,12 @@ export function RehearsalRoom() {
               allowFullScreen
             />
           </div>
+        )}
+        {source === 'youtube' && yt.error !== null && (
+          <p className="rounded-xl border border-danger/40 bg-danger/10 px-3 py-2 text-sm">
+            Esse vídeo não pode tocar aqui: o dono bloqueou a reprodução fora do YouTube ou ele saiu do ar. Toque em "Trocar o vídeo do
+            YouTube" e cole outra versão (ao vivo, cover, aula).
+          </p>
         )}
         <AudioCard songId={id} audio={audio} canEdit={Boolean(audioInfo?.canEdit)} active={source === 'audio'} hasYoutube={Boolean(ytId)} />
 
@@ -266,6 +279,8 @@ export function RehearsalRoom() {
             <LoopCard player={player} prefs={prefs} setPrefs={setPrefs} />
           </>
         )}
+
+        <NotesCard songId={id} initial={song.practiceNotes ?? ''} player={source ? player : null} />
 
         {song.content.trim() && (
           <section className="card p-4">
@@ -494,6 +509,166 @@ function AudioCard({
         </div>
       )}
       {fileInput}
+    </section>
+  )
+}
+
+/** Link do YouTube para ensaiar: colar, trocar ou tirar (fica guardado para a pessoa). */
+function YoutubeLinkCard({ songId, hasVideo, current }: { songId: string; hasVideo: boolean; current: string | null }) {
+  const save = useSavePractice(songId)
+  const toast = useToast()
+  const [open, setOpen] = useState(!hasVideo)
+  const [url, setUrl] = useState('')
+  useEffect(() => setOpen(!hasVideo), [hasVideo])
+
+  const submit = (value: string) => {
+    if (value && !youtubeId(value)) return toast('Cole um link do YouTube (youtube.com ou youtu.be).', 'error')
+    save.mutate(
+      { url: value },
+      {
+        onSuccess: () => {
+          setUrl('')
+          setOpen(false)
+          toast(value ? 'Vídeo do YouTube adicionado.' : 'Link removido.')
+        },
+        onError: (err) => toast(err.message, 'error'),
+      },
+    )
+  }
+
+  if (!open)
+    return (
+      <div className="flex justify-end">
+        <button className="flex items-center gap-1.5 text-xs text-muted hover:text-text" onClick={() => setOpen(true)}>
+          <Link2 className="size-3.5" /> Trocar o vídeo do YouTube
+        </button>
+      </div>
+    )
+  return (
+    <section className="card p-4">
+      <p className="flex items-center gap-2 text-sm font-semibold">
+        <Link2 className="size-4 text-accent" /> {hasVideo ? 'Trocar o vídeo do YouTube' : 'Vídeo do YouTube para ensaiar'}
+      </p>
+      <p className="mt-0.5 text-xs text-muted">Cole o link de uma versão no YouTube (ao vivo, aula, cover). Fica guardado para você.</p>
+      <form
+        className="mt-3 flex gap-2"
+        onSubmit={(e) => {
+          e.preventDefault()
+          submit(url.trim())
+        }}
+      >
+        <input
+          className="input"
+          type="url"
+          inputMode="url"
+          value={url}
+          onChange={(e) => setUrl(e.target.value)}
+          placeholder="https://youtu.be/…"
+          aria-label="Link do YouTube"
+        />
+        <button className="btn-primary shrink-0" disabled={save.isPending || !url.trim()}>
+          {save.isPending ? <Loader2 className="size-4 animate-spin" /> : 'Usar'}
+        </button>
+      </form>
+      <div className="mt-2 flex justify-between gap-3 text-xs">
+        {current ? (
+          <button className="text-muted hover:text-danger" onClick={() => submit('')} disabled={save.isPending}>
+            Tirar o meu link
+          </button>
+        ) : (
+          <span />
+        )}
+        {hasVideo && (
+          <button className="text-muted hover:text-text" onClick={() => setOpen(false)}>
+            Cancelar
+          </button>
+        )}
+      </div>
+    </section>
+  )
+}
+
+/** Minhas observações da música: salvam sozinhas; dá para inserir o tempo atual ([1:23]). */
+function NotesCard({ songId, initial, player }: { songId: string; initial: string; player: Player | null }) {
+  const save = useSavePractice(songId)
+  const [text, setText] = useState(initial)
+  const [state, setState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
+  const area = useRef<HTMLTextAreaElement>(null)
+  const lastSaved = useRef(initial)
+
+  // Salva 1 segundo depois de parar de digitar.
+  useEffect(() => {
+    if (text === lastSaved.current) return
+    const t = setTimeout(() => {
+      setState('saving')
+      save.mutate(
+        { notes: text },
+        {
+          onSuccess: () => {
+            lastSaved.current = text
+            setState('saved')
+          },
+          onError: () => setState('error'),
+        },
+      )
+    }, 1000)
+    return () => clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [text])
+
+  const insertTime = () => {
+    if (!player) return
+    const tag = `[${fmt(player.now())}] `
+    const el = area.current
+    const pos = el?.selectionStart ?? text.length
+    // Começa numa linha nova, se o cursor estiver no meio de uma.
+    const before = text.slice(0, pos)
+    const prefix = before && !before.endsWith('\n') ? '\n' : ''
+    const next = before + prefix + tag + text.slice(pos)
+    setText(next)
+    requestAnimationFrame(() => {
+      const at = pos + prefix.length + tag.length
+      el?.focus()
+      el?.setSelectionRange(at, at)
+    })
+  }
+
+  return (
+    <section className="card p-4">
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <p className="flex items-center gap-2 text-sm font-semibold">
+          <NotebookPen className="size-4 text-accent" /> Minhas observações
+        </p>
+        <span className="text-xs text-muted">
+          {state === 'saving' && 'Salvando…'}
+          {state === 'saved' && (
+            <span className="inline-flex items-center gap-1 text-ok">
+              <Check className="size-3.5" /> Salvo
+            </span>
+          )}
+          {state === 'error' && <span className="text-danger">Não salvou. Confira a internet.</span>}
+        </span>
+      </div>
+      <textarea
+        ref={area}
+        className="input min-h-32 resize-y py-2.5 leading-relaxed"
+        value={text}
+        onChange={(e) => {
+          setText(e.target.value)
+          setState('idle')
+        }}
+        maxLength={5000}
+        placeholder="O que treinar nesta música: a virada do refrão, a levada do baixo, onde respirar…"
+        aria-label="Minhas observações"
+      />
+      <div className="mt-2 flex items-center justify-between gap-2">
+        <span className="text-xs text-muted">Só você vê.</span>
+        {player && (
+          <button className="btn-ghost h-8 px-3 text-xs" onClick={insertTime} disabled={!player.duration}>
+            <Clock className="size-3.5" /> Inserir o tempo atual
+          </button>
+        )}
+      </div>
     </section>
   )
 }

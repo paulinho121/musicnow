@@ -33,8 +33,13 @@ const YT_ORIGINS = ['https://www.youtube-nocookie.com', 'https://www.youtube.com
 export const youtubeEmbedUrl = (id: string) =>
   `https://www.youtube-nocookie.com/embed/${id}?enablejsapi=1&playsinline=1&rel=0&modestbranding=1&origin=${encodeURIComponent(location.origin)}`
 
-export function useYouTubePlayer(iframe: RefObject<HTMLIFrameElement | null>, videoId: string | null): Player & { rates: number[] } {
+export function useYouTubePlayer(
+  iframe: RefObject<HTMLIFrameElement | null>,
+  videoId: string | null,
+): Player & { rates: number[]; error: number | null } {
   const [state, setState] = useState(INITIAL)
+  /** Erro do YouTube (101/150: o dono do vídeo não deixa tocar fora do YouTube; 100: não existe). */
+  const [error, setError] = useState<number | null>(null)
   const [rates, setRates] = useState<number[]>([0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2])
   const last = useRef({ time: 0, at: 0, playing: false, rate: 1 })
 
@@ -47,6 +52,7 @@ export function useYouTubePlayer(iframe: RefObject<HTMLIFrameElement | null>, vi
   useEffect(() => {
     if (!videoId) return
     setState(INITIAL)
+    setError(null)
     let ready = false
     // Pede para o player começar a mandar notícias (repete até ele responder).
     const hello = setInterval(() => {
@@ -62,6 +68,7 @@ export function useYouTubePlayer(iframe: RefObject<HTMLIFrameElement | null>, vi
         return
       }
       if (data.event === 'onReady' || data.event === 'initialDelivery') ready = true
+      if (data.event === 'onError') setError(Number((data as { info?: unknown }).info) || 150)
       const info = data.info
       if (!info || typeof info !== 'object') return
       ready = true
@@ -86,6 +93,7 @@ export function useYouTubePlayer(iframe: RefObject<HTMLIFrameElement | null>, vi
   return {
     ...state,
     rates,
+    error,
     play: () => send('playVideo'),
     pause: () => send('pauseVideo'),
     seek: (t) => {

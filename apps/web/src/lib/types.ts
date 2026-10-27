@@ -97,6 +97,9 @@ export interface SongDetail extends SongInput {
   isFavorite: boolean
   canEdit: boolean
   personalKey: string | null
+  /** Sala de ensaio: anotações e link do YouTube da pessoa (só ela vê). */
+  practiceNotes: string | null
+  practiceUrl: string | null
   /** A letra foi removida pelo servidor (sem autorização de exibição). */
   lyricsHidden: boolean
   importedFrom: ImportFormat | null
