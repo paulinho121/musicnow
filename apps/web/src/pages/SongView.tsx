@@ -24,6 +24,8 @@ import {
   ChevronRight,
   EllipsisVertical,
   Expand,
+  Maximize2,
+  Minimize2,
   FileDown,
   FileText,
   FileUp,
@@ -109,6 +111,8 @@ const VIEWER_DEFAULTS = {
   view: 'chord' as 'chord' | 'score',
   /** Pedal Bluetooth: rola a cifra (no fim, passa de música) ou troca de música direto. */
   pedal: 'scroll' as 'scroll' | 'song',
+  /** Modo foco: só a cifra e a barra de comandos (vale para as próximas músicas até sair). */
+  focus: false,
 }
 
 /** Teclas que os pedais e controles Bluetooth enviam (modos mais comuns). */
@@ -317,11 +321,38 @@ export function SongViewer({ songId, setlist }: { songId: string; setlist?: Setl
   const headerHidden = useHideOnScroll() && !markMode
   useWakeLock(Boolean(song))
 
+  const focus = Boolean(prefs.focus) && !markMode
+  // A tela cheia aberta pelo modo foco: ao sair dela (Esc do navegador), sai do foco também.
+  const fsByFocus = useRef(false)
+  const setFocus = useCallback(
+    (on: boolean) => {
+      setPrefs((p) => ({ ...p, focus: on }))
+      setPanelOpen(false)
+      if (on && !document.fullscreenElement && document.documentElement.requestFullscreen) {
+        document.documentElement.requestFullscreen().then(
+          () => (fsByFocus.current = true),
+          () => {},
+        )
+      } else if (!on && fsByFocus.current && document.fullscreenElement) {
+        fsByFocus.current = false
+        document.exitFullscreen().catch(() => {})
+      }
+    },
+    [setPrefs],
+  )
+
   useEffect(() => {
-    const onFs = () => setFullscreen(Boolean(document.fullscreenElement))
+    const onFs = () => {
+      const on = Boolean(document.fullscreenElement)
+      setFullscreen(on)
+      if (!on && fsByFocus.current) {
+        fsByFocus.current = false
+        setPrefs((p) => ({ ...p, focus: false }))
+      }
+    }
     document.addEventListener('fullscreenchange', onFs)
     return () => document.removeEventListener('fullscreenchange', onFs)
-  }, [])
+  }, [setPrefs])
 
   // Teclado e pedais Bluetooth (que enviam setas / PageDown). No fim da página,
   // "avançar" passa para a próxima música do repertório.
@@ -331,6 +362,7 @@ export function SongViewer({ songId, setlist }: { songId: string; setlist?: Setl
     const onKey = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement) return
       if (KEY_LABEL[e.key]) setLastKey(e.key)
+      if (e.key === 'Escape' && focus) return setFocus(false)
       if (e.key === ' ' || e.key === 'Enter') {
         // Enter só quando não há botão em foco (senão o Enter é do botão).
         if (e.key === 'Enter' && e.target instanceof HTMLButtonElement) return
@@ -349,7 +381,7 @@ export function SongViewer({ songId, setlist }: { songId: string; setlist?: Setl
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [locked, shift, next, prev, pedal])
+  }, [locked, shift, next, prev, pedal, focus, setFocus])
 
   if (isLoading) return <PageSpinner />
   if (error || !song)
@@ -404,277 +436,312 @@ export function SongViewer({ songId, setlist }: { songId: string; setlist?: Setl
 
   return (
     <div className="min-h-dvh pb-36">
-      <header
-        className={clsx(
-          'sticky top-0 z-30 border-b border-border bg-bg/95 backdrop-blur transition-transform duration-200',
-          headerHidden && '-translate-y-full',
-        )}
-      >
-        {setlist && (
-          <div className="flex items-center gap-1 border-b border-border bg-surface/60 px-2 py-1">
-            <button
-              className="btn-icon size-9 shrink-0 border-transparent bg-transparent"
-              onClick={setlist.onExit}
-              aria-label="Voltar ao repertório"
-            >
-              <ListMusic className="size-4" />
-            </button>
-            <p className="min-w-0 flex-1 truncate text-xs text-muted">
-              <b className="text-text">{setlist.name}</b> · {setlist.position + 1} de {setlist.total}
-            </p>
-            <button className="btn-icon size-9 shrink-0" onClick={prev?.go} disabled={!prev} aria-label="Música anterior">
-              <ChevronLeft className="size-4" />
-            </button>
-            <button className="btn-icon size-9 shrink-0" onClick={next?.go} disabled={!next} aria-label="Próxima música">
-              <ChevronRight className="size-4" />
-            </button>
-          </div>
-        )}
-        {setlist?.live && <LiveStrip live={setlist.live} />}
-        <div className="mx-auto flex max-w-4xl items-center gap-1 px-2 py-2">
-          <button
-            className="btn-icon shrink-0 border-transparent bg-transparent"
-            aria-label="Voltar"
-            onClick={() => (setlist ? setlist.onExit() : window.history.length > 1 ? navigate(-1) : navigate('/musicas'))}
-          >
-            <ArrowLeft className="size-5" />
-          </button>
-          <div className="min-w-0 flex-1">
-            <h1 className="line-clamp-2 text-base leading-tight font-bold break-words sm:truncate md:text-lg">{song.title}</h1>
-            <p className="truncate text-sm text-muted">{song.artist}</p>
-          </div>
-          <button
-            className="btn-icon shrink-0 border-transparent bg-transparent"
-            aria-label={song.isFavorite ? 'Remover dos favoritos' : 'Favoritar'}
-            aria-pressed={song.isFavorite}
-            onClick={() => fav.mutate({ id: song.id, value: !song.isFavorite })}
-          >
-            <Star className={clsx('size-5', song.isFavorite ? 'fill-accent text-accent' : '')} />
-          </button>
-          <button
-            className={clsx('btn-icon shrink-0', markMode ? 'border-accent bg-accent/15 text-accent' : 'border-transparent bg-transparent')}
-            aria-label={markMode ? 'Sair do modo de marcar' : 'Marcar trechos'}
-            aria-pressed={markMode}
-            onClick={() => {
-              setMarkMode((m) => !m)
-              setScrolling(false)
-            }}
-          >
-            <Tag className="size-5" />
-          </button>
-          {/* "Tocando agora" nos Stories/Status: para todos, também dentro do repertório. */}
-          <button
-            className="btn-icon shrink-0 border-transparent bg-transparent"
-            aria-label="Postar tocando agora"
-            title="Postar “Tocando agora” nos Stories ou no Status"
-            onClick={() => setNowOpen(true)}
-          >
-            <Share className="size-5" />
-          </button>
-          {!setlist && (
-            <AddToSetlistButton
-              songId={song.id}
-              songTitle={song.title}
-              isPrivate={song.visibility === 'private'}
-              className="hidden sm:inline-flex"
-              open={addOpen}
-              onOpenChange={setAddOpen}
-            />
+      {focus ? (
+        // Modo foco: só a faixa do Modo Palco (quem segue precisa ver se está conectado).
+        setlist?.live && (
+          <header className="sticky top-0 z-30 border-b border-border bg-bg/95 backdrop-blur">
+            <LiveStrip live={setlist.live} />
+          </header>
+        )
+      ) : (
+        <header
+          className={clsx(
+            'sticky top-0 z-30 border-b border-border bg-bg/95 backdrop-blur transition-transform duration-200',
+            headerHidden && '-translate-y-full',
           )}
-          {song.canEdit && !setlist && (
-            <button
-              className="btn-icon hidden shrink-0 border-transparent bg-transparent sm:inline-flex"
-              aria-label="Compartilhar música"
-              title="Compartilhar com outra pessoa"
-              onClick={() => setShareOpen(true)}
-            >
-              <Share2 className="size-5" />
-            </button>
-          )}
-          {song.canEdit && !setlist && (
-            <Link
-              to={`/musicas/${song.id}/editar`}
-              className="btn-icon hidden shrink-0 border-transparent bg-transparent sm:inline-flex"
-              aria-label="Editar"
-            >
-              <Pencil className="size-5" />
-            </Link>
-          )}
-          {song.scores && song.scores.length > 0 && (
-            <button
-              className={clsx(
-                'btn-icon shrink-0',
-                viewMode === 'score' ? 'border-accent bg-accent/15 text-accent' : 'border-transparent bg-transparent',
-              )}
-              aria-label={viewMode === 'score' ? 'Ver cifra' : 'Ver partitura'}
-              title={viewMode === 'score' ? 'Ver cifra' : 'Ver partitura'}
-              onClick={() => setViewMode(viewMode === 'score' ? 'chord' : 'score')}
-            >
-              <FileText className="size-5" />
-            </button>
-          )}
-          {/* Celular: as ações menos usadas ficam num menu, para o título ter espaço. */}
-          {!setlist && (
-            <button
-              className="btn-icon shrink-0 border-transparent bg-transparent sm:hidden"
-              aria-label="Mais opções"
-              onClick={() => setMoreOpen(true)}
-            >
-              <EllipsisVertical className="size-5" />
-            </button>
-          )}
-        </div>
-
-        {markMode ? (
-          <p className="bg-accent/10 px-4 py-2 text-center text-xs text-accent">
-            Toque numa linha para marcar · toque numa marcação para apagar
-          </p>
-        ) : (
-          sections.length > 1 && (
-            <nav aria-label="Seções" className="mx-auto flex max-w-4xl gap-2 overflow-x-auto px-3 pb-2 [scrollbar-width:none]">
-              {sections.map((s) => (
-                <button
-                  key={s.index}
-                  className="chip h-8 shrink-0 text-xs"
-                  onClick={() => {
-                    document.getElementById(`linha-${s.index}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-                    // No comando, a seção vai também para a tela de toda a banda.
-                    if (setlist?.live?.isLeader && setlist.live.stage) setlist.live.onSection(s.index)
-                  }}
-                >
-                  {s.label}
-                </button>
-              ))}
-            </nav>
-          )
-        )}
-      </header>
-
-      <div className="mx-auto max-w-4xl px-4 pt-4">
-        {/* Destaque: capa, nome e as informações para tocar */}
-        <section className="relative mb-5 overflow-hidden rounded-3xl border border-border bg-surface">
-          <CoverGlow song={song} />
-          <div className="relative flex items-center gap-4 p-4 sm:gap-6 sm:p-6">
-            <SongCover
-              song={song}
-              hd
-              className={clsx('rounded-2xl shadow-2xl shadow-black/50', setlist ? 'size-20 sm:size-28' : 'size-24 sm:size-36')}
-            />
-            <div className="min-w-0 flex-1">
-              {setlist?.block ? (
-                // No show: em que bloco a banda está (com a cor do bloco)
-                <p
-                  className="flex flex-wrap items-center gap-x-1.5 text-[11px] font-bold tracking-widest uppercase"
-                  style={{ color: setlist.block.color }}
-                >
-                  {setlist.block.name}
-                  <span className="font-semibold tracking-normal text-muted normal-case">
-                    {[setlist.block.subtitle, `${setlist.block.song} de ${setlist.block.songs}`].filter(Boolean).join(' · ')}
-                  </span>
-                </p>
-              ) : (
-                <p className="text-[11px] font-bold tracking-widest text-muted uppercase">{song.style ?? 'Música'}</p>
-              )}
-              <h2 className="mt-0.5 line-clamp-2 text-xl leading-tight font-extrabold tracking-tight break-words sm:text-3xl">
-                {song.title}
-              </h2>
-              <p className="mt-0.5 truncate text-sm text-muted">
-                {[song.artist, song.composer && song.composer !== song.artist ? song.composer : null].filter(Boolean).join(' · ')}
+        >
+          {setlist && (
+            <div className="flex items-center gap-1 border-b border-border bg-surface/60 px-2 py-1">
+              <button
+                className="btn-icon size-9 shrink-0 border-transparent bg-transparent"
+                onClick={setlist.onExit}
+                aria-label="Voltar ao repertório"
+              >
+                <ListMusic className="size-4" />
+              </button>
+              <p className="min-w-0 flex-1 truncate text-xs text-muted">
+                <b className="text-text">{setlist.name}</b> · {setlist.position + 1} de {setlist.total}
               </p>
-              <div className="mt-3 flex flex-wrap gap-1.5 text-xs">
-                {setlist?.itemKey && (
-                  <HeroChip>
-                    Repertório <b className="font-mono text-chord">{setlist.itemKey}</b>
-                  </HeroChip>
-                )}
-                {original && (
-                  <HeroChip>
-                    Original <b className="font-mono">{spellKey(original, accidentals)}</b>
-                  </HeroChip>
-                )}
-                {song.personalKey && !setlist && (
-                  <HeroChip>
-                    Meu tom <b className="font-mono text-chord">{song.personalKey}</b>
-                  </HeroChip>
-                )}
-                {song.bpm && <HeroChip>{song.bpm} BPM</HeroChip>}
-                {song.timeSignature && <HeroChip>{song.timeSignature}</HeroChip>}
-                {setlist?.liveKey && (
-                  <HeroChip>
-                    <span className="size-1.5 rounded-full bg-danger" /> Ao vivo <b className="font-mono text-chord">{setlist.liveKey}</b>
-                  </HeroChip>
-                )}
-              </div>
-              <UsageBadge usagePeople={song.usagePeople} usageSetlists={song.usageSetlists} className="mt-2.5 text-xs font-medium" />
-            </div>
-          </div>
-        </section>
-        {song.referenceUrl && (
-          <div className="-mt-1 mb-4">
-            <ReferencePlayer url={song.referenceUrl} title={song.title} />
-          </div>
-        )}
-        {setlist?.itemNotes && (
-          <p className="mb-3 rounded-xl border-l-4 border-sec-intro bg-sec-intro/10 px-3 py-2 text-sm">
-            <b>Neste repertório:</b> {setlist.itemNotes}
-          </p>
-        )}
-        {song.notes && <p className="mb-4 rounded-xl border-l-4 border-accent bg-accent/10 px-3 py-2 text-sm">{song.notes}</p>}
-        {hideLyrics && (
-          <p className="mb-4 rounded-xl bg-surface-2 px-3 py-2 text-sm text-muted">
-            A letra desta música não está autorizada para exibição. Mostrando apenas acordes e seções.
-          </p>
-        )}
-
-        {/* Alternador de visualização e ação de partitura */}
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-          {song.scores && song.scores.length > 0 ? (
-            <div className="flex items-center gap-1.5">
-              <button
-                type="button"
-                className={clsx(
-                  'chip h-9 px-4 text-xs font-semibold sm:text-sm flex items-center gap-1.5 transition',
-                  viewMode === 'chord' ? 'chip-on' : 'hover:border-accent/40',
-                )}
-                onClick={() => setViewMode('chord')}
-              >
-                Cifra
+              <button className="btn-icon size-9 shrink-0" onClick={prev?.go} disabled={!prev} aria-label="Música anterior">
+                <ChevronLeft className="size-4" />
               </button>
-              <button
-                type="button"
-                className={clsx(
-                  'chip h-9 px-4 text-xs font-semibold sm:text-sm flex items-center gap-1.5 transition',
-                  viewMode === 'score' ? 'chip-on' : 'hover:border-accent/40',
-                )}
-                onClick={() => setViewMode('score')}
-              >
-                <FileText className="size-4" />
-                Ver partitura {song.scores.length > 1 ? `(${song.scores.length})` : ''}
+              <button className="btn-icon size-9 shrink-0" onClick={next?.go} disabled={!next} aria-label="Próxima música">
+                <ChevronRight className="size-4" />
               </button>
             </div>
-          ) : null}
-
-          {song.canEdit && !setlist && (
-            <button
-              type="button"
-              className={clsx(
-                'btn-ghost h-8 px-2.5 text-xs text-muted hover:text-text flex items-center gap-1.5',
-                song.scores?.length ? 'ml-auto' : '',
-              )}
-              onClick={() => setUploadScoreOpen(true)}
-            >
-              <FileUp className="size-3.5 text-accent" />
-              {song.scores?.length ? 'Adicionar outra parte' : 'Anexar partitura (.gp, .gp5 ou PDF)'}
-            </button>
           )}
-          {/* Sala de ensaio: tocar junto com o vídeo ou o áudio guia (velocidade, tom e loop). */}
-          <Link
-            to={`/musicas/${song.id}/ensaio`}
-            className="btn-ghost flex h-8 items-center gap-1.5 px-2.5 text-xs text-muted hover:text-text"
-          >
-            <Headphones className="size-3.5 text-accent" /> Sala de ensaio
-          </Link>
-        </div>
+          {setlist?.live && <LiveStrip live={setlist.live} />}
+          <div className="mx-auto flex max-w-4xl items-center gap-1 px-2 py-2">
+            <button
+              className="btn-icon shrink-0 border-transparent bg-transparent"
+              aria-label="Voltar"
+              onClick={() => (setlist ? setlist.onExit() : window.history.length > 1 ? navigate(-1) : navigate('/musicas'))}
+            >
+              <ArrowLeft className="size-5" />
+            </button>
+            <div className="min-w-0 flex-1">
+              <h1 className="line-clamp-2 text-base leading-tight font-bold break-words sm:truncate md:text-lg">{song.title}</h1>
+              <p className="truncate text-sm text-muted">{song.artist}</p>
+            </div>
+            <button
+              className="btn-icon shrink-0 border-transparent bg-transparent"
+              aria-label="Modo foco: só a cifra e os comandos"
+              title="Modo foco: só a cifra e os comandos"
+              onClick={() => setFocus(true)}
+            >
+              <Maximize2 className="size-5" />
+            </button>
+            <button
+              className="btn-icon shrink-0 border-transparent bg-transparent"
+              aria-label={song.isFavorite ? 'Remover dos favoritos' : 'Favoritar'}
+              aria-pressed={song.isFavorite}
+              onClick={() => fav.mutate({ id: song.id, value: !song.isFavorite })}
+            >
+              <Star className={clsx('size-5', song.isFavorite ? 'fill-accent text-accent' : '')} />
+            </button>
+            <button
+              className={clsx('btn-icon shrink-0', markMode ? 'border-accent bg-accent/15 text-accent' : 'border-transparent bg-transparent')}
+              aria-label={markMode ? 'Sair do modo de marcar' : 'Marcar trechos'}
+              aria-pressed={markMode}
+              onClick={() => {
+                setMarkMode((m) => !m)
+                setScrolling(false)
+              }}
+            >
+              <Tag className="size-5" />
+            </button>
+            {/* "Tocando agora" nos Stories/Status: para todos, também dentro do repertório. */}
+            <button
+              className="btn-icon shrink-0 border-transparent bg-transparent"
+              aria-label="Postar tocando agora"
+              title="Postar “Tocando agora” nos Stories ou no Status"
+              onClick={() => setNowOpen(true)}
+            >
+              <Share className="size-5" />
+            </button>
+            {!setlist && (
+              <AddToSetlistButton
+                songId={song.id}
+                songTitle={song.title}
+                isPrivate={song.visibility === 'private'}
+                className="hidden sm:inline-flex"
+                open={addOpen}
+                onOpenChange={setAddOpen}
+              />
+            )}
+            {song.canEdit && !setlist && (
+              <button
+                className="btn-icon hidden shrink-0 border-transparent bg-transparent sm:inline-flex"
+                aria-label="Compartilhar música"
+                title="Compartilhar com outra pessoa"
+                onClick={() => setShareOpen(true)}
+              >
+                <Share2 className="size-5" />
+              </button>
+            )}
+            {song.canEdit && !setlist && (
+              <Link
+                to={`/musicas/${song.id}/editar`}
+                className="btn-icon hidden shrink-0 border-transparent bg-transparent sm:inline-flex"
+                aria-label="Editar"
+              >
+                <Pencil className="size-5" />
+              </Link>
+            )}
+            {song.scores && song.scores.length > 0 && (
+              <button
+                className={clsx(
+                  'btn-icon shrink-0',
+                  viewMode === 'score' ? 'border-accent bg-accent/15 text-accent' : 'border-transparent bg-transparent',
+                )}
+                aria-label={viewMode === 'score' ? 'Ver cifra' : 'Ver partitura'}
+                title={viewMode === 'score' ? 'Ver cifra' : 'Ver partitura'}
+                onClick={() => setViewMode(viewMode === 'score' ? 'chord' : 'score')}
+              >
+                <FileText className="size-5" />
+              </button>
+            )}
+            {/* Celular: as ações menos usadas ficam num menu, para o título ter espaço. */}
+            {!setlist && (
+              <button
+                className="btn-icon shrink-0 border-transparent bg-transparent sm:hidden"
+                aria-label="Mais opções"
+                onClick={() => setMoreOpen(true)}
+              >
+                <EllipsisVertical className="size-5" />
+              </button>
+            )}
+          </div>
+
+          {markMode ? (
+            <p className="bg-accent/10 px-4 py-2 text-center text-xs text-accent">
+              Toque numa linha para marcar · toque numa marcação para apagar
+            </p>
+          ) : (
+            sections.length > 1 && (
+              <nav aria-label="Seções" className="mx-auto flex max-w-4xl gap-2 overflow-x-auto px-3 pb-2 [scrollbar-width:none]">
+                {sections.map((s) => (
+                  <button
+                    key={s.index}
+                    className="chip h-8 shrink-0 text-xs"
+                    onClick={() => {
+                      document.getElementById(`linha-${s.index}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                      // No comando, a seção vai também para a tela de toda a banda.
+                      if (setlist?.live?.isLeader && setlist.live.stage) setlist.live.onSection(s.index)
+                    }}
+                  >
+                    {s.label}
+                  </button>
+                ))}
+              </nav>
+            )
+          )}
+        </header>
+      )}
+
+      {focus && (
+        <button
+          className={clsx(
+            'fixed right-3 z-40 flex h-9 items-center gap-1.5 rounded-full border border-border bg-surface/80 px-3 text-xs font-semibold text-muted shadow-lg shadow-black/30 backdrop-blur hover:text-text',
+            // Abaixo da faixa do Modo Palco, quando ela aparece.
+            setlist?.live ? 'top-[calc(env(safe-area-inset-top)+3.5rem)]' : 'top-[max(0.75rem,env(safe-area-inset-top))]',
+          )}
+          onClick={() => setFocus(false)}
+          aria-label="Sair do modo foco"
+        >
+          <Minimize2 className="size-3.5" /> Sair do foco
+        </button>
+      )}
+
+      <div className={clsx('mx-auto max-w-4xl px-4', focus ? 'pt-14' : 'pt-4')}>
+        {!focus && (
+          <>
+            {/* Destaque: capa, nome e as informações para tocar */}
+            <section className="relative mb-5 overflow-hidden rounded-3xl border border-border bg-surface">
+              <CoverGlow song={song} />
+              <div className="relative flex items-center gap-4 p-4 sm:gap-6 sm:p-6">
+                <SongCover
+                  song={song}
+                  hd
+                  className={clsx('rounded-2xl shadow-2xl shadow-black/50', setlist ? 'size-20 sm:size-28' : 'size-24 sm:size-36')}
+                />
+                <div className="min-w-0 flex-1">
+                  {setlist?.block ? (
+                    // No show: em que bloco a banda está (com a cor do bloco)
+                    <p
+                      className="flex flex-wrap items-center gap-x-1.5 text-[11px] font-bold tracking-widest uppercase"
+                      style={{ color: setlist.block.color }}
+                    >
+                      {setlist.block.name}
+                      <span className="font-semibold tracking-normal text-muted normal-case">
+                        {[setlist.block.subtitle, `${setlist.block.song} de ${setlist.block.songs}`].filter(Boolean).join(' · ')}
+                      </span>
+                    </p>
+                  ) : (
+                    <p className="text-[11px] font-bold tracking-widest text-muted uppercase">{song.style ?? 'Música'}</p>
+                  )}
+                  <h2 className="mt-0.5 line-clamp-2 text-xl leading-tight font-extrabold tracking-tight break-words sm:text-3xl">
+                    {song.title}
+                  </h2>
+                  <p className="mt-0.5 truncate text-sm text-muted">
+                    {[song.artist, song.composer && song.composer !== song.artist ? song.composer : null].filter(Boolean).join(' · ')}
+                  </p>
+                  <div className="mt-3 flex flex-wrap gap-1.5 text-xs">
+                    {setlist?.itemKey && (
+                      <HeroChip>
+                        Repertório <b className="font-mono text-chord">{setlist.itemKey}</b>
+                      </HeroChip>
+                    )}
+                    {original && (
+                      <HeroChip>
+                        Original <b className="font-mono">{spellKey(original, accidentals)}</b>
+                      </HeroChip>
+                    )}
+                    {song.personalKey && !setlist && (
+                      <HeroChip>
+                        Meu tom <b className="font-mono text-chord">{song.personalKey}</b>
+                      </HeroChip>
+                    )}
+                    {song.bpm && <HeroChip>{song.bpm} BPM</HeroChip>}
+                    {song.timeSignature && <HeroChip>{song.timeSignature}</HeroChip>}
+                    {setlist?.liveKey && (
+                      <HeroChip>
+                        <span className="size-1.5 rounded-full bg-danger" /> Ao vivo <b className="font-mono text-chord">{setlist.liveKey}</b>
+                      </HeroChip>
+                    )}
+                  </div>
+                  <UsageBadge usagePeople={song.usagePeople} usageSetlists={song.usageSetlists} className="mt-2.5 text-xs font-medium" />
+                </div>
+              </div>
+            </section>
+            {song.referenceUrl && (
+              <div className="-mt-1 mb-4">
+                <ReferencePlayer url={song.referenceUrl} title={song.title} />
+              </div>
+            )}
+            {setlist?.itemNotes && (
+              <p className="mb-3 rounded-xl border-l-4 border-sec-intro bg-sec-intro/10 px-3 py-2 text-sm">
+                <b>Neste repertório:</b> {setlist.itemNotes}
+              </p>
+            )}
+            {song.notes && <p className="mb-4 rounded-xl border-l-4 border-accent bg-accent/10 px-3 py-2 text-sm">{song.notes}</p>}
+            {hideLyrics && (
+              <p className="mb-4 rounded-xl bg-surface-2 px-3 py-2 text-sm text-muted">
+                A letra desta música não está autorizada para exibição. Mostrando apenas acordes e seções.
+              </p>
+            )}
+
+            {/* Alternador de visualização e ação de partitura */}
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+              {song.scores && song.scores.length > 0 ? (
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    className={clsx(
+                      'chip h-9 px-4 text-xs font-semibold sm:text-sm flex items-center gap-1.5 transition',
+                      viewMode === 'chord' ? 'chip-on' : 'hover:border-accent/40',
+                    )}
+                    onClick={() => setViewMode('chord')}
+                  >
+                    Cifra
+                  </button>
+                  <button
+                    type="button"
+                    className={clsx(
+                      'chip h-9 px-4 text-xs font-semibold sm:text-sm flex items-center gap-1.5 transition',
+                      viewMode === 'score' ? 'chip-on' : 'hover:border-accent/40',
+                    )}
+                    onClick={() => setViewMode('score')}
+                  >
+                    <FileText className="size-4" />
+                    Ver partitura {song.scores.length > 1 ? `(${song.scores.length})` : ''}
+                  </button>
+                </div>
+              ) : null}
+
+              {song.canEdit && !setlist && (
+                <button
+                  type="button"
+                  className={clsx(
+                    'btn-ghost h-8 px-2.5 text-xs text-muted hover:text-text flex items-center gap-1.5',
+                    song.scores?.length ? 'ml-auto' : '',
+                  )}
+                  onClick={() => setUploadScoreOpen(true)}
+                >
+                  <FileUp className="size-3.5 text-accent" />
+                  {song.scores?.length ? 'Adicionar outra parte' : 'Anexar partitura (.gp, .gp5 ou PDF)'}
+                </button>
+              )}
+              {/* Sala de ensaio: tocar junto com o vídeo ou o áudio guia (velocidade, tom e loop). */}
+              <Link
+                to={`/musicas/${song.id}/ensaio`}
+                className="btn-ghost flex h-8 items-center gap-1.5 px-2.5 text-xs text-muted hover:text-text"
+              >
+                <Headphones className="size-3.5 text-accent" /> Sala de ensaio
+              </Link>
+            </div>
+          </>
+        )}
 
         {viewMode === 'score' && song.scores && song.scores.length > 0 ? (
           <div className="py-2">
@@ -682,7 +749,7 @@ export function SongViewer({ songId, setlist }: { songId: string; setlist?: Setl
           </div>
         ) : (
           <>
-            {song.canEdit && song.content.trim() && !markMode && !singer && (
+            {song.canEdit && song.content.trim() && !markMode && !singer && !focus && (
               <Link
                 to={alignUrl}
                 className="mb-3 inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs font-medium text-muted hover:bg-surface-2 hover:text-text"
@@ -690,7 +757,7 @@ export function SongViewer({ songId, setlist }: { songId: string; setlist?: Setl
                 <MoveHorizontal className="size-3.5" /> Ajustar posição dos acordes
               </Link>
             )}
-            {songChords.length > 0 && prefs.showChords && !singer && (
+            {songChords.length > 0 && prefs.showChords && !singer && !focus && (
               <SongChords
                 chords={songChords}
                 open={prefs.chordStrip}
@@ -857,10 +924,16 @@ export function SongViewer({ songId, setlist }: { songId: string; setlist?: Setl
               onChange={(e) => setPrefs((p) => ({ ...p, wrap: e.target.checked }))}
             />
           </label>
-          <button className="btn-ghost mt-2 w-full" onClick={toggleFullscreen}>
-            {fullscreen ? <Shrink className="size-4" /> : <Expand className="size-4" />}
-            {fullscreen ? 'Sair da tela cheia' : 'Tela cheia'}
-          </button>
+          <div className="mt-2 grid grid-cols-2 gap-2">
+            <button className="btn-ghost" onClick={() => setFocus(!focus)}>
+              {focus ? <Minimize2 className="size-4" /> : <Maximize2 className="size-4" />}
+              {focus ? 'Sair do foco' : 'Modo foco'}
+            </button>
+            <button className="btn-ghost" onClick={toggleFullscreen}>
+              {fullscreen ? <Shrink className="size-4" /> : <Expand className="size-4" />}
+              {fullscreen ? 'Sair da tela cheia' : 'Tela cheia'}
+            </button>
+          </div>
           <div className="mt-2 grid grid-cols-2 gap-2">
             <button
               className="btn-ghost"
