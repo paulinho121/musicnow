@@ -29,6 +29,7 @@ import {
   FileDown,
   FileText,
   FileUp,
+  House,
   ListMusic,
   ListPlus,
   Lock,
@@ -452,6 +453,9 @@ export function SongViewer({ songId, setlist }: { songId: string; setlist?: Setl
         >
           {setlist && (
             <div className="flex items-center gap-1 border-b border-border bg-surface/60 px-2 py-1">
+              <Link to="/inicio" className="btn-icon size-9 shrink-0 border-transparent bg-transparent" aria-label="Ir para o início">
+                <House className="size-4" />
+              </Link>
               <button
                 className="btn-icon size-9 shrink-0 border-transparent bg-transparent"
                 onClick={setlist.onExit}
@@ -479,6 +483,16 @@ export function SongViewer({ songId, setlist }: { songId: string; setlist?: Setl
             >
               <ArrowLeft className="size-5" />
             </button>
+            {!setlist && (
+              <Link
+                to="/inicio"
+                className="btn-icon hidden shrink-0 border-transparent bg-transparent sm:inline-flex"
+                aria-label="Ir para o início"
+                title="Ir para o início"
+              >
+                <House className="size-5" />
+              </Link>
+            )}
             <div className="min-w-0 flex-1">
               <h1 className="line-clamp-2 text-base leading-tight font-bold break-words sm:truncate md:text-lg">{song.title}</h1>
               <p className="truncate text-sm text-muted">{song.artist}</p>
@@ -1080,6 +1094,9 @@ export function SongViewer({ songId, setlist }: { songId: string; setlist?: Setl
 
       <Sheet open={moreOpen} onClose={() => setMoreOpen(false)} title={song.title}>
         <div className="-mx-2 flex flex-col">
+          <Link to="/inicio" className="flex h-12 items-center gap-3 rounded-xl px-2 hover:bg-surface-2">
+            <House className="size-5 text-muted" /> Ir para o início
+          </Link>
           <button
             className="flex h-12 items-center gap-3 rounded-xl px-2 text-left hover:bg-surface-2"
             onClick={() => {
