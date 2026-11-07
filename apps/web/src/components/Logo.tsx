@@ -6,13 +6,18 @@ const SIZES = {
   xl: { text: 'text-4xl sm:text-5xl', mark: 'h-16 sm:h-20' },
 }
 
-export function Logo({ size = 'md' }: { size?: keyof typeof SIZES }) {
+/** `compact`: só o símbolo (barra lateral recolhida). */
+export function Logo({ size = 'md', compact = false }: { size?: keyof typeof SIZES; compact?: boolean }) {
   return (
     <span className={clsx('inline-flex items-center gap-3 font-extrabold tracking-tight', SIZES[size].text)}>
       <img src="/logo-mark.svg" alt="" className={clsx('w-auto shrink-0', SIZES[size].mark)} />
-      <span>
-        Ensaio <span className="text-accent">Fácil</span>
-      </span>
+      {compact ? (
+        <span className="sr-only">Ensaio Fácil</span>
+      ) : (
+        <span>
+          Ensaio <span className="text-accent">Fácil</span>
+        </span>
+      )}
     </span>
   )
 }

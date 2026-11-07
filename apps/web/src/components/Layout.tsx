@@ -1,10 +1,11 @@
 import clsx from 'clsx'
-import { CalendarDays, Gauge, Home, LifeBuoy, ListMusic, Music2, ShieldCheck, UserRound, Globe } from 'lucide-react'
+import { CalendarDays, Gauge, Home, LifeBuoy, ListMusic, Music2, PanelLeftClose, PanelLeftOpen, ShieldCheck, UserRound, Globe } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { Suspense, useEffect } from 'react'
 import { NavLink, Outlet } from 'react-router'
 import { redeemPendingCoupon } from '../lib/coupon'
 import { keys, useMe } from '../lib/queries'
+import { useLocalState } from '../lib/storage'
 import { usePageTracking } from '../lib/usePageTracking'
 import { Avatar } from './Avatar'
 import { BillingBanner } from './BillingNotice'
@@ -30,6 +31,9 @@ export function Layout() {
   const { data: me } = useMe()
   const qc = useQueryClient()
   const toast = useToast()
+  // Barra lateral recolhida (só os ícones): a escolha fica lembrada neste navegador.
+  const [sidebar, setSidebar] = useLocalState('ef-sidebar', { collapsed: false })
+  const collapsed = sidebar.collapsed
   // Cupom de parceiro guardado (link /p/luiz ou cadastro): usa assim que a pessoa entra no app.
   useEffect(() => {
     redeemPendingCoupon().then((r) => {
@@ -44,26 +48,46 @@ export function Layout() {
 
   return (
     <div className="min-h-dvh md:flex">
-      <aside className="sticky top-0 hidden h-dvh w-60 shrink-0 flex-col gap-1 border-r border-border p-4 md:flex">
-        <div className="mb-6 px-2 pt-2">
-          <Logo />
+      <aside
+        className={clsx(
+          'sticky top-0 hidden h-dvh shrink-0 flex-col gap-1 border-r border-border py-4 transition-[width] duration-200 md:flex',
+          collapsed ? 'w-[4.5rem] px-3' : 'w-60 px-4',
+        )}
+      >
+        <div className={clsx('mb-6 pt-2', collapsed ? 'flex justify-center' : 'px-2')}>
+          <Logo compact={collapsed} />
         </div>
         {navItems.map(({ to, label, icon: Icon }) => (
           <NavLink
             key={to}
             to={to}
+            title={collapsed ? label : undefined}
+            aria-label={collapsed ? label : undefined}
             className={({ isActive }) =>
               clsx(
-                'flex h-11 items-center gap-3 rounded-xl px-3 text-sm font-medium transition',
+                'flex h-11 items-center gap-3 rounded-xl text-sm font-medium transition',
+                collapsed ? 'justify-center' : 'px-3',
                 isActive ? 'bg-accent/15 text-accent' : 'text-muted hover:bg-surface hover:text-text',
               )
             }
           >
             {/* Perfil: a foto da pessoa no lugar do ícone, quando ela tem foto. */}
-            {to === '/perfil' && me?.image ? <Avatar name={me.name} image={me.image} className="size-5 text-[10px]" /> : <Icon className="size-5" />}
-            {label}
+            {to === '/perfil' && me?.image ? <Avatar name={me.name} image={me.image} className="size-5 text-[10px]" /> : <Icon className="size-5 shrink-0" />}
+            {!collapsed && label}
           </NavLink>
         ))}
+        <button
+          className={clsx(
+            'mt-auto flex h-11 items-center gap-3 rounded-xl text-sm font-medium text-muted transition hover:bg-surface hover:text-text',
+            collapsed ? 'justify-center' : 'px-3',
+          )}
+          onClick={() => setSidebar({ collapsed: !collapsed })}
+          aria-label={collapsed ? 'Abrir o menu' : 'Recolher o menu'}
+          title={collapsed ? 'Abrir o menu' : 'Recolher o menu'}
+        >
+          {collapsed ? <PanelLeftOpen className="size-5 shrink-0" /> : <PanelLeftClose className="size-5 shrink-0" />}
+          {!collapsed && 'Recolher'}
+        </button>
       </aside>
 
       <main className="mx-auto w-full min-w-0 max-w-4xl flex-1 px-4 pt-5 pb-28 md:px-8 md:pt-8 md:pb-10">
