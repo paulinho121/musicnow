@@ -5,6 +5,7 @@ import { db, schema } from '../db'
 import { isAdminUser, requireUser, validate, type AppEnv } from '../http'
 import { canViewSong, isFavoriteExpr, songListColumns } from './songs'
 import { billingSummary } from '../billing'
+import { resetAccountData } from '../account-reset'
 
 const { user, profile, userInstrument, song, songUserState, favorite, setlist, setlistMember, setlistItem } = schema
 
@@ -90,6 +91,12 @@ export const meRoutes = new Hono<AppEnv>()
       }
     })
     return c.json(await loadMe(uid))
+  })
+
+  // Zerar os dados (configuração de fábrica): pede a palavra de confirmação.
+  .post('/reset', validate('json', z.object({ confirm: z.literal('ZERAR', { message: 'Digite ZERAR para confirmar.' }) })), async (c) => {
+    await resetAccountData(c.var.user.id)
+    return c.json({ ok: true })
   })
 
   .get('/dashboard', async (c) => {

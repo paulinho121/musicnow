@@ -6,6 +6,7 @@ import { type FormEvent, useEffect, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router'
 import { Avatar } from '../components/Avatar'
 import { DeleteAccount } from '../components/DeleteAccount'
+import { ResetAccount } from '../components/ResetAccount'
 import { ErrorState, PageSpinner, useToast } from '../components/ui'
 import { logout as endSession } from '../lib/auth'
 import { useAvatar } from '../lib/avatar'
@@ -272,6 +273,7 @@ export function Profile() {
         </button>
       </div>
 
+      {!onboarding && <ResetAccount />}
       {!onboarding && <DeleteAccount />}
     </form>
   )
