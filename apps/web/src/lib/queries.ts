@@ -80,6 +80,19 @@ export function useSaveSong(id?: string) {
   })
 }
 
+/** Excluir várias músicas da pessoa; as que estão em repertório ficam (voltam em `kept`). */
+export function useBulkDeleteSongs() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (ids: string[]) =>
+      api<{ deleted: number; kept: { id: string; title: string }[] }>('/songs/bulk-delete', { method: 'POST', json: { ids } }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['songs'] })
+      qc.invalidateQueries({ queryKey: keys.dashboard })
+    },
+  })
+}
+
 export function useDeleteSong() {
   const qc = useQueryClient()
   return useMutation({

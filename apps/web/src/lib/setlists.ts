@@ -93,6 +93,20 @@ export const useUpdateSetlist = (id: string) =>
 export const useArchiveSetlist = (id: string) =>
   useSetlistMutation(id, (archived: boolean) => api(`/setlists/${id}/archive`, { method: 'POST', json: { archived } }))
 
+/** Excluir vários repertórios (só os que a pessoa lidera); com `withSongs`, as músicas dela também. */
+export function useBulkDeleteSetlists() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (input: { ids: string[]; withSongs: boolean }) =>
+      api<{ setlists: number; songs: number; kept: { id: string; title: string }[] }>('/setlists/bulk-delete', { method: 'POST', json: input }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: setlistKeys.all })
+      qc.invalidateQueries({ queryKey: ['songs'] })
+      qc.invalidateQueries({ queryKey: songKeys.dashboard })
+    },
+  })
+}
+
 export const useDeleteSetlist = (id: string) => useSetlistMutation(id, () => api(`/setlists/${id}`, { method: 'DELETE' }))
 
 export const useDuplicateSetlist = (id: string) =>

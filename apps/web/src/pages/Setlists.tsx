@@ -4,14 +4,17 @@ import {
   Archive,
   CalendarCheck,
   CalendarDays,
+  CheckSquare,
   ChevronDown,
   KeyRound,
   ListMusic,
   ListPlus,
+  Loader2,
   MapPin,
   Music2,
   Plus,
   Search,
+  Trash2,
   X,
 } from 'lucide-react'
 import { type FormEvent, useMemo, useState } from 'react'
@@ -19,9 +22,11 @@ import { Link, useNavigate } from 'react-router'
 import { Avatar } from '../components/Avatar'
 import { type CoverSong, SongCover } from '../components/SongCover'
 import { PlaylistImport } from '../components/setlist/PlaylistImport'
-import { EmptyState, ErrorState, Skeleton } from '../components/ui'
+import { SelectBox, SelectionBar } from '../components/SelectionBar'
+import { Sheet } from '../components/Sheet'
+import { EmptyState, ErrorState, Skeleton, useToast } from '../components/ui'
 import { useLocalState } from '../lib/storage'
-import { useSetlists } from '../lib/setlists'
+import { useBulkDeleteSetlists, useSetlists } from '../lib/setlists'
 import type { SetlistSummary } from '../lib/types'
 
 const timeFmt = new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', minute: '2-digit' })
@@ -86,6 +91,44 @@ export function Setlists() {
   const setStatus = (v: StatusFilter) => setView((x) => ({ ...x, status: v }))
   const setSort = (v: Sort) => setView((x) => ({ ...x, sort: v }))
   const navigate = useNavigate()
+  const toast = useToast()
+
+  // Seleção para excluir vários: só os repertórios que a pessoa lidera.
+  const [selecting, setSelecting] = useState(false)
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [confirmOpen, setConfirmOpen] = useState(false)
+  const [withSongs, setWithSongs] = useState(false)
+  const bulkDelete = useBulkDeleteSetlists()
+  const toggle = (id: string) =>
+    setSelected((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  const stopSelecting = () => {
+    setSelecting(false)
+    setSelected(new Set())
+  }
+  const select = (s: SetlistSummary) =>
+    selecting ? { checked: selected.has(s.id), disabled: s.role !== 'owner', onToggle: () => toggle(s.id) } : undefined
+  const deleteSelected = () =>
+    bulkDelete.mutate(
+      { ids: [...selected], withSongs },
+      {
+        onSuccess: ({ setlists, songs, kept }) => {
+          setConfirmOpen(false)
+          setWithSongs(false)
+          stopSelecting()
+          let msg = `${setlists} ${setlists === 1 ? 'repertório excluído' : 'repertórios excluídos'}`
+          if (withSongs) msg += ` e ${songs} ${songs === 1 ? 'música' : 'músicas'}`
+          msg += '.'
+          if (kept.length) msg += ` ${kept.length === 1 ? 'Ficou 1 música, que está' : `Ficaram ${kept.length} músicas, que estão`} em outro repertório.`
+          toast(msg)
+        },
+        onError: (e) => toast(e.message, 'error'),
+      },
+    )
 
   const join = (e: FormEvent) => {
     e.preventDefault()
@@ -131,6 +174,9 @@ export function Setlists() {
   }, [all])
   const totalUpcoming = all.filter((s) => !s.archived && s.eventDate && new Date(s.eventDate).getTime() >= now).length
   const filtering = q.trim() !== '' || status !== 'todos'
+  const archivedCount = all.filter((s) => s.archived).length
+  // Os que dá para selecionar na tela (os arquivados só quando a seção está aberta).
+  const selectable = [...active, ...(showArchived ? archived : [])].filter((s) => s.role === 'owner').map((s) => s.id)
 
   return (
     <div className="space-y-5">
@@ -145,6 +191,11 @@ export function Setlists() {
           )}
         </div>
         <div className="flex gap-2">
+          {counts.todos + archivedCount > 0 && !selecting && (
+            <button type="button" className="btn-ghost" onClick={() => setSelecting(true)} title="Selecionar repertórios para excluir">
+              <CheckSquare className="size-4" /> <span className="hidden sm:inline">Selecionar</span>
+            </button>
+          )}
           <button
             type="button"
             className="btn-ghost"
@@ -262,7 +313,7 @@ export function Setlists() {
               )}
               <div className="grid gap-3 xl:grid-cols-2">
                 {g.items.map((s) => (
-                  <SetlistCard key={s.id} s={s} />
+                  <SetlistCard key={s.id} s={s} select={select(s)} />
                 ))}
               </div>
             </section>
@@ -280,7 +331,7 @@ export function Setlists() {
               {showArchived && (
                 <div className="mt-3 grid gap-3 opacity-80 xl:grid-cols-2">
                   {archived.map((s) => (
-                    <SetlistCard key={s.id} s={s} />
+                    <SetlistCard key={s.id} s={s} select={select(s)} />
                   ))}
                 </div>
               )}
@@ -313,6 +364,55 @@ export function Setlists() {
           </button>
         )}
       </div>
+
+      {selecting && (
+        <>
+          {/* Espaço para a barra de seleção não cobrir o último repertório. */}
+          <div className="h-20" />
+          <SelectionBar
+            count={selected.size}
+            total={selectable.length}
+            onAll={() => setSelected(selected.size === selectable.length ? new Set() : new Set(selectable))}
+            onCancel={stopSelecting}
+            onDelete={() => setConfirmOpen(true)}
+          />
+        </>
+      )}
+
+      <Sheet
+        open={confirmOpen}
+        onClose={() => setConfirmOpen(false)}
+        title={`Excluir ${selected.size} ${selected.size === 1 ? 'repertório' : 'repertórios'}?`}
+      >
+        <div className="space-y-4">
+          <ul className="list-disc space-y-1.5 pl-5 text-sm">
+            <li>Os repertórios somem também para os músicos convidados, com escala, ensaios e marcações da banda. Não dá para desfazer.</li>
+          </ul>
+          <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-border p-3">
+            <input
+              type="checkbox"
+              className="mt-0.5 size-5 shrink-0 accent-[var(--accent)]"
+              checked={withSongs}
+              onChange={(e) => setWithSongs(e.target.checked)}
+            />
+            <span className="text-sm">
+              <b>Excluir também as músicas</b> desses repertórios
+              <span className="mt-0.5 block text-xs text-muted">
+                Só as que você cadastrou. Músicas que estão em outro repertório continuam na sua biblioteca.
+              </span>
+            </span>
+          </label>
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <button type="button" className="btn-ghost" onClick={() => setConfirmOpen(false)}>
+              Cancelar
+            </button>
+            <button type="button" className="btn bg-danger text-white hover:brightness-110" disabled={bulkDelete.isPending} onClick={deleteSelected}>
+              {bulkDelete.isPending ? <Loader2 className="size-4 animate-spin" /> : <Trash2 className="size-4" />}
+              {withSongs ? 'Excluir repertórios e músicas' : 'Excluir'}
+            </button>
+          </div>
+        </div>
+      </Sheet>
     </div>
   )
 }
@@ -346,19 +446,28 @@ export function DateBadge({ iso }: { iso: string }) {
   )
 }
 
-function SetlistCard({ s }: { s: SetlistSummary }) {
+type CardSelect = { checked: boolean; disabled: boolean; onToggle: () => void }
+
+/** `select`: modo de seleção (o cartão vira uma caixinha de marcar; só os que a pessoa lidera). */
+function SetlistCard({ s, select }: { s: SetlistSummary; select?: CardSelect }) {
   const when = s.eventDate ? whenLabel(s.eventDate) : null
   const soon = s.eventDate ? daysUntil(s.eventDate) : null
   const extra = s.memberCount + 1 - s.people.length
   const pending = s.schedule?.mine === 'pendente'
-  return (
-    <Link
-      to={`/repertorios/${s.id}`}
-      className={clsx(
-        'card group flex gap-4 p-3 transition hover:-translate-y-0.5 hover:border-accent/50 sm:p-4',
-        pending && 'border-accent/60',
+  const className = clsx(
+    'card group flex w-full gap-4 p-3 text-left transition sm:p-4',
+    select
+      ? clsx(select.checked && 'border-accent bg-accent/10', select.disabled ? 'cursor-not-allowed opacity-50' : 'hover:border-accent/50')
+      : 'hover:-translate-y-0.5 hover:border-accent/50',
+    !select && pending && 'border-accent/60',
+  )
+  const body = (
+    <>
+      {select && (
+        <span className="self-center">
+          <SelectBox checked={select.checked} disabled={select.disabled} />
+        </span>
       )}
-    >
       <CoverMosaic songs={s.songs} />
       <div className="flex min-w-0 flex-1 flex-col">
         <div className="flex items-start justify-between gap-2">
@@ -425,6 +534,24 @@ function SetlistCard({ s }: { s: SetlistSummary }) {
           </span>
         </div>
       </div>
+    </>
+  )
+  if (select)
+    return (
+      <button
+        type="button"
+        className={className}
+        onClick={select.onToggle}
+        disabled={select.disabled}
+        aria-pressed={select.checked}
+        title={select.disabled ? 'Só quem lidera o repertório pode excluí-lo' : undefined}
+      >
+        {body}
+      </button>
+    )
+  return (
+    <Link to={`/repertorios/${s.id}`} className={className}>
+      {body}
     </Link>
   )
 }

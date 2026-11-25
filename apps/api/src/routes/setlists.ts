@@ -28,7 +28,7 @@ import {
   totalConnections,
   updateStage,
 } from '../realtime'
-import { canViewSong } from './songs'
+import { canViewSong, deleteOwnSongs } from './songs'
 
 const { setlist, setlistItem, setlistBlock, setlistMember, setlistSuggestion, invite, song, user, userInstrument, songUserState, changeLog } =
   schema
@@ -530,6 +530,38 @@ export const setlistsRoutes = new Hono<AppEnv>()
         await touch(tx, id, uid, archived ? 'archive' : 'unarchive')
       })
       return c.json({ archived })
+    },
+  )
+
+  // Excluir vários (seleção na lista): só os que a pessoa lidera. Com `withSongs`, as músicas
+  // dela que estavam neles também saem, menos as que seguem em outro repertório.
+  .post(
+    '/bulk-delete',
+    validate('json', z.object({ ids: z.array(z.string().uuid()).min(1).max(200), withSongs: z.boolean().default(false) })),
+    async (c) => {
+      const uid = c.var.user.id
+      const { ids, withSongs } = c.req.valid('json')
+      const own = (
+        await db
+          .select({ id: setlist.id })
+          .from(setlist)
+          .where(and(eq(setlist.ownerId, uid), inArray(setlist.id, ids)))
+      ).map((r) => r.id)
+      if (!own.length) return c.json({ setlists: 0, songs: 0, kept: [] })
+      const songIds = withSongs
+        ? (
+            await db
+              .selectDistinct({ id: setlistItem.songId })
+              .from(setlistItem)
+              .innerJoin(song, eq(song.id, setlistItem.songId))
+              .where(and(inArray(setlistItem.setlistId, own), eq(song.ownerId, uid)))
+          ).map((r) => r.id)
+        : []
+      await db.delete(setlist).where(inArray(setlist.id, own))
+      // Quem estava com o repertório aberto (Modo Palco) é avisado, como na exclusão de um só.
+      for (const id of own) closeRoom(id)
+      const { deleted, kept } = await deleteOwnSongs(uid, songIds)
+      return c.json({ setlists: own.length, songs: deleted, kept })
     },
   )
 

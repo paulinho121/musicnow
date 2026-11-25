@@ -1,5 +1,5 @@
 import { atLeast, guessKey, isChord, isShortMusicLink, normalizeSearch, parseMusicLink, PUBLIC_LICENSES, stripLyrics, cleanSheetText, youtubeId } from '@ensaio/shared'
-import { and, asc, desc, eq, exists, ilike, isNull, or, sql, type SQL } from 'drizzle-orm'
+import { and, asc, desc, eq, exists, ilike, inArray, isNull, or, sql, type SQL } from 'drizzle-orm'
 import { Hono } from 'hono'
 import { HTTPException } from 'hono/http-exception'
 import { randomInt } from 'node:crypto'
@@ -203,6 +203,36 @@ export const sharedSongRoutes = new Hono<AppEnv>()
     if (row.ownerId !== uid) await db.insert(songShare).values({ songId: row.id, userId: uid }).onConflictDoNothing()
     return c.json({ songId: row.id }, 201)
   })
+
+/**
+ * Exclui as músicas da pessoa (só as dela, entre `ids`). As que ainda estão em algum
+ * repertório ficam, para não quebrar o show: voltam em `kept`.
+ */
+export async function deleteOwnSongs(uid: string, ids: string[]) {
+  if (!ids.length) return { deleted: 0, kept: [] as { id: string; title: string }[] }
+  const own = await db
+    .select({ id: song.id, title: song.title })
+    .from(song)
+    .where(and(eq(song.ownerId, uid), inArray(song.id, ids)))
+  if (!own.length) return { deleted: 0, kept: [] }
+  const used = new Set(
+    (
+      await db
+        .selectDistinct({ id: setlistItem.songId })
+        .from(setlistItem)
+        .where(inArray(setlistItem.songId, own.map((r) => r.id)))
+    ).map((r) => r.id),
+  )
+  const kept = own.filter((r) => used.has(r.id))
+  const gone = own.filter((r) => !used.has(r.id)).map((r) => r.id)
+  if (gone.length) {
+    const scoreIds = (await Promise.all(gone.map(scoresOfSong))).flat().map((sc) => sc.id)
+    await db.delete(song).where(inArray(song.id, gone))
+    await removeScoreFiles(scoreIds)
+    await db.insert(changeLog).values(gone.map((id) => ({ entityType: 'song' as const, entityId: id, userId: uid, action: 'delete' as const })))
+  }
+  return { deleted: gone.length, kept }
+}
 
 export const songsRoutes = new Hono<AppEnv>()
   .use(requireUser)
@@ -488,6 +518,11 @@ export const songsRoutes = new Hono<AppEnv>()
     }
     return c.json({ id })
   })
+
+  // Excluir várias de uma vez (seleção na lista de músicas).
+  .post('/bulk-delete', validate('json', z.object({ ids: z.array(z.string().uuid()).min(1).max(500) })), async (c) =>
+    c.json(await deleteOwnSongs(c.var.user.id, c.req.valid('json').ids)),
+  )
 
   .delete('/:id', validate('param', z.object({ id: z.string().uuid() })), async (c) => {
     const uid = c.var.user.id

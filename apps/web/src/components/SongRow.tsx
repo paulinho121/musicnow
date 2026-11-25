@@ -3,11 +3,37 @@ import { Lock, Play, Star } from 'lucide-react'
 import { Link } from 'react-router'
 import { useToggleFavorite } from '../lib/queries'
 import type { SongListItem } from '../lib/types'
+import { SelectBox } from './SelectionBar'
 import { SongCover } from './SongCover'
 import { UsageBadge } from './UsageBadge'
 
-export function SongRow({ song }: { song: SongListItem }) {
+/** `select`: modo de seleção da lista (a linha vira uma caixinha de marcar). */
+export function SongRow({ song, select }: { song: SongListItem; select?: { checked: boolean; disabled: boolean; onToggle: () => void } }) {
   const fav = useToggleFavorite()
+  if (select)
+    return (
+      <button
+        type="button"
+        className={clsx(
+          'flex w-full items-center gap-3 border-b border-border py-2.5 pr-3 pl-3 text-left transition last:border-b-0 sm:pl-4',
+          select.checked ? 'bg-accent/10' : 'hover:bg-surface-2/60',
+          select.disabled && 'cursor-not-allowed opacity-50',
+        )}
+        onClick={select.onToggle}
+        disabled={select.disabled}
+        aria-pressed={select.checked}
+        title={select.disabled ? 'Só dá para excluir as músicas que você cadastrou' : undefined}
+      >
+        <SelectBox checked={select.checked} disabled={select.disabled} />
+        <SongCover song={song} className="size-12 rounded-lg shadow-md shadow-black/30" />
+        <span className="min-w-0 flex-1">
+          <span className="line-clamp-2 block leading-snug font-semibold break-words sm:truncate">{song.title}</span>
+          <span className="block truncate text-sm text-muted">
+            {select.disabled ? 'De outra pessoa' : [song.artist, song.style].filter(Boolean).join(' · ')}
+          </span>
+        </span>
+      </button>
+    )
   return (
     <div className="group flex items-center gap-1 border-b border-border transition last:border-b-0 hover:bg-surface-2/60">
       <Link to={`/musicas/${song.id}`} className="flex min-w-0 flex-1 items-center gap-3 py-2.5 pl-3 sm:pl-4">
