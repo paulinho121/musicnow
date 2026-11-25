@@ -376,3 +376,15 @@ describe('texto colado com caracteres invisíveis', () => {
     expect(isChordLine(cleanSheetText('\u200BB7(4/9)\u2009E7'))).toBe(true)
   })
 })
+
+describe('cifra colada codificada como link', () => {
+  it('decodifica e reconhece seção e acordes', () => {
+    const colado = 'tom:%20%20D%0A%0A%E2%80%8B%5BIntro%5D%20D%20%20G%0A%0AD%20%20%20%20%20%20Bm%0AToda%20menina%20baiana'
+    expect(cleanSheetText(colado)).toBe('tom:  D\n\n[Intro] D  G\n\nD      Bm\nToda menina baiana')
+    expect(parseSheet(colado).map((l) => l.kind)).toEqual(['lyrics', 'blank', 'section', 'blank', 'chords', 'lyrics'])
+  })
+  it('não mexe em texto normal com %', () => {
+    const normal = 'C   G\nCem por cento %0A\nAm  F\nÉ 100% seu'
+    expect(cleanSheetText(normal)).toBe(normal)
+  })
+})

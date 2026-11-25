@@ -187,7 +187,7 @@ const NOISE_RE = /^(\||\|\||\(|\)|x\d+|\d+x|%|-+|\/+|\.+|:|x|×|n\.?c\.?|\d\.)$/
  * Sem isso, uma linha de acordes com um caractere invisível vira texto comum.
  */
 export function cleanSheetText(text: string): string {
-  return text
+  return decodeUrlText(text)
     .replace(/\r\n?|[\u2028\u2029\u0085]/g, '\n')
     .replace(/[\u200B-\u200F\u202A-\u202E\u2060-\u2064\u2066-\u2069\uFEFF\u00AD\u180E]/g, '')
     .replace(/[\u00A0\u1680\u2000-\u200A\u202F\u205F\u3000]/g, ' ')
@@ -209,6 +209,30 @@ export function isChordLine(line: string): boolean {
     else if (!NOISE_RE.test(t) && !NOISE_RE.test(clean)) other++
   }
   return chords > 0 && other === 0
+}
+
+/**
+ * Cifra que chega codificada como link ("tom:%20D%0A%0A%5BIntro%5D…"): acontece ao copiar
+ * de alguns apps no celular. Só decodifica quando há quebras de linha codificadas (%0A) e
+ * poucas quebras de verdade, para não mexer num "100%" escrito na letra.
+ */
+function decodeUrlText(text: string): string {
+  const encodedBreaks = text.match(/%0[AD]/gi)?.length ?? 0
+  if (encodedBreaks < 2 || encodedBreaks <= (text.match(/\n/g)?.length ?? 0)) return text
+  // Codificação de formulário: espaço vira "+" (só quando não há %20 nem espaço de verdade).
+  const t = !/%20| /i.test(text) ? text.replace(/\+/g, ' ') : text
+  try {
+    return decodeURIComponent(t)
+  } catch {
+    // "%" solto no meio: decodifica só as sequências válidas.
+    return t.replace(/(%[0-9a-f]{2})+/gi, (m) => {
+      try {
+        return decodeURIComponent(m)
+      } catch {
+        return m
+      }
+    })
+  }
 }
 
 /** Transpõe apenas os acordes de uma linha, preservando o alinhamento das colunas. */
